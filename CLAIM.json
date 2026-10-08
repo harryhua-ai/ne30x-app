@@ -5,9 +5,9 @@
  "github_principal": "harryhua-ai",
  "executor_id": "harryhua-ai",
  "claimed_at": "2026-10-08T02:19:37Z",
- "lease_expires_at": "2026-10-08T02:53:17Z",
+ "lease_expires_at": "2026-10-08T02:48:50Z",
  "execution_base": "83b880f75233baee5705b87bc25f771dffdc395b",
- "status": "active",
+ "status": "investigated",
  "branch": "agent/1/d9ff8c74",
  "heartbeat_at": "2026-10-08T02:47:17Z",
  "supersedes": null,
@@ -17,5 +17,6 @@
   "digest": "fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962",
   "release": "v1.1.2",
   "source_sha": "cfb522a"
- }
+ },
+ "note": "\u8c03\u67e5\u5b8c\u6210\uff1a\u7ed3\u8bba=\u53ef\u884c\uff08\u6709\u6761\u4ef6\uff09\uff0c\u63a8\u8350 PSRAM RAM \u88c5\u8f7d\u3001\u5426\u5b9a Flash XIP\u3002\u5b8c\u6574\u8c03\u67e5\u62a5\u544a\uff08AC1-AC4 \u8bc1\u636e\u6620\u5c04\u3001\u5185\u5b58\u5e03\u5c40/\u542f\u52a8\u94fe/OTA \u94fe/ABI \u8bc1\u636e\u3001RAM vs XIP \u5bf9\u6bd4\u3001hello-app PoC \u8303\u56f4/\u9a8c\u6536/\u505c\u6b62\u6761\u4ef6\uff09\u89c1 Issue \u8bc4\u8bba https://github.com/harryhua-ai/ne30x-app/issues/1#issuecomment-6051137428 \u3002\u8bc1\u636e\u57fa\u7ebf\uff1ane301@counting de25a6f1 \u6e90\u7801 + \u672c\u5730 counting \u6784\u5efa map/size \u5b9e\u6d4b\u3002\u672a\u5b9e\u73b0\u4efb\u4f55\u52a0\u8f7d\u5668\u3001\u672a\u4fee\u6539 ne301\u3001\u672a\u70e7\u5199\u8bbe\u5907\u3002"
 }
