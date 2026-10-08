@@ -14,7 +14,7 @@
  "contract_digest": "90e8f2d5789ca09c7020fe44a3e68e15714925b0ae926447e3ed5d8af220f5c2",
  "candidate": {
   "branch": "agent/2/50117b15",
-  "sha": "e61860d35f27e856f820567eb327517c74cea70e",
+  "sha": "8c321abe8469ce3c0e0468c8a2df44abecfd16fe",
   "scope": {
    "pass": true,
    "paths": {
@@ -27,8 +27,19 @@
     "docs/evidence/build-evidence.md": "ALLOWED",
     "docs/evidence/device-evidence.md": "ALLOWED",
     "docs/evidence/device_session.log": "ALLOWED",
+    "docs/evidence/fs-manifests/README.md": "ALLOWED",
+    "docs/evidence/fs-manifests/device_apps_manifest.txt": "ALLOWED",
+    "docs/evidence/fs-manifests/device_final_apps.manifest": "ALLOWED",
+    "docs/evidence/fs-manifests/device_final_readback.manifest": "ALLOWED",
+    "docs/evidence/fs-manifests/device_state_before_full_write.manifest": "ALLOWED",
+    "docs/evidence/fs-manifests/injected_apps_manifest.txt": "ALLOWED",
+    "docs/evidence/fs-manifests/injected_v2.manifest": "ALLOWED",
+    "docs/evidence/fs-manifests/injected_v2_apps.manifest": "ALLOWED",
+    "docs/evidence/fs-manifests/pristine_backup.manifest": "ALLOWED",
+    "docs/evidence/fs-manifests/pristine_vs_injected.diff": "ALLOWED",
     "tests/run_build_checks.sh": "ALLOWED",
     "tools/fetch_abi_header.sh": "ALLOWED",
+    "tools/fs_manifest.c": "ALLOWED",
     "tools/make_bad_images.py": "ALLOWED",
     "tools/pack_app_image.py": "ALLOWED",
     "tools/validate_app_image.py": "ALLOWED"
@@ -36,12 +47,12 @@
    "violations": [],
    "main_attributed_paths": [],
    "counts": {
-    "ALLOWED": 14,
+    "ALLOWED": 25,
     "FORBIDDEN": 0,
     "MAIN_ATTRIBUTED": 0
    }
   },
-  "preserved_at": "2026-10-08T13:06:44Z"
+  "preserved_at": "2026-10-08T14:38:51Z"
  },
  "runtime": {
   "digest": "fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962",
