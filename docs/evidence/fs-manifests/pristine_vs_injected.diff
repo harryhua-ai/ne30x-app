@@ -1,0 +1,24 @@
+# pristine_backup.manifest vs injected_v2.manifest (diff, 2026-10-08)
+# 含义: 885 个原有文件内容级逐一保留(sha256 全部一致); 仅新增 /apps/ 下 5 个测试文件
+# 注意: 前两段 'generated/image_label/image_sha256' 差异为两镜像固有属性, 非内容差异
+
+5a6,10
+> /apps/bad-abi-version.bin|608|5d7b4c123e7b70eb03eb01cf2db624a5fd7f536c0e6bda9fb9faaf1e1a8d99d7
+> /apps/bad-crc32.bin|608|e2719ee39fba779681a72fe70276fd4740cbd37bca00092377d8c20a034611c6
+> /apps/bad-target-address.bin|608|77e94139c6ed7b938463ed5c17165f481a9f43e4030279a07460202c758390cf
+> /apps/hello_v1.bin|608|d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03
+> /apps/hello_v2.bin|608|db1c6d60b398cab11a276e15770fdcdf9d42b9c96b4de6ef2cc93c1ecdec8744
+886,887c891,892
+< # fs_manifest v1 generated=2026-10-08T14:04:44Z
+< # image_label=pristine_backup(backup_littlefs.bin@/tmp/ne301-board-backup)
+---
+> # fs_manifest v1 generated=2026-10-08T14:04:51Z
+> # image_label=final_injected(lfs_injected_v2.img@/tmp/ne301-poc-evidence)
+889c894
+< # image_sha256=1a8b3c69003bb94c5509bbc9f299e24643eb68325dd241dc54c125dec8acf1cd
+---
+> # image_sha256=45c6a4086ca1c49187bb4d1f4d7c58d60360edc26eec47199d778e882f6c43e1
+891c896
+< # totals files=885 dirs=25 bytes=13323928 unreadable=0
+---
+> # totals files=890 dirs=25 bytes=13326968 unreadable=0
