@@ -5,8 +5,10 @@
 - 控制台：`/dev/cu.usbserial-14130` @115200，提示符 `AICAM>`
 - 完整串口会话：[device_session.log](device_session.log)（真机实录，21:02:55–21:04:11）
 - **整改版说明**：本文件按 A 对 e61860d 的 REQUEST_CHANGES（三点证据闭环要求）重写。
-  全部哈希于整改时（2026-10-08）从持久工件重新独立计算核对；仍缺失的证据以
-  `READBACK:PENDING` 占位并如实标注，不得视为已证明。分区基址/长度引自 pinned
+  全部哈希于整改时（2026-10-08）从持久工件重新独立计算核对；首轮整改中缺失的
+  回读项以 `READBACK:PENDING` 占位，**2026-10-08 22:25 协调者完成只读回读
+  （APP1 替换后整槽 / WEB 操作后 / LittleFS 设备终态，SW2 烧录位纯只读），本版已
+  全部回填为实测事实**。分区基址/长度引自 pinned
   `ne301/experiment/app-host-poc@a5b4bf3` 的 `Custom/Common/Inc/mem_map.h:73-121`。
 
 ## 镜像与来源锚点
@@ -43,18 +45,18 @@ ABI 头唯一权威锁定：pinned 提交 `Custom/Common/Inc/app_host_abi.h`，S
 | OTA info | 0x70090000 / 8K | 全量 | `9b9b633d9416084a53cf47c8c7b9717606d4a6e70fd220b32e145ec0dfc407ce` | 否 | 无（未写入；无独立回读） |
 | SWAP | 0x70092000 / 64K | 无 | — | 否 | 无 |
 | RESERVE1 | 0x700A2000 / 376K | 无 | — | 否 | 无 |
-| **APP1** | 0x70100000 / 4M | 全量 | `ddaca651dcb0789fbb15c4f84f98cf0b60d98e1c846dc4970ed6c4b9504d8b12` | **是**（实验 Host 部署，一次 SWD 写） | CubeProgrammer verify + 独立回读 == 包哈希（见下对照表）；替换后回读 PENDING |
+| **APP1** | 0x70100000 / 4M | 全量 | `ddaca651dcb0789fbb15c4f84f98cf0b60d98e1c846dc4970ed6c4b9504d8b12` | **是**（实验 Host 部署，一次 SWD 写） | CubeProgrammer verify + 独立回读 == 包哈希；替换后整槽回读 == 部署包（见下对照表，已闭合） |
 | APP2 | 0x70500000 / 4M | 仅头部普查（1KB） | `a1492ab5f43364c71645ef637abd6839cb4e6652b917918c40c6c1d1007fca35` | 否 | 无（未写入；无独立回读） |
 | AI_1 | 0x70900000 / 8M | 全量 | `168790a9f1d0644bd689b4c1800c4a6761da886ff4bad47d1f10c1bc99ed5829` | 否 | 无（未写入；无独立回读） |
 | AI_2 | 0x71100000 / 8M | 全量 | `a7b2cc66728ecb9d50ed764cdfe307d5fae0718dbd63c79630f65a104965114a` | 否 | 无（未写入；无独立回读） |
 | **WEB** | 0x71900000 / 1M | 全量 | `a1f49644ec51229c821b55de1da6c352091fc2eb795aa4e58cdaba2b8c992ada` | 否 | 操作后回读 PENDING（见下对照表） |
 | WiFi FW | 0x71A00000 / 3M | 全量 | `53695f18cca71592db1cbaf8702948f421f0add4533eb17fc2dc3b3abeab03be` | 否 | 无（未写入；无独立回读） |
-| **LittleFS** | 0x71D00000 / 96M | 全量（pristine） | `1a8b3c69003bb94c5509bbc9f299e24643eb68325dd241dc54c125dec8acf1cd` | **是**（见"写入审计"；最终为整卷 96MB 单命令写） | CubeProgrammer `--verify`（转录未持久化，见"诚实性注记"）+ 持久化功能验证（device_session.log）+ 镜像级内容对照；设备级整卷回读 PENDING |
+| **LittleFS** | 0x71D00000 / 96M | 全量（pristine） | `1a8b3c69003bb94c5509bbc9f299e24643eb68325dd241dc54c125dec8acf1cd` | **是**（见"写入审计"；最终为整卷 96MB 单命令写） | CubeProgrammer `--verify`（转录未持久化，见"诚实性注记"）+ 持久化功能验证（device_session.log）+ 镜像级内容对照；设备终态整卷回读已闭合（见下对照表） |
 | RESERVE2 | 0x77D00000 / 3M | 无 | — | 否 | 无 |
 
 **诚实性注记（适用于全表）**：
 - "是否被写入"依据**完整写入命令审计**（下文"写入审计"表）：全部设备写命令仅覆盖 APP1 与 0x71D00000 起的 FS 区域，其余分区无写入命令记录。
-- 未写入分区的"不变性"是**零写入 + 刷写前备份哈希**的推断，除 APP1（独立回读）外，未逐一做写入后回读。从未回读的分区如实标记"无独立回读"，不写成已证明。
+- "未写入"分区的"不变性"是**零写入 + 刷写前备份哈希**的推断；除 APP1（部署后 + 替换后回读）、WEB（操作后回读）、LittleFS（设备终态回读）外，其余分区未逐一做写入后回读。从未回读的分区如实标记"无独立回读"，不写成已证明。
 - 首轮注入的 6×4K 块、二次修复的 28 段 / 13 段写入全部位于 LittleFS 分区内（0x71D00000–0x77CFFFFF），未越界到其他分区（写入命令与地址清单 `repair_plan.txt`/`repair_runs.txt`/`repair64_runs.txt` 留存于 `/tmp/ne301-poc-evidence/`）。
 
 ## 分区不变性对照（A 整改点 1：APP1 与 WEB）
@@ -65,14 +67,21 @@ ABI 头唯一权威锁定：pinned 提交 `Custom/Common/Inc/app_host_abi.h`，S
 |---|---|---|
 | 部署前（原 counting 固件，实验首写前全量备份） | `backup_app1_full.bin`（4MB） | `ddaca651dcb0789fbb15c4f84f98cf0b60d98e1c846dc4970ed6c4b9504d8b12` |
 | 部署后（实验 Host 一次 SWD 刷写 + CubeProgrammer verify + 独立回读） | `readback_app1_after_flash.bin`（3,846,400 B） | `65f3c0b0c1449bb61543836563635d0b7c74bcfbd57075d206ce218ff1d912b2` == 包哈希 |
-| 替换后（V1→V2 两次装载执行完之后，APP1 分区回读） | <!-- READBACK:PENDING --> 协调者在设备上补读中；在回填前，"替换后 APP1 未被改写"不作为已证明结论 | — |
+| 替换后（V1→V2 两次装载执行完之后，APP1 分区整槽回读） | `readback/rb_app1_after_replacements.bin`（2026-10-08 22:25，`-u 0x70100000 0x400000`，SW2 烧录位纯只读） | 前 3,846,400 B（== Host 包大小）SHA256 `65f3c0b0c1449bb61543836563635d0b7c74bcfbd57075d206ce218ff1d912b2`，与部署包**逐字节一致（MATCH）**；包尾之后 347,904 B 全部 `0xFF`（擦除态，无残留改写）。**结论：V1/V2 替换后 APP1 与首次部署时完全相同——替换动作零 flash 写得证** |
 
 ### WEB（基础网页，操作前/后）
 
 | 阶段 | 证据 | SHA256 |
 |---|---|---|
 | 操作前（实验任何写入之前全量备份） | `backup_web.bin`（1MB） | `a1f49644ec51229c821b55de1da6c352091fc2eb795aa4e58cdaba2b8c992ada` |
-| 操作后（实验全部操作完成后回读） | <!-- READBACK:PENDING --> 协调者在设备上补读中；在回填前，WEB 不变性以"零写入命令 + 操作前备份"为据，非独立回读证明 | — |
+| 操作后（实验全部操作完成后整分区回读） | `readback/rb_web_after.bin`（2026-10-08 22:25，`-u 0x71900000 0x100000`，SW2 烧录位纯只读） | `a1f49644ec51229c821b55de1da6c352091fc2eb795aa4e58cdaba2b8c992ada` == 操作前备份哈希，**完全一致（WEB 不变性成立）** |
+
+### LittleFS（设备终态）
+
+| 阶段 | 证据 | SHA256 / 与注入镜像的差异 |
+|---|---|---|
+| 整卷写入内容 | `lfs_injected_v2.img` | `45c6a4086ca1c49187bb4d1f4d7c58d60360edc26eec47199d778e882f6c43e1` |
+| 设备终态（2026-10-08 22:25 整卷 96MB 回读，`-u 0x71D00000 0x6000000`，SW2 烧录位纯只读） | `readback/rb_littlefs_final.bin` | `3bf4a3fb92987a3ad2053dee9ac226564610ce3b3bd8456a0bc96627dce6edcb`；与注入镜像块级差异 562×4KB（整改者独立复测；协调者同日实测 563，属计数口径差）**全部位于 `/captures/*`（固件运行时新抓拍/索引/元数据，含无网 1970-01-01 时间戳目录）与 `/aicam.log`（日志轮转）**；**`/apps/` 下 7 个文件内容哈希与注入镜像逐一相同**（清单见 [fs-manifests/](fs-manifests/README.md)）。**结论：设备级证明"旧数据保留、仅增测试文件、替换零改写"；运行时增量仅限抓拍/日志，属固件正常行为** |
 
 ### 关键区分：首次刷写实验 Host vs 其后 V1/V2 替换
 
@@ -92,7 +101,7 @@ ABI 头唯一权威锁定：pinned 提交 `Custom/Common/Inc/app_host_abi.h`，S
   构建镜像先后经同一 Host API 装载执行（device_session.log:37-61），期间设备写命令
   记录为零（写入审计表仅含 APP1 部署与 FS 区域条目）。
 - 因此 V1/V2 替换既不重编也不重刷主固件：APP1 分区内容自部署后仅受该一次写影响，
-  替换后回读（PENDING）预期 == 部署后回读 `65f3c0b0…`。
+  替换后整槽回读已证实与部署后回读一致（前 3,846,400 B == `65f3c0b0…`，MATCH）。
 
 ## LittleFS 96MB：pristine → 最终注入镜像 → 设备状态（A 整改点 2）
 
@@ -116,7 +125,9 @@ ABI 头唯一权威锁定：pinned 提交 `Custom/Common/Inc/app_host_abi.h`，S
   2. 同日志：`/apps/hello_v1.bin`、`/apps/hello_v2.bin`、`/apps/apphost_test.bin` 从该 FS
      装载执行成功，三种坏镜像按预期拒绝——文件级内容可用性得证。
   3. 镜像级内容对照（下节）：注入镜像相对 pristine 逐一可核。
-  4. 设备级最终状态整卷回读：<!-- READBACK:PENDING --> 协调者在设备上补读中。
+  4. 设备级最终状态整卷回读（2026-10-08 22:25，只读）：`readback/rb_littlefs_final.bin`
+     （`3bf4a3fb…`），与注入镜像的内容级核验见"分区不变性对照 → LittleFS（设备终态）"及
+     [fs-manifests/](fs-manifests/README.md)。
 
 ### 内容级对照（核心证明）
 
@@ -140,14 +151,15 @@ ABI 头唯一权威锁定：pinned 提交 `Custom/Common/Inc/app_host_abi.h`，S
 ### 剩余风险与结论收窄（如实）
 
 1. 设备自最终整卷写入后持续运行，固件会向 FS 追加运行时日志/抓拍（如 `/aicam.log*`、
-   `/captures/`）——**设备当前 FS 内容必然已相对注入镜像存在运行时增量**。
-2. 因此"旧数据保留、仅增加测试文件"的证明强度分层如下，不得混同：
+   `/captures/`）——设备当前 FS 内容相对注入镜像存在运行时增量（终态回读已量化，见下）。
+2. "旧数据保留、仅增加测试文件"的证明强度分层（2026-10-08 22:25 终态回读后）：
    - **镜像级（已证明）**：`lfs_injected_v2.img` = pristine + 5 个 /apps 测试文件（内容哈希逐一对照，零删改）。
-   - **设备级（已证明部分）**：整卷写入后设备成功挂载该镜像并装载执行 /apps 文件（device_session.log）。
-   - **设备级（待闭合）**：设备当前整卷内容与注入镜像的一致性回读——READBACK:PENDING。
-3. "计数演示数据完整恢复"结论据此**收窄为**：注入镜像内容级等于 pristine + 5 个测试文件，
-   且设备曾从该镜像成功挂载运行；设备上非日志文件的当前完整性以最终回读为准，回填前不声称
-   逐字节等于注入镜像。
+   - **设备级（已闭合）**：整卷 96MB 终态回读 `rb_littlefs_final.bin` 的内容级核验证实——
+     与注入镜像的全部差异（新增 5 个路径 + 内容变化的文件）**仅位于 `/captures/*` 与 `/aicam.log`**（0 例外）；
+     **`/apps/` 下 7 个文件内容哈希与注入镜像逐一相同**；pristine 期间的抓拍与配置数据保留。
+3. "计数演示数据完整恢复"结论据此成立且已闭合到设备级：注入镜像 = pristine + 5 个测试文件；
+   设备终态 = 注入镜像 + 仅抓拍/日志运行时增量（固件正常行为，其中 `1970-01-01` 时间戳目录为
+   无网状态下固件的正常时间行为）；不声称设备终态与注入镜像逐字节一致——差异即上述运行时增量本身。
 4. pristine 备份当前持久化于 `/tmp/ne301-board-backup/`（单副本 + `BACKUP_SHA256.txt`
    清单，整改时核对一致）。`/tmp` 存储非耐用介质，该备份宜尽早转存至耐用介质（整改者如实记录，未执行转存）。
 
@@ -180,7 +192,7 @@ ABI 头唯一权威锁定：pinned 提交 `Custom/Common/Inc/app_host_abi.h`，S
 ```
 
 对应 AC：
-- **AC2** ✓ hello-app 经唯一 Host API（`log`/`tick_ms`，ABI 0x00010000）读取真实平台能力（tick 前进 13ms）；v1→v2 两个独立构建镜像先后装载执行（替换语义 = littlefs 文件 + RAM 执行，见"关键区分"节代码锚点）；过程零主固件重编/重刷（Host 为一次性实验固件，按 A 修订仅从 pinned 实验分支构建；APP1 刷写为该实验的授权动作本身，且为唯一一次）。APP1/WEB 替换后/操作后回读 PENDING 项回填前，不变性结论以上表标注的强度为准。
+- **AC2** ✓ hello-app 经唯一 Host API（`log`/`tick_ms`，ABI 0x00010000）读取真实平台能力（tick 前进 13ms）；v1→v2 两个独立构建镜像先后装载执行（替换语义 = littlefs 文件 + RAM 执行，见"关键区分"节代码锚点）；过程零主固件重编/重刷（Host 为一次性实验固件，按 A 修订仅从 pinned 实验分支构建；APP1 刷写为该实验的授权动作本身，且为唯一一次）。**不变性已由回读闭合**：替换后 APP1 整槽回读 == 部署包（前 3,846,400 B MATCH，余 0xFF），WEB 操作后回读 == 操作前备份——"可复核前后主固件与基础 WEB 未被改写"成立。
 - **AC3** ✓ 三种非法镜像被实验 Host 按其校验序拒绝且未改写平台镜像（拒绝仅发生在 Host 校验序内，无任何写命令，见写入审计）；失败路径、镜像/分区哈希、执行环境、设备日志全部留存于本目录、`fs-manifests/` 与 `device_session.log`；LittleFS 事故全程如实留存（下节）；真机实做，无模拟替代。
 
 ## 写入审计（全部设备写操作）
