@@ -12,7 +12,37 @@
  "heartbeat_at": "2026-10-08T13:05:34Z",
  "supersedes": null,
  "contract_digest": "90e8f2d5789ca09c7020fe44a3e68e15714925b0ae926447e3ed5d8af220f5c2",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/2/50117b15",
+  "sha": "e61860d35f27e856f820567eb327517c74cea70e",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "README.md": "ALLOWED",
+    "apps/hello-app/.gitignore": "ALLOWED",
+    "apps/hello-app/Makefile": "ALLOWED",
+    "apps/hello-app/hello_app.ld": "ALLOWED",
+    "apps/hello-app/main.c": "ALLOWED",
+    "docs/app-hello-poc.md": "ALLOWED",
+    "docs/evidence/build-evidence.md": "ALLOWED",
+    "docs/evidence/device-evidence.md": "ALLOWED",
+    "docs/evidence/device_session.log": "ALLOWED",
+    "tests/run_build_checks.sh": "ALLOWED",
+    "tools/fetch_abi_header.sh": "ALLOWED",
+    "tools/make_bad_images.py": "ALLOWED",
+    "tools/pack_app_image.py": "ALLOWED",
+    "tools/validate_app_image.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 14,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-08T13:06:44Z"
+ },
  "runtime": {
   "digest": "fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962",
   "release": "v1.1.2",
