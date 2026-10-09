@@ -1,0 +1,283 @@
+=== serial_helpers ===
+  next(0)=1 next(1)=2 next(0xFFFFFFFFu)=1
+  newer(1,0)=1 newer(0,1)=0 newer(5,5)=0 newer(0xFFFFFFFFu,1)=0 newer(1,0xFFFFFFFFu)=1
+=== create_edges ===
+  create(cfg=NULL)=NULL
+  line(degenerate)=NULL
+  line(tiny-len)=NULL
+  snap[after-empty-update] active=0 next_id=1 n=0
+  null-api: next_id=1 active=0
+  null-api: survived
+=== greedy_matching ===
+  snap[t100] active=2 next_id=3 n=2
+    trk id=1 pos=(0.100000,0.100000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=2 pos=(0.900000,0.900000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  snap[t200] active=2 next_id=3 n=2
+    trk id=1 pos=(0.100000,0.100000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=2 pos=(0.900000,0.900000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+=== match_order_contention ===
+  snap[seed] active=2 next_id=3 n=2
+    trk id=1 pos=(0.400000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=2 pos=(0.600000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  snap[contended] active=2 next_id=3 n=2
+    trk id=1 pos=(0.500000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=2
+    trk id=2 pos=(0.600000,0.500000) age=1 miss=1 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  snap[recovered] active=2 next_id=3 n=2
+    trk id=1 pos=(0.500000,0.500000) age=3 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=300 last_report=100 hist_used=3 trail_used=2
+    trk id=2 pos=(0.620000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=300 last_report=100 hist_used=2 trail_used=1
+=== confirm_gating ===
+  snap[age1] active=1 next_id=2 n=0
+  snap[age2] active=1 next_id=2 n=0
+  snap[age3] active=1 next_id=2 n=1
+    trk id=1 pos=(0.500000,0.500000) age=3 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=300 last_report=100 hist_used=3 trail_used=1
+=== miss_retire ===
+  snap[born] active=1 next_id=2 n=1
+    trk id=1 pos=(0.500000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  records n=0
+  snap[miss1] active=1 next_id=2 n=1
+    trk id=1 pos=(0.500000,0.500000) age=1 miss=1 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  records n=0
+  snap[miss2] active=1 next_id=2 n=1
+    trk id=1 pos=(0.500000,0.500000) age=1 miss=2 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  records n=1
+    rec[0] track=1 seg=0 entered=100 start=100 end=400 end_type=DEPARTED events=0 nb_points=0
+  snap[retired] active=0 next_id=2 n=0
+  snap[reborn] active=1 next_id=3 n=1
+    trk id=2 pos=(0.500000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=500 last_match=500 last_report=500 hist_used=1 trail_used=1
+=== record_subsampling ===
+  records n=1
+    rec[0] track=1 seg=0 entered=100 start=100 end=3100 end_type=DEPARTED events=0 nb_points=4
+      pt[0] t=1000 (0.500000,0.500000)
+      pt[1] t=1400 (0.500000,0.500000)
+      pt[2] t=1800 (0.500000,0.500000)
+      pt[3] t=2200 (0.500000,0.500000)
+  records n=1
+    rec[0] track=1 seg=0 entered=100 start=100 end=2600 end_type=DEPARTED events=0 nb_points=4
+      pt[0] t=500 (0.500000,0.500000)
+      pt[1] t=900 (0.500000,0.500000)
+      pt[2] t=1300 (0.500000,0.500000)
+      pt[3] t=1700 (0.500000,0.500000)
+  records n=1
+    rec[0] track=1 seg=0 entered=100 start=100 end=1000 end_type=DEPARTED events=0 nb_points=3
+      pt[0] t=200 (0.500000,0.500000)
+      pt[1] t=300 (0.500000,0.500000)
+      pt[2] t=400 (0.500000,0.500000)
+=== window_snapshot_chain ===
+  records n=1
+    rec[0] track=1 seg=0 entered=100 start=100 end=200 end_type=CROSSING events=0 nb_points=0
+  snap[after-window-1] active=1 next_id=2 n=1
+    trk id=1 pos=(0.500000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=1 entered=100 last_match=100 last_report=200 hist_used=1 trail_used=1
+  records n=1
+    rec[0] track=1 seg=1 entered=100 start=200 end=400 end_type=CROSSING events=0 nb_points=1
+      pt[0] t=300 (0.520000,0.500000)
+  snap[after-window-2] active=1 next_id=2 n=1
+    trk id=1 pos=(0.520000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=2 entered=100 last_match=300 last_report=400 hist_used=2 trail_used=1
+  records n=1
+    rec[0] track=1 seg=2 entered=100 start=400 end=700 end_type=DEPARTED events=0 nb_points=0
+  snap[after-retire] active=0 next_id=2 n=0
+=== anti_bounce ===
+  cross[step-in] win_in=1 win_out=0 tot_in=1 tot_out=0 events=1
+    evt track=1 ts=300 dir=IN
+  snap[after-in] active=1 next_id=2 n=1
+    trk id=1 pos=(0.700000,0.500000) age=2 miss=0 last_side=0 counted_dir=1 seg_events=1 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=2
+  cross[step-out] win_in=0 win_out=1 tot_in=0 tot_out=1 events=1
+    evt track=1 ts=400 dir=OUT
+  snap[after-out] active=1 next_id=2 n=1
+    trk id=1 pos=(0.300000,0.500000) age=3 miss=0 last_side=0 counted_dir=2 seg_events=3 seg_id=0 entered=100 last_match=300 last_report=100 hist_used=3 trail_used=3
+  cross[step-in-2] win_in=1 win_out=0 tot_in=1 tot_out=0 events=1
+    evt track=1 ts=500 dir=IN
+  cross[step-same-side] win_in=0 win_out=0 tot_in=0 tot_out=0 events=0
+  snap[final] active=1 next_id=2 n=1
+    trk id=1 pos=(0.710000,0.500000) age=5 miss=0 last_side=0 counted_dir=1 seg_events=3 seg_id=0 entered=100 last_match=500 last_report=100 hist_used=4 trail_used=4
+=== online_and_orientation ===
+  cross[on-line-start] win_in=0 win_out=0 tot_in=0 tot_out=0 events=0
+  cross[from-on-line] win_in=0 win_out=0 tot_in=0 tot_out=0 events=0
+  cross[normal-out] win_in=0 win_out=1 tot_in=0 tot_out=1 events=1
+    evt track=1 ts=400 dir=OUT
+  cross[flipped-anchor] win_in=0 win_out=0 tot_in=0 tot_out=0 events=0
+=== crossing_uses_history ===
+  cross[in-via-history] win_in=1 win_out=0 tot_in=1 tot_out=0 events=1
+    evt track=1 ts=190 dir=IN
+  cross[out-via-history] win_in=0 win_out=1 tot_in=0 tot_out=1 events=1
+    evt track=1 ts=240 dir=OUT
+  ring[trail-vs-history] track=1 k=4 found=1
+    hist n=3: t100(0.300000,0.500000) t140(0.700000,0.500000) t180(0.300000,0.500000)
+    trail n=1: t100(0.300000,0.500000)
+=== trail_first_point ===
+  ring[first] track=1 k=8 found=1
+    hist n=1: t100(0.500000,0.500000)
+    trail n=1: t100(0.500000,0.500000)
+=== trail_dense_frames ===
+  snap[moved] active=1 next_id=2 n=1
+    trk id=1 pos=(1.050000,0.500000) age=20 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=1050 last_report=100 hist_used=16 trail_used=10
+  ring[dense] track=1 k=16 found=1
+    hist n=16: t300(0.300000,0.500000) t350(0.350000,0.500000) t400(0.400000,0.500000) t450(0.450000,0.500000) t500(0.500000,0.500000) t550(0.550000,0.500000) t600(0.600000,0.500000) t650(0.650000,0.500000) t700(0.700000,0.500000) t750(0.750000,0.500000) t800(0.800000,0.500000) t850(0.850000,0.500000) t900(0.900000,0.500000) t950(0.950000,0.500000) t1000(1.000000,0.500000) t1050(1.050000,0.500000)
+    trail n=10: t100(0.100000,0.500000) t200(0.200000,0.500000) t300(0.300000,0.500000) t400(0.400000,0.500000) t500(0.500000,0.500000) t600(0.600000,0.500000) t700(0.700000,0.500000) t800(0.800000,0.500000) t900(0.900000,0.500000) t1000(1.000000,0.500000)
+=== trail_jitter_dedup ===
+  ring[jitter] track=1 k=8 found=1
+    hist n=5: t100(0.505000,0.500000) t200(0.495000,0.500000) t300(0.505000,0.500000) t400(0.495000,0.500000) t500(0.505000,0.500000)
+    trail n=1: t100(0.505000,0.500000)
+  ring[interval-500] track=1 k=8 found=1
+    hist n=6: t100(0.505000,0.500000) t200(0.495000,0.500000) t300(0.505000,0.500000) t400(0.495000,0.500000) t500(0.505000,0.500000) t600(0.505000,0.500000)
+    trail n=2: t100(0.505000,0.500000) t600(0.505000,0.500000)
+  ring[jitter-again] track=1 k=8 found=1
+    hist n=7: t100(0.505000,0.500000) t200(0.495000,0.500000) t300(0.505000,0.500000) t400(0.495000,0.500000) t500(0.505000,0.500000) t600(0.505000,0.500000) t700(0.495000,0.500000)
+    trail n=2: t100(0.505000,0.500000) t600(0.505000,0.500000)
+  ring[interval-500-2] track=1 k=8 found=1
+    hist n=8: t100(0.505000,0.500000) t200(0.495000,0.500000) t300(0.505000,0.500000) t400(0.495000,0.500000) t500(0.505000,0.500000) t600(0.505000,0.500000) t700(0.495000,0.500000) t1100(0.505000,0.500000)
+    trail n=3: t100(0.505000,0.500000) t600(0.505000,0.500000) t1100(0.505000,0.500000)
+=== trail_multi_and_eviction ===
+  ring[k8-eviction] track=1 k=8 found=1
+    hist n=8: t500(0.300000,0.500000) t600(0.350000,0.500000) t700(0.400000,0.500000) t800(0.450000,0.500000) t900(0.500000,0.500000) t1000(0.550000,0.500000) t1100(0.600000,0.500000) t1200(0.650000,0.500000)
+    trail n=8: t500(0.300000,0.500000) t600(0.350000,0.500000) t700(0.400000,0.500000) t800(0.450000,0.500000) t900(0.500000,0.500000) t1000(0.550000,0.500000) t1100(0.600000,0.500000) t1200(0.650000,0.500000)
+  ring[k16-eviction] track=1 k=16 found=1
+    hist n=16: t500(0.300000,0.500000) t600(0.350000,0.500000) t700(0.400000,0.500000) t800(0.450000,0.500000) t900(0.500000,0.500000) t1000(0.550000,0.500000) t1100(0.600000,0.500000) t1200(0.650000,0.500000) t1300(0.700000,0.500000) t1400(0.750000,0.500000) t1500(0.800000,0.500000) t1600(0.850000,0.500000) t1700(0.900000,0.500000) t1800(0.950000,0.500000) t1900(1.000000,0.500000) t2000(1.050000,0.500000)
+    trail n=16: t500(0.300000,0.500000) t600(0.350000,0.500000) t700(0.400000,0.500000) t800(0.450000,0.500000) t900(0.500000,0.500000) t1000(0.550000,0.500000) t1100(0.600000,0.500000) t1200(0.650000,0.500000) t1300(0.700000,0.500000) t1400(0.750000,0.500000) t1500(0.800000,0.500000) t1600(0.850000,0.500000) t1700(0.900000,0.500000) t1800(0.950000,0.500000) t1900(1.000000,0.500000) t2000(1.050000,0.500000)
+  ring[track-a] track=1 k=8 found=1
+    hist n=6: t100(0.100000,0.200000) t200(0.150000,0.200000) t300(0.200000,0.200000) t400(0.250000,0.200000) t500(0.300000,0.200000) t600(0.350000,0.200000)
+    trail n=6: t100(0.100000,0.200000) t200(0.150000,0.200000) t300(0.200000,0.200000) t400(0.250000,0.200000) t500(0.300000,0.200000) t600(0.350000,0.200000)
+  ring[track-b] track=2 k=8 found=1
+    hist n=6: t100(0.805000,0.700000) t200(0.795000,0.700000) t300(0.805000,0.700000) t400(0.795000,0.700000) t500(0.805000,0.700000) t600(0.795000,0.700000)
+    trail n=2: t100(0.805000,0.700000) t600(0.795000,0.700000)
+=== capacity_and_clamp ===
+  snap[after-70-detects] active=64 next_id=65 n=64
+    trk id=1 pos=(0.010000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=2 pos=(0.020000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=3 pos=(0.030000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=4 pos=(0.040000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=5 pos=(0.050000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=6 pos=(0.060000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=7 pos=(0.070000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=8 pos=(0.080000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=9 pos=(0.090000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=10 pos=(0.100000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=11 pos=(0.110000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=12 pos=(0.120000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=13 pos=(0.130000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=14 pos=(0.140000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=15 pos=(0.150000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=16 pos=(0.160000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=17 pos=(0.170000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=18 pos=(0.180000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=19 pos=(0.190000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=20 pos=(0.200000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=21 pos=(0.210000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=22 pos=(0.220000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=23 pos=(0.230000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=24 pos=(0.240000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=25 pos=(0.250000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=26 pos=(0.260000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=27 pos=(0.270000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=28 pos=(0.280000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=29 pos=(0.290000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=30 pos=(0.300000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=31 pos=(0.310000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=32 pos=(0.320000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=33 pos=(0.330000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=34 pos=(0.340000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=35 pos=(0.350000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=36 pos=(0.360000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=37 pos=(0.370000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=38 pos=(0.380000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=39 pos=(0.390000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=40 pos=(0.400000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=41 pos=(0.410000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=42 pos=(0.420000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=43 pos=(0.430000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=44 pos=(0.440000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=45 pos=(0.450000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=46 pos=(0.460000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=47 pos=(0.470000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=48 pos=(0.480000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=49 pos=(0.490000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=50 pos=(0.500000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=51 pos=(0.510000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=52 pos=(0.520000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=53 pos=(0.530000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=54 pos=(0.540000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=55 pos=(0.550000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=56 pos=(0.560000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=57 pos=(0.570000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=58 pos=(0.580000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=59 pos=(0.590000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=60 pos=(0.600000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=61 pos=(0.610000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=62 pos=(0.620000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=63 pos=(0.630000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=64 pos=(0.640000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  snap[after-second-frame] active=64 next_id=65 n=64
+    trk id=1 pos=(0.010000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=2 pos=(0.020000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=3 pos=(0.030000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=4 pos=(0.040000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=5 pos=(0.050000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=6 pos=(0.060000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=7 pos=(0.070000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=8 pos=(0.080000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=9 pos=(0.090000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=10 pos=(0.100000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=11 pos=(0.110000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=12 pos=(0.120000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=13 pos=(0.130000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=14 pos=(0.140000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=15 pos=(0.150000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=16 pos=(0.160000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=17 pos=(0.170000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=18 pos=(0.180000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=19 pos=(0.190000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=20 pos=(0.200000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=21 pos=(0.210000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=22 pos=(0.220000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=23 pos=(0.230000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=24 pos=(0.240000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=25 pos=(0.250000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=26 pos=(0.260000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=27 pos=(0.270000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=28 pos=(0.280000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=29 pos=(0.290000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=30 pos=(0.300000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=31 pos=(0.310000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=32 pos=(0.320000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=33 pos=(0.330000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=34 pos=(0.340000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=35 pos=(0.350000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=36 pos=(0.360000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=37 pos=(0.370000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=38 pos=(0.380000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=39 pos=(0.390000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=40 pos=(0.400000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=41 pos=(0.410000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=42 pos=(0.420000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=43 pos=(0.430000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=44 pos=(0.440000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=45 pos=(0.450000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=46 pos=(0.460000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=47 pos=(0.470000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=48 pos=(0.480000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=49 pos=(0.490000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=50 pos=(0.500000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=51 pos=(0.510000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=52 pos=(0.520000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=53 pos=(0.530000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=54 pos=(0.540000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=55 pos=(0.550000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=56 pos=(0.560000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=57 pos=(0.570000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=58 pos=(0.580000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=59 pos=(0.590000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=60 pos=(0.600000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=61 pos=(0.610000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=62 pos=(0.620000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=63 pos=(0.630000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+    trk id=64 pos=(0.640000,0.500000) age=2 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=200 last_report=100 hist_used=2 trail_used=1
+=== multi_track_retire_order ===
+  snap[three-born] active=3 next_id=4 n=3
+    trk id=1 pos=(0.100000,0.100000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=2 pos=(0.500000,0.500000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+    trk id=3 pos=(0.900000,0.900000) age=1 miss=0 last_side=0 counted_dir=0 seg_events=0 seg_id=0 entered=100 last_match=100 last_report=100 hist_used=1 trail_used=1
+  records n=3
+    rec[0] track=1 seg=0 entered=100 start=100 end=400 end_type=DEPARTED events=0 nb_points=0
+    rec[1] track=2 seg=0 entered=100 start=100 end=400 end_type=DEPARTED events=0 nb_points=0
+    rec[2] track=3 seg=0 entered=100 start=100 end=400 end_type=DEPARTED events=0 nb_points=0
+  snap[all-retired] active=0 next_id=4 n=0
+=== end ===

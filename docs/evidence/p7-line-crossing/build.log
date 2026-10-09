@@ -1,0 +1,7 @@
+make: Entering directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/8/apps/line-crossing'
+rm -rf build
+mkdir -p build
+cc -Wall -Wextra -Werror -std=c11 -O2 -Iinclude -c src/lc_tracker.c -o build/lc_tracker.o
+cc -Wall -Wextra -Werror -std=c11 -O2 -Iinclude -c src/lc_line_cross.c -o build/lc_line_cross.o
+ar rcs build/liblinecross.a build/lc_tracker.o build/lc_line_cross.o
+make: Leaving directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/8/apps/line-crossing'

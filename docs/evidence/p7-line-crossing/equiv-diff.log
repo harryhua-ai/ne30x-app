@@ -1,0 +1,5 @@
+golden: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/8/tests/line-crossing/golden/lc_equiv_trace.expected.txt
+ported: harness trace (apps/line-crossing core)
+diff: IDENTICAL
+sha256 golden: 9d5751d675a61444e0c9db9932b1cd1aa5fd766559182f2e0f78091f1e2aa0c0
+sha256 ported: 9d5751d675a61444e0c9db9932b1cd1aa5fd766559182f2e0f78091f1e2aa0c0
