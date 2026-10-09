@@ -195,11 +195,20 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 | --- | --- |
 | `golden.neapp`（上表 SHA） | 结构和软件验签通过 |
 | 相同 212B TBS、不同合法 DER：`5af8dff5f50d12fe16b2300b142597e4adfd2b10a1fddd7d0fd5b40051dd9fc9` | 结构/软件验签通过；两份 `SHA-256(TBS)` 相同，整包摘要不同 |
+| 固定同 TBS / 仅 `s → n-s` 的另一份合法 DER：`99469a8303f91ab3c8f523ac2a2435dce2ee28ef7b73385d0a2fb3da16e36685` | 原包 high-S 与此 low-S 包均通过独立主机验签；两包为相同 `SHA-256(TBS)` 身份，且 **v1 不因 high-S 拒绝原包** |
 | 已签名内容被篡改：`d415350f633ca1d6de57b2b9ffcb766c836762545ef37d332e464fb3c7808b8d` | `SIGNATURE_INVALID` |
 | 受信测试钥重新签过的非规范大写 `app_id`：`61c00538d0679e8a57baeb8afc5e7cb5c38a51da65dd6c601a1dabb6d6c3b61f` | `BAD_PACKAGE`（证明“签名正确”不自动放行非法编码） |
 | 受信测试钥重新签过的错误逻辑板型：`3969a54a2727747af5d3a84a70f0a6efca6b7b64a7e54a84ec07d0ba28b68b28` | `TARGET_INCOMPATIBLE` |
 | 受信测试钥重新签过、文件摘要同步修正但原生头 `reserved0 != 0`：`585f5f61c9621947d62783095ffe2d8701745e520b8af161038c5c1e9891e480` | host 签名验证通过；协议应拒绝为 `BAD_PACKAGE`。**尚未运行设备 parser** |
 | 正确包的 72B DER 后追加 1 字节：`4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201` | `BAD_PACKAGE`（签名段变成 73B，**此例只证明候选长度上限拒绝**；并未单独验证 ASN.1 完整消费尾随数据的行为） |
+
+**low-S / high-S 互操作固定对照（A 离线复核，非设备验收）**：原 §2.5 黄金包的 ECDSA P-256 签名为合法 **high-S**。对其 DER 解出 `(r,s)`，取 P-256 阶 `n=FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551`，保留 `r` 且令 `s' = n-s`，用最短规范 DER 重编码，即得到 **low-S** 的 71B 签名（HEX）：
+
+```text
+30450221009b9d250faaea7aa92f6ccd3515137de5012f9150f0088eadee8770dc23b3a133022045c9f292004bbde70464c94c637d99a8748f7fed904db5a08f2eade5a7d22519
+```
+
+将它直接附到**未经改变**的黄金 TBS 212B 后，得到 283B 包，`SHA-256(package)=99469a8303f91ab3c8f523ac2a2435dce2ee28ef7b73385d0a2fb3da16e36685`；`SHA-256(TBS)` 仍是 `5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91`。本地 `cryptography` 与独立 OpenSSL 对原始 high-S / 派生 low-S 都验证成功（low-S 变体 OpenSSL `Verified OK`、退出码 0）；两个包字节/整包哈希不同但内容身份相同，v1 均不得单因 S 高低而拒绝。这里的变换不需要私钥，也不代表生产发行授权；设备端处理与幂等安装行为仍由 P3/P4 独立验证。
 
 **DER 尾随校验的独立补充反例（同日，仍是候选协议离线测试）**：
 
