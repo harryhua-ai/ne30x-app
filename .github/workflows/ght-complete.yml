@@ -1,0 +1,104 @@
+name: ght-complete
+
+# Mechanical post-merge completion for ght Candidate attempts (Harry Dev
+# downstream thin-caller model, harry-dev docs/adoption.md): a merged ght
+# Candidate PR deterministically triggers the canonical executor-neutral
+# `ght complete <issue> --pr <pr>` primitive, executed by the attempt's own
+# durably-bound runtime capsule. This automation owns no product,
+# scheduling, review, Contract, Plan, or Issue-DONE authority: `ght
+# complete` performs and verifies every durable predicate itself, and any
+# failure fails closed with diagnostics (no retry-with-different-input, no
+# best-effort cleanup, no state rewriting). workflow_dispatch is the safe
+# explicit retry entry for merged-but-unreconciled attempts (the durable
+# recovery path requires no User relay and no private scheduler state).
+#
+# The Harry Dev runtime is never copied into this repository (no repo-local
+# github-task Skill, no second canonical behavior surface, no vendored
+# canonical glue): the ONLY repo-local pieces are the minimal event/branch
+# resolver (`scripts/ght/ght-gha-resolve.sh`) that derives the merged
+# Candidate's Issue/PR identity BEFORE any runtime is selected, and the
+# thin completion adapter (`scripts/ght/ght-gha-adapter.sh`) that resolves
+# the attempt's own runtime binding from its claim lineage, materializes
+# that exact capsule from this repository's own refs/ght runtime namespace
+# with content verification, and delegates completion to the capsule's own
+# canonical glue.
+#
+# Applicability boundary: only merged ght Candidate PRs (head branch
+# agent/<issue>/<id>) enter completion. A merged PR whose head ref is
+# outside that namespace (A-owned docs/release/other work) is judged
+# not applicable and ends as an explicit no-op success; a ref inside the
+# namespace that is not exactly canonical fails closed as untrusted.
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number of the merged Candidate attempt (explicit; no guessing)"
+        required: true
+        type: string
+      pr:
+        description: "PR number of the merged Candidate (explicit; no guessing)"
+        required: true
+        type: string
+
+permissions:
+  contents: write       # lease/reservation residue cleanup may delete refs
+  pull-requests: read   # gh reads durable PR/review facts
+  issues: write         # read the Issue Contract and post completion
+                        # evidence — never an independent DONE decision
+
+concurrency:
+  group: ght-complete-${{ github.event_name == 'workflow_dispatch' && inputs.issue || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  complete:
+    runs-on: ubuntu-latest
+    # Only a genuinely MERGED PR starts completion: closed-but-unmerged
+    # (rejected or withdrawn) never does. workflow_dispatch is the explicit
+    # retry entry for merged-but-unreconciled attempts.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Run the accepted runtime: the Candidate's merge commit on the
+          # auto path, the default-branch HEAD on explicit dispatch retries.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+
+      - name: Resolve issue / pr from canonical metadata (fail closed on ambiguity)
+        id: facts
+        env:
+          GHA_EVENT_NAME: ${{ github.event_name }}
+          GHA_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GHA_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GHA_DISPATCH_ISSUE: ${{ inputs.issue }}
+          GHA_DISPATCH_PR: ${{ inputs.pr }}
+        run: |
+          set -euo pipefail
+          scripts/ght/ght-gha-resolve.sh >> "$GITHUB_OUTPUT"
+
+      - name: Record not-applicable outcome (no-op success evidence)
+        if: steps.facts.outputs.applicable == 'false'
+        run: |
+          echo "Mechanical completion: PR #${{ github.event.pull_request.number }} head ref '${{ github.event.pull_request.head.ref }}' is not a canonical ght attempt branch — not applicable, completion skipped (no-op success)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Canonical executor-neutral completion via the attempt-bound runtime capsule
+        if: steps.facts.outputs.applicable != 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Explicit project pin (fallback for unbound legacy attempts only;
+          # an attempt's own durable runtime binding always wins). Must move
+          # together with a reviewed `ght activate-runtime <digest>` pin
+          # change.
+          GHT_RUNTIME_REF: fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962
+          # Completion-only machine identity: audit metadata for completed_by
+          # under the installation token; the runtime refuses it on every
+          # non-completion command.
+          GHT_RECONCILER_ID: ght-complete-workflow
+          GHT_EXECUTOR_ID: ght-complete-workflow
+        run: |
+          set -euo pipefail
+          scripts/ght/ght-gha-adapter.sh \
+            "${{ steps.facts.outputs.issue }}" "${{ steps.facts.outputs.pr }}"

@@ -1,0 +1,114 @@
+name: ght-plan-publish
+
+# A-side REMOTE Execution Plan publication (Harry Dev downstream
+# thin-caller model, harry-dev docs/adoption.md). A composes the complete
+# Execution Plan payload and commits it to the designated file
+# docs/plans/current-plan.yaml through GitHub's web/API surface (the commit
+# doubles as A's durable decision record); the push to main publishes
+# exactly that payload through the canonical `ght plan-publish` primitive,
+# executed by the ACTIVATED runtime capsule materialized from this
+# repository's own refs/ght runtime namespace. Node contract_digest values
+# may be LEFT OUT: the canonical invocation runs with
+# --bind-contract-digests, so the runtime itself binds each unbound node's
+# digest at publication time through the one canonical digest primitive —
+# A never hand-computes digests.
+#
+# This workflow and its glue own NO Plan semantics and never generate or
+# alter nodes, priorities, barriers, authorization ids, or max_concurrency
+# — scheduling authority stays with A alone. The trigger is bound ONE-TO-ONE
+# to that exact payload file: writes to any other path never publish, and
+# every publication executes exactly the content of the triggering commit.
+# Every durable predicate (Plan v1 validation, immutable revisions,
+# exact-prior CAS replacement, plan_id stability, pointer confirmation) is
+# verified by the runtime itself; any failure fails closed with diagnostics
+# and leaves no half-published state (CAS guarantees the previous revision
+# stays current).
+#
+# The Harry Dev runtime is never copied into this repository: this workflow
+# materializes the repository's activated runtime capsule via the thin
+# repo-local glue scripts/ght/materialize-runtime.sh (content-verified) and
+# then invokes the capsule's OWN canonical scripts/ght-plan-publish.sh
+# directly from the materialized runtime path — no repo-local copy of any
+# canonical glue exists, so the publication protocol surface can never
+# drift from the activated runtime.
+
+on:
+  # Normal remote-A path: a plain GitHub contents write — A commits the
+  # complete Plan payload to the designated file and the push to main
+  # mechanically publishes it. No local checkout, no authenticated gh CLI,
+  # and no User/B command relay.
+  push:
+    branches: [main]
+    paths: ['docs/plans/current-plan.yaml']
+  # Explicit break-glass retry (e.g. publishing an older payload revision
+  # from an exact re-commit, or an admin re-run); still only ever executes
+  # the exact A-authored payload through the canonical primitive.
+  workflow_dispatch:
+    inputs:
+      plan_path:
+        description: "Repository-relative path to the committed Plan v1 payload (explicit; no guessing)"
+        required: false
+        type: string
+        default: docs/plans/current-plan.yaml
+      replace_revision:
+        description: "Exact prior revision SHA this publication supersedes (omit to resolve the current pointer; CAS fail-closed)"
+        required: false
+        type: string
+
+permissions:
+  contents: write       # publish refs/ght/plans/current via the canonical primitive
+  issues: read          # the mandatory fresh-read digest gate reads each node's Issue Contract
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Materialize the activated runtime capsule (content-verified)
+        id: runtime
+        run: |
+          set -euo pipefail
+          runtime_dir=$(scripts/ght/materialize-runtime.sh)
+          echo "dir=$runtime_dir" >> "$GITHUB_OUTPUT"
+          "$runtime_dir/scripts/ght.py" version >&2
+
+      - name: Canonical remote Plan publication (the activated capsule's own glue)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Machine publication identity: the runner's GITHUB_TOKEN is an
+          # installation credential that cannot answer the authenticated-user
+          # endpoint; this identity is refused on every command except
+          # `ght plan-publish` (audit metadata only).
+          GHT_PLAN_PUBLISHER_ID: ght-plan-publish-workflow
+          GHT_RUNTIME_DIR: ${{ steps.runtime.outputs.dir }}
+          GHA_PLAN_PATH: ${{ inputs.plan_path || 'docs/plans/current-plan.yaml' }}
+          GHA_REPLACE_REVISION: ${{ inputs.replace_revision }}
+        run: |
+          set -euo pipefail
+          if [ -n "$GHA_REPLACE_REVISION" ]; then
+            "$GHT_RUNTIME_DIR/scripts/ght-plan-publish.sh" "$GHA_PLAN_PATH" \
+              --replace "$GHA_REPLACE_REVISION" | tee plan-publish-result.json
+          else
+            "$GHT_RUNTIME_DIR/scripts/ght-plan-publish.sh" "$GHA_PLAN_PATH" \
+              --replace-current | tee plan-publish-result.json
+          fi
+
+      - name: Publish outcome evidence
+        if: always()
+        run: |
+          {
+            echo "## Execution Plan publication"
+            if [ -s plan-publish-result.json ]; then
+              plan_id=$(jq -r '.plan_id' plan-publish-result.json)
+              revision=$(jq -r '.revision' plan-publish-result.json)
+              ref=$(jq -r '.ref' plan-publish-result.json)
+              nodes=$(jq -r '.nodes' plan-publish-result.json)
+              replaced=$(jq -r '.replaced // "first publish"' plan-publish-result.json)
+              echo "- plan_id: `$plan_id`"
+              echo "- published revision: `$revision`"
+              echo "- ref: `$ref` ($nodes nodes, replaced: $replaced)"
+            else
+              echo "- publication FAILED — see the step log; no half-published pointer exists (CAS guarantees the previous revision stays current)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
