@@ -1,10 +1,10 @@
 # NE301 × ne30x-app — 可信 App 包及安装/运行协议 v1
 
-> **规范效力以 GitHub 已集成源码为准**。维护者：Role A。关联 [ne30x-app #4](https://github.com/harryhua-ai/ne30x-app/issues/4)、[唯一源 PR #5](https://github.com/harryhua-ai/ne30x-app/pull/5)、设备端证据 [ne301 #27](https://github.com/harryhua-ai/ne301/issues/27)。**PR 未经正常审查并合并至 `ne30x-app/main` 前**，本文仅为待审候选，不是 P3/P4 实施许可；**经正常审查合并后**，该集成版本固定 `.neapp` v1 的包字节、信任、身份、错误与外部行为规范，但**仍不是** `ght` READY、设备实现 PASS 或生产发布授权。
+> **规范效力以 GitHub 已集成源码为准**。维护者：Role A。关联 [ne30x-app #4](https://github.com/harryhua-ai/ne30x-app/issues/4)、[A 决策原始候选 PR #5](https://github.com/harryhua-ai/ne30x-app/pull/5)、设备端证据 [ne301 #27](https://github.com/harryhua-ai/ne301/issues/27)。**本规范文件未经正式 Candidate exact-SHA 审查并集成至 `ne30x-app/main` 前**，本文仅为待审候选，不是 P3/P4 实施许可；**经正式 Candidate 审查合并后**，该集成版本固定 `.neapp` v1 的包字节、信任、身份、错误与外部行为规范，但**仍不是** `ght` READY、设备实现 PASS 或生产发布授权。
 >
 > 事实基线：独立 hello-app 的 [#2 验证](https://github.com/harryhua-ai/ne30x-app/issues/2)；实验 Host [ne301#25](https://github.com/harryhua-ai/ne301/issues/25) 固定在 `experiment/app-host-poc@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e`；[唯一公开 C ABI 头](https://github.com/harryhua-ai/ne301/blob/a5b4bf3dd25931d612680aff200e4e0ac8d8e64e/Custom/Common/Inc/app_host_abi.h)。这不是生产 Host 基线。
 >
-> **阅读规则**：**已确认**＝User 已定产品范围或有可复核证据的事实；正文保留的 **A 候选语义**、**提议/待冻结** 字样，专指本 PR 审查期间的规范决策，**只有经正常评审合并至 `main` 才成为 v1 对 P3/P4 有约束力的规则**，不能在未合并分支上提前实施；**待证据/阻塞**＝实现、硬件或安全能力尚未证明，**不会因文档合并就升级为测试 PASS 或生产承诺**。本 v1 不采用“局部已冻结、另一半自行选择”的可选线格式；若后续实测证伪，只能经 A 审核的受控协议修订，不允许 P3/P4 局部改字节。#27 的只读调查已于 2026-10-09 经 [PR #28](https://github.com/harryhua-ai/ne301/pull/28) 合并至实验分支，merge commit `b00584d598628ebeefdd95bbb6c43ffd4477f412`；这不是签名/安装/恢复实现证据。
+> **阅读规则**：**已确认**＝User 已定产品范围或有可复核证据的事实；正文保留的 **A 候选语义**、**提议/待冻结** 字样，专指本规范文件待审阶段的协议决策，**只有经正常评审合并至 `main` 才成为 v1 对 P3/P4 有约束力的规则**，不能在未合并分支上提前实施；**待证据/阻塞**＝实现、硬件或安全能力尚未证明，**不会因文档合并就升级为测试 PASS 或生产承诺**。本 v1 不采用“局部已冻结、另一半自行选择”的可选线格式；若后续实测证伪，只能经 A 审核的受控协议修订，不允许 P3/P4 局部改字节。#27 的只读调查已于 2026-10-09 经 [PR #28](https://github.com/harryhua-ai/ne301/pull/28) 合并至实验分支，merge commit `b00584d598628ebeefdd95bbb6c43ffd4477f412`；这不是签名/安装/恢复实现证据。
 
 ## 1. 产品边界（已确认）
 
