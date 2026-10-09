@@ -12,7 +12,43 @@
  "heartbeat_at": "2026-10-09T13:30:45Z",
  "supersedes": null,
  "contract_digest": "e5e29addf62e80d78bb6cab2c44806bda3c80685e4c6699dd2bf482d5ad77122",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/8/73c10835",
+  "sha": "9fc995065fd355ac4c6e1105adb948196a8ecff4",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "apps/line-crossing/.gitignore": "ALLOWED",
+    "apps/line-crossing/Makefile": "ALLOWED",
+    "apps/line-crossing/include/lc_line_cross.h": "ALLOWED",
+    "apps/line-crossing/include/lc_tracker.h": "ALLOWED",
+    "apps/line-crossing/include/lc_types.h": "ALLOWED",
+    "apps/line-crossing/src/lc_line_cross.c": "ALLOWED",
+    "apps/line-crossing/src/lc_tracker.c": "ALLOWED",
+    "docs/evidence/p7-line-crossing/build.log": "ALLOWED",
+    "docs/evidence/p7-line-crossing/equiv-diff.log": "ALLOWED",
+    "docs/evidence/p7-line-crossing/equiv-trace-ported.log": "ALLOWED",
+    "docs/evidence/p7-line-crossing/final-run.log": "ALLOWED",
+    "docs/evidence/p7-line-crossing/golden-regen.log": "ALLOWED",
+    "docs/evidence/p7-line-crossing/provenance.patch": "ALLOWED",
+    "docs/evidence/p7-line-crossing/test_lc_engine.log": "ALLOWED",
+    "docs/evidence/p7-line-crossing/upstream-baseline.log": "ALLOWED",
+    "docs/p7-line-crossing-port.md": "ALLOWED",
+    "tests/line-crossing/golden/lc_equiv_trace.expected.txt": "ALLOWED",
+    "tests/line-crossing/lc_equiv_harness.c": "ALLOWED",
+    "tests/line-crossing/run_tests.sh": "ALLOWED",
+    "tests/line-crossing/test_lc_engine.c": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 20,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-09T13:32:03Z"
+ },
  "runtime": {
   "digest": "0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f",
   "release": "v1.1.3",
