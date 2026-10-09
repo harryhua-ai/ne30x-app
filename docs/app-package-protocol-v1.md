@@ -127,6 +127,56 @@ manifest 至少有以下逻辑字段；名称、字节编码、排序、是否�
 
 **定稿判断**：先保留该逻辑型号映射，作为 P2 规范候选而非已完成的板卡检测实现。如果后续只读设备核对或 Host 构建证据证明 `0x3010` 被多种互不兼容的板卡配置共用，A 必须在开放 P3/P4 READY 前缩窄支持范围或修订字段/型号版本；不能默认信任 signed manifest 自己的设备声明来修复这一问题。
 
+### 2.5 首组可复核的离线候选向量（仅 P2 设计证据，非设备验收）
+
+**覆盖范围**：本例遵守 §2.2–§2.4 **尚未冻结**的 8B magic + 两个 `u32-le` 长度、160B 定长 manifest、原样 32B 镜像头及 payload、DER ECDSA-P256 单签名。使用**公开、不安全的非生产测试私钥标量 `d=1`** 派生 SPKI；这仅供复核数学互操作，不能用于任何真实可信 App、发布者或设备信任根。原生载荷是人工构造的 4 字节 ARM Thumb 示例 `00 20 70 47`，**不是**从 hello-app 源码构建的 App，不证明 STM32 可执行、设备 PKA、Web 准入或断电恢复。
+
+| 可复核量 | 精确值 |
+| --- | --- |
+| `publisher_id` / `app_id` / 版本 | `test-publisher` / `hello-app` / `1.0.0` |
+| `target_board_id` / PSRAM / Host ABI / cap mask | `0x3010` / 64 MiB / `0x00010000` / `0x00000003`（仅模型声明） |
+| `native_target_addr` / `native_entry_offset` / 原生 payload | `0x93E00000` / 0 / `00207047` |
+| 原生 32B 头 CRC32(payload) | `0xDE8E3439`；NE301 `Custom/Common/Utils/generic_math.c` 的反射 IEEE CRC32，初值与终值 XOR 均为 `0xFFFFFFFF` |
+| `manifest_len` / `image_len` / TBS 长度 | 160 / 36 / **212 字节**（完整文件从字节 0 起连续取 212B） |
+| `SHA-256(TBS)` | `5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91` |
+| 验签公钥 SPKI DER 长度及 SHA-256 | 91B；`5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3` |
+| 合法包 `golden.neapp` 长度与 SHA-256 | 284B；`9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679` |
+
+**完整的候选黄金包字节**（连续 HEX，可忽略换行；最后 72B 为 DER 签名）：
+
+```text
+4e45415050010000a0000000240000004e4d4631746573742d7075626c697368
+6572000068656c6c6f2d61707000000000000000000000000000000000000000
+0000000001000000000000001030000040000000000001000300000004000000
+2400000004000000000000000000e09337d3abca3d54a2ec9cb14f5602234777
+56e74ecd319bc7f9af8e304d57eb66ca5cd252fb0ce8932436faf8ccd1040981
+b89ee4ad6b9fe9e2a2b7e71aacb27cd34e45413120000100000001000000e093
+04000000000000000000000039348ede0020704730460221009b9d250faaea7a
+a92f6ccd3515137de5012f9150f0088eadee8770dc23b3a133022100ba360d6c
+ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
+```
+
+**公开非生产测试公钥 `SPKI DER`（HEX）**：
+
+```text
+3059301306072a8648ce3d020106082a8648ce3d030107034200046b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c2964fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5
+```
+
+**离线复核步骤**：将以上两个 HEX 各自去除空白并解码为 `golden.neapp`、`test-pub.spki.der`；独立确认文件 SHA-256。再提取 `golden.neapp[0:212]` 为 `tbs.bin`、`[212:]` 为 `sig.der`；从 SPKI DER 导出 PEM 公钥后执行 `openssl dgst -sha256 -verify pub.pem -signature sig.der tbs.bin`，预期 `Verified OK`。实际生成时使用 Python `cryptography` 46.0.4 签名，并由 OpenSSL 3.5.5 独立验签成功；**两者均为主机侧**，不是 NE301 固件或 mbedTLS 硬件 ALT 的实际验收。
+
+**已运行的有限离线拒绝/幂等证据**：
+
+| 测例及冻结样本 SHA-256 | Python 候选结构/策略检查结果 |
+| --- | --- |
+| `golden.neapp`（上表 SHA） | 结构和软件验签通过 |
+| 相同 212B TBS、不同合法 DER：`5af8dff5f50d12fe16b2300b142597e4adfd2b10a1fddd7d0fd5b40051dd9fc9` | 结构/软件验签通过；两份 `SHA-256(TBS)` 相同，整包摘要不同 |
+| 已签名内容被篡改：`d415350f633ca1d6de57b2b9ffcb766c836762545ef37d332e464fb3c7808b8d` | `SIGNATURE_INVALID` |
+| 受信测试钥重新签过的非规范大写 `app_id`：`61c00538d0679e8a57baeb8afc5e7cb5c38a51da65dd6c601a1dabb6d6c3b61f` | `BAD_PACKAGE`（证明“签名正确”不自动放行非法编码） |
+| 受信测试钥重新签过的错误逻辑板型：`3969a54a2727747af5d3a84a70f0a6efca6b7b64a7e54a84ec07d0ba28b68b28` | `TARGET_INCOMPATIBLE` |
+| 正确包 DER 后追加一个字节：`4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201` | `BAD_PACKAGE`（DER 必须完整消费） |
+
+**证明边界与后续门槛**：这是一套 A 候选格式的**离线规格向量**，已用本地 Python 参考检查与独立 OpenSSL 验签验证相应正例；并非 P3 签名打包器、设备签名准入、Host 目标代码、STM32 PKA 或真机故障恢复的测试 PASS。还需要 P3/P4 **分别**消费同一冻结数据、补充非规范 DER/镜像头/溢出长度的负例和设备资源边界，并由 A 复核签名格式与 Host 安全门槛。候选包不准部署，也不能作为生产发行方签名凭据。
+
 ## 3. 身份、版本和互操作（A 候选语义）
 
 - 以发行者身份 + App ID 确定 App 逻辑身份；同身份的新版本才是升级，换发行者不能静默接管旧 ID。
