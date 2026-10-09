@@ -12,7 +12,37 @@
  "heartbeat_at": "2026-10-09T13:51:02Z",
  "supersedes": null,
  "contract_digest": "ec1bf63b4f1d7a5e40a84758895645ac36bbe662ec7c58c2b60c138828aba3b9",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/6/9a4daa9a",
+  "sha": "5c7506edc463c2e4bdf7f61c59fb6822ac1f1ec8",
+  "scope": {
+   "pass": true,
+   "paths": {
+    ".gitignore": "ALLOWED",
+    "apps/hello-app/.gitignore": "ALLOWED",
+    "apps/hello-app/Makefile": "ALLOWED",
+    "apps/hello-app/main.c": "ALLOWED",
+    "docs/evidence/p3-package-artifacts.json": "ALLOWED",
+    "docs/evidence/p3-package-checks.log": "ALLOWED",
+    "docs/p3-packaging.md": "ALLOWED",
+    "package/neapp_format.py": "ALLOWED",
+    "package/neapp_pack.py": "ALLOWED",
+    "package/neapp_verify.py": "ALLOWED",
+    "tests/package/gen_dev_key.py": "ALLOWED",
+    "tests/package/generated_cases.py": "ALLOWED",
+    "tests/package/run_package_checks.sh": "ALLOWED",
+    "tests/package/spec_vectors.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 14,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-09T13:51:32Z"
+ },
  "runtime": {
   "digest": "0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f",
   "release": "v1.1.3",
