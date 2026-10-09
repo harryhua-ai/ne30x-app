@@ -68,6 +68,39 @@ manifest 至少有以下逻辑字段；名称、字节编码、排序、是否�
 
 **下一轮定稿必需的可复核证据**：A 需完成 manifest 字段的精确 ID、宽度、编码、排序与字符串限制，以及显式长度上限；制定一组固定 manifest 与独立镜像的 `TBS` 十六进制、SHA-256、非生产测试密钥 SPKI DER、公钥指纹、合法签名 DER，并针对 magic、长度、字段重复/歧义、metadata/payload 篡改、尾部附加、错钥、板型、ABI、资源与版本冲突分别生成负例。P3/P4 必须消费同一套**已冻结**规范向量；当前 #32 的 64 字节 Spike 向量不能冒充上述端到端包向量。
 
+### 2.3 规范 manifest 的定长编码（A 提议；未冻结 / 未授权实现）
+
+为了让 MCU 解析简单且防止 JSON/CBOR 的排序、重复键和整数表示歧义，v1 **优先使用恰好 160 字节的定长二进制 manifest**（不使用自由 JSON 文本、TLV、证书链或额外扩展区域）。这使 §2.2 中 `manifest_len` 的**候选唯一合法值**为 160；它是 A 的候选选择，不是已实现或已完成设备实测的事实。所有无符号数都按小端编码，不允许标量的其它字节序或变长写法；非空保留字段不得忽略。
+
+| 相对 manifest 的偏移 / 长度 | 候选字段 | 编码与必须核验的约束 |
+| --- | --- | --- |
+| `0..3` / 4B | `manifest_magic` | ASCII `NMF1`（`4E 4D 46 31`），否则拒绝 |
+| `4..19` / 16B | `publisher_id` | 1–16 字节规范 ASCII 标识，右侧 `00` 填充；身份须与设备信任映射一致 |
+| `20..51` / 32B | `app_id` | 1–32 字节同样的规范 ASCII 标识与 `00` 填充 |
+| `52..57` / 6B | `version_major/minor/patch` | 各 `u16-le`，只作整数三段比较；无预发布、构建后缀或前导文本 |
+| `58..59` / 2B | `reserved` | 必须全零 |
+| `60..63` / 4B | `target_board_id` | `u32-le`；唯一受控实验板型编号映射 **待 A 核实后固定** |
+| `64..67` / 4B | `required_psram_mib` | `u32-le`；当前证据仅支持 64 MiB 实验板型，32 MiB 默认拒绝 |
+| `68..71` / 4B | `required_host_abi` | `u32-le`；当前固定实验 ABI `0x00010000`，并须等于原生 32B 镜像头的 ABI |
+| `72..75` / 4B | `required_host_caps` | `u32-le` 位掩码：bit0=`log`、bit1=`tick_ms`；其它位必须零，且声明集合须被当前 Host API 实际支持 |
+| `76..79` / 4B | `required_exec_region_bytes` | `u32-le`，不得小于原生镜像内 `image_size`，不得超过设备实际允许执行区 |
+| `80..83` / 4B | `native_file_len` | `u32-le`，须与 §2.2 `image_len` 完全相等 |
+| `84..87` / 4B | `native_image_size` | `u32-le`，须等于原生 32B 头的 `image_size`，且 `native_file_len = 32 + native_image_size` |
+| `88..91` / 4B | `native_entry_offset` | `u32-le`，须等于原生镜像头的 `entry_offset`，小于 `native_image_size` 且满足现有 Thumb 对齐约束 |
+| `92..95` / 4B | `native_target_addr` | `u32-le`，须等于原生镜像头 `target_addr` 和当前设备 loader 的受控执行区地址 |
+| `96..127` / 32B | `native_file_sha256` | 对整个原生镜像文件（含 **原样 32B 镜像头**）求 SHA-256，须恒时比较匹配；原有 CRC32 仍需独立校验 |
+| `128..159` / 32B | `publisher_key_sha256` | 对受控 Host 的发行方公钥 **SPKI DER 原始字节**求 SHA-256；包中只记录标识摘要，不携带可替换信任锚 |
+
+标识字符集候选为小写 ASCII `a-z`、数字 `0-9` 和中间 `-`；首字符须为 `a-z`，末字符为字母或数字（单字符 ID 可为单个字母），禁止 `-` 首尾、空字符串、非 ASCII、内嵌 NUL、非零右填充、大小写折叠或 Unicode 多种归一化。标识长度不得含糊：从右侧连续零填充逆向确定文本结束位置；恰好占满槽位时无零填充。未知 `publisher_id` 或其 `publisher_key_sha256` 与设备独立保存的唯一 `publisher_id → SHA-256(SPKI DER)` 映射不一致，必须拒绝。
+
+**原生镜像交叉检查必须收紧而不能削弱 Host ABI**：包中固定 `native_file_len = 32 + native_image_size`、原生头的 `header_size = 32`、`magic = NEA1`、`format_version = 1`；将原生 `target_addr`、`entry_offset`、`image_size`、`abi_version` 与 manifest 字段逐字比较，并运行现有 CRC32/边界检查。当前 `app_host_validate` 对 `header_size` 只要求 **至少** 32、对文件尾部不强制恰好消费；P4 的**签名准入层必须额外执行 v1 的更严格检查**，不得把旧 loader 的宽松验收当成已满足该候选。
+
+**资源上限候选与证据分级**：根据 #27 的 64 MiB PSRAM PoC，原生 Host 执行区为 2 MiB；建议首版 `native_file_len` 上限不超过 `2,097,152` 字节（设备仍须以**实际** `region_size` 复核），包头 16B + manifest 160B + 严格 DER P-256 签名最多 72B，候选整个包上限为 `2,097,400` 字节。文件必须严格按 `16 + 160 + native_file_len + DER_len` 完全消费，DER_len 候选区间 8–72B，并由严格 ASN.1 解码器校验序列/整数长度、值范围与无尾随数据；若设备实际存储写入配额、解析栈或 PKA 边界不能证明支持这些值，A **先修改并重审协议上限**，不能由 B 分别自行扩容。
+
+**安全检查顺序**：先对不可信头和 `manifest_len` / `image_len` 作溢出安全的有限读取与结构/唯一编码检查；然后用可信 Host 本地公钥确定签名/发布者身份并完成 ECDSA P-256 验签；之后交叉验证 `native_file_sha256`、镜像头 CRC/ABI/目标地址、设备能力、容量、版本及安装状态。中间任何失败均不可创建可执行的安装记录。若设备上还存在绕过验签可直接装载任意镜像的实验 UART/裸文件入口，必须由 P4 准入阶段关闭或受控隔离。
+
+**未决而非默认通过**：`target_board_id` 与实际硬件身份如何安全判别，真实设备 2 MiB 容量与 DER/PKA 边界、Host 内置密钥部署/撤销、管理员认证、存储断电提交安全，尚需独立证据；#27/#32 都没有证明这些机制的实现。这个 manifest 提议可以在 Draft 中逐字评审，但不是 P3/P4 可以据以提前编写兼容产品代码的协议冻结信号。
+
 ## 3. 身份、版本和互操作（A 候选语义）
 
 - 以发行者身份 + App ID 确定 App 逻辑身份；同身份的新版本才是升级，换发行者不能静默接管旧 ID。
