@@ -262,7 +262,7 @@ A 使用公开 GitHub 的 **hello-app 现有源码**、链接脚本及 pinned Ho
 
 ### 3.2 逻辑安装/执行状态（A 候选语义）
 
-安装身份至少可观测 `not_installed`、`installed`、`unavailable`（曾安装但完整性、兼容性或信任检查不可通过）。上传中、签名检查中、提交中的进度可以呈现为操作状态，**不得**将 `upload_complete` 或 `verified` 混同 `installed`；失败操作保留原已提交版本，除非安装事务真实无法满足该一致性目标，届时必须停在 P2 设计阻塞。
+安装身份至少可观测 `not_installed`、`installed`、`unavailable`（有**可验证的既有安装身份记录**，但包完整性、兼容性或**当前** Host 信任检查不可通过）。**记录或共享卷不可读取/状态不可判定时，不属于上述三个安装状态**：操作返回 `STORAGE_STATE_UNKNOWN` 错误，并拒绝安装、覆盖、卸载和执行，保留介质供非破坏性恢复。只有可靠证明不存在已提交记录时才能返回 `not_installed`；不得把损坏记录猜成未安装，也不得将不可判定状态写成新的持久 App 生命周期状态。上传中、签名检查中、提交中的进度可以呈现为操作状态，**不得**将 `upload_complete` 或 `verified` 混同 `installed`；失败操作保留原已提交版本，除非安装事务真实无法满足该一致性目标，届时必须停在 P2 设计阻塞。
 
 运行状态以 `idle` / `running` / `last_result` 表达可观察行为，`last_result` 包括成功/可恢复错误和有证据的返回码，不虚构强制停止、故障隔离或崩溃后进程状态。即使 App 已安装，也只有管理员明确发起的运行请求可触发入口；设备启动不自动恢复 `running`。
 
@@ -363,7 +363,8 @@ A 使用公开 GitHub 的 **hello-app 现有源码**、链接脚本及 pinned Ho
 | 新设备/Host 的目标或 ABI 不匹配 | `TARGET_INCOMPATIBLE` / `ABI_INCOMPATIBLE` / `RESOURCE_LIMIT`；不可执行；先前可用版本不被静默替换 | 忽略 manifest/镜像头冲突 |
 | 当前正在运行 | 第二次运行、更新、卸载以 `BUSY` 拒绝；不假设可安全强制终止 | 写入或卸载运行中执行镜像，或假报停止成功 |
 | 管理员卸载后或重复卸载 | 卸载提交成功后该身份不可执行；重复卸载返回无变更；其他 App/用户数据不变 | 删除了普通文件就断言已撤销所有执行入口 |
-| 重启、信任撤销或 Host 不再兼容 | 从可信持久安装记录恢复身份，再决定 `installed` 或 `unavailable`；**不自动运行** | 自动运行失信/不兼容代码，或隐匿记录丢失 |
+| 重启、信任撤销或 Host 不再兼容 | 若旧记录可信可读，保留身份并重新判断 `installed` 或 `unavailable`；**不自动运行** | 自动运行失信/不兼容代码，或隐匿记录丢失 |
+| 共享卷/安装记录损坏、读取失败、记录是否存在无法确定 | 返回 `STORAGE_STATE_UNKNOWN` 请求错误，拒绝安装、替换、卸载及执行，保留原始内容供恢复；**不推定任何安装身份状态** | 将读失败显示为 `not_installed` 或把未知文件当合法新版本清理/执行 |
 
 “旧版本或完整新版本”是 **P4 必须证明的产品 AC**，不是 LittleFS rename、文件删除或 #2 离线注入已经提供的事实；如果设备路径无法达到该结果，A 应暂停/重新规划 P4，而非放宽为“通常能成功”。严格保留现有 `/captures`、日志、配置等共享用户数据，备份丢失也不能被伪装成成功回退。
 
@@ -393,7 +394,7 @@ A 使用公开 GitHub 的 **hello-app 现有源码**、链接脚本及 pinned Ho
 
 ## 7. 面向 P3/P4/P5 的错误与证据接口（A 候选语义）
 
-对外至少区分 `AUTH_REQUIRED`、`FORBIDDEN`、`BAD_PACKAGE`、`SIGNATURE_INVALID`、`PUBLISHER_UNTRUSTED`、`TARGET_INCOMPATIBLE`、`ABI_INCOMPATIBLE`、`RESOURCE_LIMIT`、`STORAGE_FULL`、`COMMIT_FAILED`、`RUNTIME_UNAVAILABLE`、`BUSY`、`DOWNGRADE_FORBIDDEN`、`VERSION_CONTENT_CONFLICT`。权限与验签检查失败不得切换已安装版本或暴露攻击者可利用的密钥/内部错误信息。枚举值/HTTP 映射及记录恢复中状态仍待最终协议冻结；不得把上传成功、签名通过或后台文件已存在误报为安装成功。
+对外至少区分 `AUTH_REQUIRED`、`FORBIDDEN`、`BAD_PACKAGE`、`SIGNATURE_INVALID`、`PUBLISHER_UNTRUSTED`、`TARGET_INCOMPATIBLE`、`ABI_INCOMPATIBLE`、`RESOURCE_LIMIT`、`STORAGE_FULL`、`STORAGE_STATE_UNKNOWN`、`COMMIT_FAILED`、`RUNTIME_UNAVAILABLE`、`BUSY`、`DOWNGRADE_FORBIDDEN`、`VERSION_CONTENT_CONFLICT`。其中 `STORAGE_STATE_UNKNOWN` **是请求失败类别，不是第四种可持久化的安装状态**；只有无法判定现有卷/已提交安装身份时使用，不把它等同于写提交失败、磁盘满或已知 App 不兼容。权限与验签检查失败不得切换已安装版本或暴露攻击者可利用的密钥/内部错误信息。枚举值/HTTP 映射及记录恢复中状态仍待最终协议冻结；不得把上传成功、签名通过或后台文件已存在误报为安装成功。
 
 ### 7.1 请求结果与状态优先级（A 候选语义）
 
@@ -409,8 +410,10 @@ A 使用公开 GitHub 的 **hello-app 现有源码**、链接脚本及 pinned Ho
 1. **管理入口先授权**：无有效凭据返回 `AUTH_REQUIRED`；已有身份但权限不足返回 `FORBIDDEN`。禁止在拒绝前把解析过的发行者/镜像/密钥错误暴露给请求者，不得因只是上传文件就授予执行权。
 2. **有界结构解析 → 可信发行者 → 密码学验签**：magic、包长、manifest 160B 唯一编码、DER 结构与尾段完整消费失败属 `BAD_PACKAGE`；不在 Host 自身信任映射的发行者/公钥摘要属 `PUBLISHER_UNTRUSTED`；在可信键上对 **原样 TBS** 验签失败属 `SIGNATURE_INVALID`。不能把包自带的键用作信任来源。为了防止长度溢出，初步有界结构检查须先于密码学操作；不规定对攻击者公开的逐字段错误细节。
 3. **签名有效仍需策略校验**：已签名文件自身的 native SHA-256、CRC 或头部/manifest 不一致仍须拒绝为无效包；目标型号/硬件不符报 `TARGET_INCOMPATIBLE`，Host API/ABI 不符报 `ABI_INCOMPATIBLE`，执行/存储资源不足归 `RESOURCE_LIMIT` / `STORAGE_FULL`（按具体已能证实的原因）。禁止将“签名通过”直接写成可执行的 `installed` 状态。
-4. **持久版本和运行状态由设备判定**：已有有效版本时才可检测幂等、降级和内容冲突；并发运行/更新/卸载已知繁忙返回 `BUSY`；存储记录不可读或运行状态不能证明可安全操作时拒绝执行，并给出明确的故障类别。提交失败报告 `COMMIT_FAILED` 而不是虚报安装成功；只有已证实持久提交的版本才可变成 `installed`。
+4. **持久版本和运行状态由设备判定**：只有能核实已提交身份或确实未安装时才可比较版本、幂等、降级和内容冲突；共享卷/安装记录无法核对时返回 `STORAGE_STATE_UNKNOWN`，不得尝试依靠残留文件恢复身份，也不得擅自卸载清理。已知运行中发生并发运行/更新/卸载返回 `BUSY`；若是执行状态本身无法证明安全则报告 `RUNTIME_UNAVAILABLE`，**不与存储状态未知混同**。实际提交失败报告 `COMMIT_FAILED`，不能以该错误掩盖更早就无法核实的安装身份；只有已证实持久提交的版本才可变成 `installed`。
 5. **多种故障同时成立时**，对外必须优先保证：未授权不泄露信息、畸形长度不进入越界解析、无签名/无信任不进入执行、未提交不标记成功。除以上先决关系外不承诺每个字段级错误码在复合坏包上的固定优先级；P5 的 HTTP 状态整数及 JSON 映射另按**这份既有错误主分类**设计，不另建一套包解析协议。
+
+**状态未知的独立验收负例（仍非已执行测试）**：①完整可信旧记录与旧包存在但信任根被换掉，应查询为 `unavailable`；②损坏或无法读取原有记录，查询与安装/卸载/执行均返回 `STORAGE_STATE_UNKNOWN`、数据不被自动改写；③已可信证明从未安装才是 `not_installed`；④记录可读且新包提交写入失败才报告 `COMMIT_FAILED`，旧有效版本保持不变。P3 可做离线错误模型/文档核对，但共享卷与断电恢复拒绝证据必须由后续 #30/#31 在获得独立授权后提供，不能把表格当成设备 PASS。
 
 **该段可观察行为不是实现接口方案**：B 可以选用已有 Host/mbedTLS/HTTP 的不同检查函数，只要最终保持相同安全语义及共享向量的预期。P2 冻结前须完成 A 对单错误类别的正负样本自审，P3/#29 各自实施后须提供独立拒绝证据。主机向量的 `SIGNATURE_INVALID` 示例只代表该例经过了结构检查，不表示任意篡改都必须绕过 `BAD_PACKAGE` 先到验签步骤。
 
