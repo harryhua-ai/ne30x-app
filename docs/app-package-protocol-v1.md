@@ -98,7 +98,7 @@ manifest 的逻辑字段如下；§2.3 已给出**160B 定长字节布局候选*
 | `64..67` / 4B | `required_psram_mib` | `u32-le`；当前证据仅支持 64 MiB 实验板型，32 MiB 默认拒绝 |
 | `68..71` / 4B | `required_host_abi` | `u32-le`；当前固定实验 ABI `0x00010000`，并须等于原生 32B 镜像头的 ABI |
 | `72..75` / 4B | `required_host_caps` | `u32-le` 位掩码：bit0=`log`、bit1=`tick_ms`；其它位必须零，且声明集合须被当前 Host API 实际支持 |
-| `76..79` / 4B | `required_exec_region_bytes` | `u32-le`，不得小于原生镜像内 `image_size`，不得超过设备实际允许执行区 |
+| `76..79` / 4B | `required_exec_region_bytes` | `u32-le`；声明摘除 32B 原生头后 payload 的最小运行驻留空间：不得小于原生 `image_size`，也不得超过设备可用执行区。它**不能替代**整份原生文件的临时装载容量检查 |
 | `80..83` / 4B | `native_file_len` | `u32-le`，须与 §2.2 `image_len` 完全相等 |
 | `84..87` / 4B | `native_image_size` | `u32-le`，须等于原生 32B 头的 `image_size`，且 `native_file_len = 32 + native_image_size` |
 | `88..91` / 4B | `native_entry_offset` | `u32-le`，须等于原生镜像头的 `entry_offset`，小于 `native_image_size` 且满足现有 Thumb 对齐约束 |
@@ -111,6 +111,8 @@ manifest 的逻辑字段如下；§2.3 已给出**160B 定长字节布局候选*
 **原生镜像交叉检查必须收紧而不能削弱 Host ABI**：包中固定 `native_file_len = 32 + native_image_size`、原生头的 `header_size = 32`、`magic = NEA1`、`format_version = 1`，并要求原生 32B 头偏移 `24..27` 的 `reserved0` **全零**；将原生 `target_addr`、`entry_offset`、`image_size`、`abi_version` 与 manifest 字段逐字比较，并运行现有 CRC32/边界检查。现有 `app_host_validate` 对 `header_size` 只要求 **至少** 32、对文件尾部不强制恰好消费，也**不检查 `reserved0`**；所以 P4 的**签名准入层必须额外执行 v1 的更严格检查**。不得改写已有 loader/ABI 宽松行为来偷换包准入证据；本条只限定新 `.neapp` v1 的签名安装边界。
 
 **资源上限候选与证据分级**：根据 #27 的 64 MiB PSRAM PoC，原生 Host 执行区为 2 MiB；建议首版 `native_file_len` 上限不超过 `2,097,152` 字节（设备仍须以**实际** `region_size` 复核），包头 16B + manifest 160B + 严格 DER P-256 签名最多 72B，候选整个包上限为 `2,097,400` 字节。文件必须严格按 `16 + 160 + native_file_len + DER_len` 完全消费，DER_len 候选区间 8–72B，并由严格 ASN.1 解码器校验序列/整数长度、值范围与无尾随数据；若设备实际存储写入配额、解析栈或 PKA 边界不能证明支持这些值，A **先修改并重审协议上限**，不能由 B 分别自行扩容。
+
+**运行驻留量与装载临时量分别验证**：上述 `required_exec_region_bytes` 只表示原生 payload 剥除镜像头后的运行驻留要求；当前固定 Host `app_host_read_file` 会**先将包含 32B 原生头的整份文件写入同一执行区**，再 `memmove` 去头。因此准入**同时**要求 `required_exec_region_bytes >= native_image_size`、`required_exec_region_bytes <= 当前可信执行区大小`，以及 `native_file_len <= 当前可信执行区大小`，缺一不可。§2.5 黄金包的 `required_exec_region_bytes=4B`、`native_file_len=36B` 正是这两种量的不同含义，不可把 4B 误当装载所需总容量；如后续 Host 装载流程变化，必须重新验证实际峰值占用，而不是仅凭签名中的声明放行。此规则不暗示当前设备实际执行区容量已由目标硬件确认。
 
 **安全检查顺序**：先对不可信头和 `manifest_len` / `image_len` 作溢出安全的有限读取与结构/唯一编码检查；然后用可信 Host 本地公钥确定签名/发布者身份并完成 ECDSA P-256 验签；之后交叉验证 `native_file_sha256`、镜像头 CRC/ABI/目标地址、设备能力、容量、版本及安装状态。中间任何失败均不可创建可执行的安装记录。若设备上还存在绕过验签可直接装载任意镜像的实验 UART/裸文件入口，必须由 P4 准入阶段关闭或受控隔离。
 
@@ -179,7 +181,13 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 
 **离线复核步骤**：将以上两个 HEX 各自去除空白并解码为 `golden.neapp`、`test-pub.spki.der`；独立确认文件 SHA-256。再提取 `golden.neapp[0:212]` 为 `tbs.bin`、`[212:]` 为 `sig.der`；从 SPKI DER 导出 PEM 公钥后执行 `openssl dgst -sha256 -verify pub.pem -signature sig.der tbs.bin`，预期 `Verified OK`。实际生成时使用 Python `cryptography` 46.0.4 签名，并由 OpenSSL 3.5.5 独立验签成功；**两者均为主机侧**，不是 NE301 固件或 mbedTLS 硬件 ALT 的实际验收。
 
-**针对现有黄金包的新增静态字段复核（A，本轮非新增设备测试）**：§2.5 `golden.neapp` 的原生 32B 头始于文件偏移 `16 + 160 = 176`；其头内 `reserved0` 位于包偏移 `200..203`，四字节均为零，符合本候选。测试矩阵所列“**合法重新签名、但原生头 reserved0 非零**”目前仅是应由 P3/设备验证器分别验收的**新增负例要求**，不是已运行 PASS；直接改动既有黄金包的一个签名字节覆盖位置而不重新签名，首先可能只是 `SIGNATURE_INVALID`，**不能**单凭这种改动证明 `reserved0` 校验。
+**原生头 reserved0 独立负例（A，本轮新增主机离线证据）**：黄金包原生头始于包偏移 176，头内 `reserved0` 位于包偏移 `200..203`，原始四字节全零。为隔离“签名坏了”或“镜像摘要坏了”与“头保留字段不合法”，在**原黄金 TBS 212B** 上依次：①将 `TBS[200]` 从 `00` 改为 `01`，其余原生头字段与 payload CRC 不变；②将原生文件 `TBS[176:212]` 的新 SHA-256 `246c57c25fc8da69559a8778ea466aac7e6d4c8789839e7b6e381bed5adae380` 写回 manifest 的 `TBS[112:144]`；③以公开**非生产** P-256 私钥 `d=1` 重新签署所得 212B TBS，并以同一已公开的测试 SPKI 公钥验签。得到 `SHA-256(TBS)=17fdb478632561965cac931634cf4bf4b2c36f42b7bd8faa063d996f52aaa310`，单份合法 DER 签名长 71B，包总长 283B、SHA-256 为 `585f5f61c9621947d62783095ffe2d8701745e520b8af161038c5c1e9891e480`。本地 `cryptography` 验签通过，独立 OpenSSL `dgst -sha256 -verify` 返回 `Verified OK` / exit 0；重算原生文件 SHA-256 匹配 manifest，payload CRC 未变。但按 §2.3 **必须因 `reserved0 != 0` 拒绝该已正确签名的包**。这只证明可复核的离线负例输入及预期，不声称设备验证器已实际拒绝。
+
+上述固定负例的**完整 DER（HEX）**，供从原黄金 TBS 按两处偏移重建后追加（ECDSA 重签若自行进行，DER 字节可不同但内容须相同）：
+
+```text
+304502207025c9259b84cf28951c66cf4ec8282d7b8db7823d6e107e695fc7257ed688de022100ff36e6990fb2f43b8229cfa7888f83b4d847315ab06b3afcf661a04d02fabee8
+```
 
 **已运行的有限离线拒绝/幂等证据**：
 
@@ -190,6 +198,7 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 | 已签名内容被篡改：`d415350f633ca1d6de57b2b9ffcb766c836762545ef37d332e464fb3c7808b8d` | `SIGNATURE_INVALID` |
 | 受信测试钥重新签过的非规范大写 `app_id`：`61c00538d0679e8a57baeb8afc5e7cb5c38a51da65dd6c601a1dabb6d6c3b61f` | `BAD_PACKAGE`（证明“签名正确”不自动放行非法编码） |
 | 受信测试钥重新签过的错误逻辑板型：`3969a54a2727747af5d3a84a70f0a6efca6b7b64a7e54a84ec07d0ba28b68b28` | `TARGET_INCOMPATIBLE` |
+| 受信测试钥重新签过、文件摘要同步修正但原生头 `reserved0 != 0`：`585f5f61c9621947d62783095ffe2d8701745e520b8af161038c5c1e9891e480` | host 签名验证通过；协议应拒绝为 `BAD_PACKAGE`。**尚未运行设备 parser** |
 | 正确包的 72B DER 后追加 1 字节：`4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201` | `BAD_PACKAGE`（签名段变成 73B，**此例只证明候选长度上限拒绝**；并未单独验证 ASN.1 完整消费尾随数据的行为） |
 
 **DER 尾随校验的独立补充反例（同日，仍是候选协议离线测试）**：
