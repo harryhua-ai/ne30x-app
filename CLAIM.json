@@ -71,5 +71,10 @@
   "candidate_sha": "8c321abe8469ce3c0e0468c8a2df44abecfd16fe",
   "completed_by": "ght-complete-workflow",
   "completed_at": "2026-10-09T01:27:54Z"
+ },
+ "resource_reclaim": {
+  "v": 1,
+  "authorized_at": "2026-10-09T02:03:22Z",
+  "claim_sha": "4e662a0dc5b87f181c504304740fcaf886be5789"
  }
 }
