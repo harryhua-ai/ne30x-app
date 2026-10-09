@@ -213,6 +213,18 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 - §2.5 原有“72B DER 后追加一字节”只证实 73B 越界被拒；现已另生成 **70B 合法 DER + 1B 尾随 FF（共 71B）**，主机 OpenSSL 与 Python 库均验证尾随拒绝（见本节新增对照）。**这不自动满足设备 mbedTLS/PKA 或所有 DER 非规范输入的拒绝验收**，仍须分别核验。
 
 **执行边界**：A 当前环境没有 `arm-none-eabi-gcc`，且无法连接 GitHub Git 远程；本轮仅复核 GitHub 保存的源码与报告，未重新构建、签署真实 hello-app，未运行目标 STM32 PKA，未写板。后续 P3/P4 仍须等待 P2 经审查冻结和独立 READY。
+### 2.7 源码一致的 Clang 实验镜像封装（新增离线证据，**非**历史 V1/V2 复现）
+
+A 使用公开 GitHub 的 **hello-app 现有源码**、链接脚本及 pinned Host ABI 头，在独立主机工作目录进行一次**候选封装的离线互操作实验**；本节不授权 P3 工具实现、P4 设备准入、产品安装或真实板卡写入。
+
+- **输入确切性**：仓库 `ne30x-app/main` 的 `apps/hello-app/main.c` Git blob `663c3ad7c858f8a31c29b1c31791d4a9c95a18d5`，`hello_app.ld` blob `9aeb90faeb8f642b3fec4b89d8ea31106a62bc6d`；`ne301@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e` 的 `app_host_abi.h` blob `9c13b87d8edec34a54befb2a9bbc9f38f89e4dd1`、SHA-256 `9337f684893cf2a06aea6f6f8c448708d91e8f9c6c86c24905ced8a7d5df23f4`。均在本轮本地重算 Git blob/hash 对上源记录。
+- **只用于隔离实验的替代编译器**：环境没有原历史 Arm GNU 15.2.1，改用 Clang/LLD/llvm-objcopy **17.0.0**，以 `--target=arm-none-eabi -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -Os -nostdlib` 及原链接脚本构建。输出确认为 ARM EABI5、Thumb `app_entry`，且两次相同输入构建 payload **逐字节一致**。Clang 生成额外的 `.ARM.exidx` 16B 区段；输出原生 payload **616B**、`entry_offset=0`，**不是**历史 GCC 构建的 576B payload/`entry_offset=0x50`。所以该工件**不能**标作历史 hello-app V1/V2 的复现或版本升级。
+- **新的独立离线封装**：原生镜像 = **648B**（32B 原生头 + 616B payload），`crc32(payload)=0xBE2EBC73`，`SHA-256(native)=fe208a99a2a3ed88c46d25b2e03bf1ae79096727be0119e4cca55efacdc9ddd6`；候选 manifest 使用 `publisher_id=test-publisher` / `app_id=hello-probe` / `app_version=0.1.0` / 逻辑 `board_id=0x3010`，避免混淆正式 hello-app 身份。签名测试密钥仍为 **公开且不安全的 P-256 私钥标量 d=1，绝不能生产使用**。
+- **结果证据**：`TBS = 824B`、`SHA-256(TBS)=267d5569fe09bb7ec0831ea068fa0408c5e8400b67e6a1ca41bdb5550660a835`。本次生成 `DER=71B`、包 `895B`，`SHA-256(package)=3f1e92a0a2ee6f607ca032a206388bb65ca7fc087cb94cd6a23dde05eeb2f241`。本地 Python 结构/验签正例通过，**独立 OpenSSL `Verified OK`**；原始 signed bytes 损坏时在 hash 检查拒绝；换成 `board_id=0x3011` 并以测试钥重新签名后，完整验签能通过而策略检查拒绝错板。**ECDSA 签名生成具有随机性，此处包哈希仅定位本次样本；可重现的是 Clang payload 与具体 TBS，而非每次都生成同一 DER 字节。**
+- **可复核方法/证据边界**：按原仓库 `apps/hello-app/main.c`、`hello_app.ld` 和 pinned ABI 哈希复核原文；独立构建 Flat Binary，按 §2.2–§2.3 生成 32B 头/160B manifest/TBS，并以主机公钥独立验签。会话内单独保存了包含源码、ELF、原生文件、`.neapp`、测试公钥、重建脚本和 `evidence.json` 的离线审计 ZIP，**它不是已并入 GitHub 的持久源码工件，也不得当作生产签名包**。
+
+**本项可关闭的只是“从原样 hello-app 源码得到另一工具链 ARM payload、并可被候选签名封装/主机独立验签”的局部问题。** 历史 V1/V2 原生二进制仍未拿到；设备 PKA/mbedTLS 互操作、当前 Host ABI 运行、管理员认证、信任根保护、存储事务与掉电恢复均未测试。Clang 实验编译不授权替换官方 GCC 15.2.1 构建基线，更不构成 P2 冻结或 P3/P4 READY。
+
 ## 3. 身份、版本和互操作（A 候选语义）
 
 - 以发行者身份 + App ID 确定 App 逻辑身份；同身份的新版本才是升级，换发行者不能静默接管旧 ID。
