@@ -175,6 +175,23 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 | 受信测试钥重新签过的错误逻辑板型：`3969a54a2727747af5d3a84a70f0a6efca6b7b64a7e54a84ec07d0ba28b68b28` | `TARGET_INCOMPATIBLE` |
 | 正确包的 72B DER 后追加 1 字节：`4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201` | `BAD_PACKAGE`（签名段变成 73B，**此例只证明候选长度上限拒绝**；并未单独验证 ASN.1 完整消费尾随数据的行为） |
 
+**DER 尾随校验的独立补充反例（同日，仍是候选协议离线测试）**：
+
+前一条 72B DER + 1B 的样本先因 73B 大小越界而被拒，不能证明 DER parser 必须完整消费签名。为隔离这两个验证谓词，现对**§2.5 原样的 212B TBS**（其 SHA-256 仍为 `5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91`），继续使用**公开不安全测试密钥 P-256 d=1** 签名，取得下面两份对照输入：
+
+| 样本 | 文件构成及 SHA-256 | 实测（host，非设备） |
+| --- | --- | --- |
+| `der_70byte_valid.neapp` | 212B TBS + 70B 严格 DER，共 282B；SHA-256 `2fcbeb5b425ac1fa35c43a54c7178e0008b0fbad04dc13298cbaab8643f5d93d` | `cryptography` 校验成功、OpenSSL `Verified OK`（exit 0） |
+| `der_tail_within_72byte_limit.neapp` | 同一 TBS 和 70B DER，在末尾追加 `FF`，签名段 **71B ≤ 72B**，共 283B；SHA-256 `ab8391274bad0fa8ec41c3c483a5840fd0a64ca0f6602a07bb723f4c08adc2d2` | `cryptography` 校验拒绝、OpenSSL `Error verifying data`（exit 1），**不是**因候选签名长度越界 |
+
+合法 DER 精确 HEX（70B；第二个样本在此串后追加 `ff`，无需重新签名）：
+
+```text
+304402201b807dc9f67b49746986ad1cf6490fcd3030c10c419329dd58bac4cb84a78f740220049be7b978bdf57e0cf37df5eef74ebf6abf485ec05b2f5d76b58a6aa6aad400
+```
+
+**可独立复核**：按上文黄金包 HEX 重建前 212B 为 `tbs.bin`，上文 SPKI DER 转为 PEM；将本段 DER HEX 解码为 `sig70.der`，复制并附加单一 `ff` 为 `sig71tail.der`。分别运行 `openssl dgst -sha256 -verify pub.pem -signature <sig>.der tbs.bin`，前者应返回 0，后者非零。这仅验证两种主机密码库对**这一种** DER 尾随输入的拒绝，不能证明目标设备 mbedTLS ALT/PKA 具有等价行为，亦不覆盖所有非规范 DER 形态。设备侧与 P3/P4 独立实现仍须在正式授权后消费受审向量。
+
 **证明边界与后续门槛**：这是一套 A 候选格式的**离线规格向量**，已用本地 Python 参考检查与独立 OpenSSL 验签验证相应正例；并非 P3 签名打包器、设备签名准入、Host 目标代码、STM32 PKA 或真机故障恢复的测试 PASS。还需要 P3/P4 **分别**消费同一冻结数据、补充非规范 DER/镜像头/溢出长度的负例和设备资源边界，并由 A 复核签名格式与 Host 安全门槛。候选包不准部署，也不能作为生产发行方签名凭据。
 
 ### 2.6 真实 hello-app 工件与独立校验边界（已读证据，未重新构建）
@@ -193,7 +210,7 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 - V2 需取得原始 608B 或提供准确源码改动、工具链及重建核对；若 hash 与历史记录不同，明确登记为**新的实验工件**，不得冒充原 V2。
 - 用两份有完整原始 bytes 的镜像作为 §2.2–§2.4 候选格式的 image 输入，仅使用公开标注的非生产测试公钥/私钥；存档完整 manifest/TBS、原生镜像 SHA-256、DER 签名和已签名内容摘要，并交给独立验签实现重算。这样得到的仍是**离线候选互操作样本**，不是 P3 DONE 或真机安装 PASS。
 - **装载容量独立于元数据**：现有实验 Host 先把包含 32B 镜像头的整份原生文件读进 2MiB 执行区，再剥去头执行。因此除 payload 的 `native_image_size` 上限外，还必须按实际 `region_size` 拒绝 `native_file_len` 越界；§2.3 中 `required_exec_region_bytes` 不能单独代替这个检查。签名正确不保证设备能装载。
-- §2.5 的“DER 后追加一字节”反例在现有 72B 签名后得到 73B，测试走长度上限拒绝，不足以验证 ASN.1 对**上限以内的尾随字节**的完整消费。冻结前需增加能隔离 DER 尾随检查本身的反例，并将长度拒绝与语法拒绝分别验收。
+- §2.5 原有“72B DER 后追加一字节”只证实 73B 越界被拒；现已另生成 **70B 合法 DER + 1B 尾随 FF（共 71B）**，主机 OpenSSL 与 Python 库均验证尾随拒绝（见本节新增对照）。**这不自动满足设备 mbedTLS/PKA 或所有 DER 非规范输入的拒绝验收**，仍须分别核验。
 
 **执行边界**：A 当前环境没有 `arm-none-eabi-gcc`，且无法连接 GitHub Git 远程；本轮仅复核 GitHub 保存的源码与报告，未重新构建、签署真实 hello-app，未运行目标 STM32 PKA，未写板。后续 P3/P4 仍须等待 P2 经审查冻结和独立 READY。
 ## 3. 身份、版本和互操作（A 候选语义）
