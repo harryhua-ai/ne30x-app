@@ -3,3 +3,8 @@
 # .ght/               本机 executor 运行状态；durable truth 只在 GitHub 与 refs/ght/*
 .worktree/
 .ght/
+
+# P3 packaging: dev/test signing keys and local work dirs (never commit)
+tests/package/work/
+__pycache__/
+*.pyc

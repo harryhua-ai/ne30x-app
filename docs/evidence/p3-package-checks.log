@@ -1,0 +1,197 @@
+
+== [0/9] preflight
+python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2
+
+== [1/9] generate NON-PRODUCTION dev/test signing identity (AC3)
+dev signing identity generated (NON-PRODUCTION TEST ROOT)
+  private key (gitignored, owner-only): /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/keys/dev-signer.pem
+  signer SPKI DER: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/keys/dev-signer.spki.der (91 B)
+  SHA-256(SPKI DER): a6864bc8721304fefdfcb3566687faff1a9d30d05207899ed7086dcc6327a4fd
+  trust store: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/trust-dev.json (publisher_id 'dev-publisher')
+
+== [2/9] clean build hello-app V1 + V2 native images (pinned ABI, Arm GNU)
+make: Entering directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/apps/hello-app'
+rm -rf build build-v2
+bash ../../tools/fetch_abi_header.sh build/cache/app_host_abi.h
+fetch_abi_header: OK (local pinned checkout /tmp/ne301-pinned-ro) -> build/cache/app_host_abi.h
+  pinned harryhua-ai/ne301@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e:Custom/Common/Inc/app_host_abi.h
+  sha256 9337f684893cf2a06aea6f6f8c448708d91e8f9c6c86c24905ced8a7d5df23f4
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -Ibuild/cache  -nostdlib -T hello_app.ld -Wl,--gc-sections -Wl,-Map,build/hello-app.map -o build/hello-app.elf main.c
+arm-none-eabi-objcopy -O binary build/hello-app.elf build/hello-app.payload.bin
+python3 ../../tools/pack_app_image.py \
+	--elf build/hello-app.elf --payload build/hello-app.payload.bin --out build/hello-app.bin \
+	--abi-header build/cache/app_host_abi.h --nm arm-none-eabi-nm --objcopy arm-none-eabi-objcopy \
+	--exec-base 0x93E00000
+packed build/hello-app.bin: header 32 B + payload 576 B = 608 B, entry_offset 0x50, crc32 0x1eb77cb6, abi 0x00010000, target 0x93e00000
+   text	   data	    bss	    dec	    hex	filename
+    576	      0	      0	    576	    240	build/hello-app.elf
+hello-app: image ready -> build/hello-app.bin
+make: Leaving directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/apps/hello-app'
+make: Entering directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/apps/hello-app'
+rm -rf build-v2
+bash ../../tools/fetch_abi_header.sh build-v2/cache/app_host_abi.h
+fetch_abi_header: OK (local pinned checkout /tmp/ne301-pinned-ro) -> build-v2/cache/app_host_abi.h
+  pinned harryhua-ai/ne301@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e:Custom/Common/Inc/app_host_abi.h
+  sha256 9337f684893cf2a06aea6f6f8c448708d91e8f9c6c86c24905ced8a7d5df23f4
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -Ibuild-v2/cache -DHELLO_APP_VERSION=2 -nostdlib -T hello_app.ld -Wl,--gc-sections -Wl,-Map,build-v2/hello-app-v2.map -o build-v2/hello-app-v2.elf main.c
+arm-none-eabi-objcopy -O binary build-v2/hello-app-v2.elf build-v2/hello-app-v2.payload.bin
+python3 ../../tools/pack_app_image.py \
+	--elf build-v2/hello-app-v2.elf --payload build-v2/hello-app-v2.payload.bin --out build-v2/hello-app-v2.bin \
+	--abi-header build-v2/cache/app_host_abi.h --nm arm-none-eabi-nm --objcopy arm-none-eabi-objcopy \
+	--exec-base 0x93E00000
+packed build-v2/hello-app-v2.bin: header 32 B + payload 576 B = 608 B, entry_offset 0x50, crc32 0x24352317, abi 0x00010000, target 0x93e00000
+   text	   data	    bss	    dec	    hex	filename
+    576	      0	      0	    576	    240	build-v2/hello-app-v2.elf
+hello-app: image ready -> build-v2/hello-app-v2.bin
+make: Leaving directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/apps/hello-app'
+V1 reproduction OK: sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03 (608 B, byte-identical to Issue #2 record)
+V2 new artifact: sha256 e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd (608 B)
+  (historical v2 db1c6d60b398cab11a276e15770fdcdf9d42b9c96b4de6ef2cc93c1ecdec8744 is NOT claimed; see docs/p3-packaging.md)
+VALID: file=608 payload=576 target=0x93e00000 entry_offset=0x50 abi=0x00010000 crc32=0x1eb77cb6
+VALID: file=608 payload=576 target=0x93e00000 entry_offset=0x50 abi=0x00010000 crc32=0x24352317
+
+== [3/9] reproducibility: rebuild V1 from clean, require identical sha256
+reproducible OK: sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03
+
+== [4/9] pack .neapp v1 packages (packer self-verifies before writing)
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v1.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 a437eacbe4bde31c625d1e05db440dbe7b6350f2dae8ed0be3858584b03824f1, content_identity(SHA-256(TBS)) 9867aca70e998fa313ca25db6d74dbf8bbcc42dd58b2558673bb20c1e5805476
+provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v1.neapp.provenance.json
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v2.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 55f06937a735823cdf9299365537a41877b586600ee4b84f14f9f32e0a39a579, content_identity(SHA-256(TBS)) 261dc1a6808324a93747e84f67309b0489d5b2eeec43ff1fa33a26fef8522b81
+provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v2.neapp.provenance.json
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/v2-image-as-1.0.0.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 faa626b7dcbb9ff584c423b406423bd75d501cac3af04c8b094dc3c347de97a1, content_identity(SHA-256(TBS)) 051a0f65ab4c6060c294d70db9b3ba85257a40ac670a78b4928eb5ce3809fed5
+provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/v2-image-as-1.0.0.neapp.provenance.json
+
+== [5/9] offline verification of the trusted packages (must PASS)
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v1.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "9867aca70e998fa313ca25db6d74dbf8bbcc42dd58b2558673bb20c1e5805476",
+  "native_crc32": "0x1eb77cb6",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "a437eacbe4bde31c625d1e05db440dbe7b6350f2dae8ed0be3858584b03824f1",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "a6864bc8721304fefdfcb3566687faff1a9d30d05207899ed7086dcc6327a4fd",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 71,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v2.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "2.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "261dc1a6808324a93747e84f67309b0489d5b2eeec43ff1fa33a26fef8522b81",
+  "native_crc32": "0x24352317",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "55f06937a735823cdf9299365537a41877b586600ee4b84f14f9f32e0a39a579",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "a6864bc8721304fefdfcb3566687faff1a9d30d05207899ed7086dcc6327a4fd",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 71,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/v2-image-as-1.0.0.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "051a0f65ab4c6060c294d70db9b3ba85257a40ac670a78b4928eb5ce3809fed5",
+  "native_crc32": "0x24352317",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "faa626b7dcbb9ff584c423b406423bd75d501cac3af04c8b094dc3c347de97a1",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "a6864bc8721304fefdfcb3566687faff1a9d30d05207899ed7086dcc6327a4fd",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 71,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+
+== [6/9] independent OpenSSL cross-verification of the same TBS/signatures
+hello-app-v1: Verified OK
+hello-app-v2: Verified OK
+
+== [7/9] P2 spec §2.5 vectors: byte-exact adoption + expected result classes
+spec vector suite: 15 entries; all hash assertions and expected result classes matched
+results -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/spec-vectors-results.json
+
+== [8/9] locally generated structure/DER/policy cases
+[generated] positives
+  ok dev_v1_accept: PASS
+  ok dev_v2_accept: PASS
+  ok repack_same_content_identity
+  ok v1_to_v2_traceable_replacement
+  ok version_content_conflict_discriminator
+[generated] signature coverage negatives
+  ok tamper_payload: SIGNATURE_INVALID
+  ok tamper_manifest_version: SIGNATURE_INVALID
+  ok wrong_signer_key: SIGNATURE_INVALID
+[generated] structure negatives
+  ok truncate_signature: BAD_PACKAGE
+  ok truncate_whole_package: BAD_PACKAGE
+  ok append_tail_byte: BAD_PACKAGE
+  ok manifest_len_159: BAD_PACKAGE
+  ok manifest_len_zero: BAD_PACKAGE
+  ok image_len_below_header: BAD_PACKAGE
+  ok image_len_overflow: BAD_PACKAGE
+  ok magic_corrupted: BAD_PACKAGE
+[generated] DER encoding negatives
+  ok der_second_object: BAD_PACKAGE
+  ok der_r_zero: BAD_PACKAGE
+  ok der_nonminimal_length: BAD_PACKAGE
+[generated] manifest encoding negatives (re-signed)
+  ok app_id_nonzero_padding: BAD_PACKAGE
+  ok app_id_embedded_nul: BAD_PACKAGE
+[generated] re-signed policy negatives
+  ok board_0x3011_signed: TARGET_INCOMPATIBLE
+  ok psram_32_signed: TARGET_INCOMPATIBLE
+  ok caps_unknown_bit_signed: BAD_PACKAGE
+  ok abi_manifest_header_mismatch_signed: BAD_PACKAGE
+  ok abi_wrong_everywhere_signed: ABI_INCOMPATIBLE
+  ok entry_odd_signed: BAD_PACKAGE
+  ok exec_region_overcommit_signed: RESOURCE_LIMIT
+  ok unknown_publisher: PUBLISHER_UNTRUSTED
+  ok native_file_overrides_small_region: RESOURCE_LIMIT
+generated case suite: 30 entries, all expectations matched
+results -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/generated-cases/generated-cases-results.json
+
+== [9/9] write structured evidence
+evidence -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/docs/evidence/p3-package-artifacts.json
+
+== ALL PACKAGE CHECKS PASSED
+V1 image  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/apps/hello-app/build/hello-app.bin
+  sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03
+V2 image  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/apps/hello-app/build-v2/hello-app-v2.bin
+  sha256 e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd
+V1 package /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v1.neapp
+  sha256 a437eacbe4bde31c625d1e05db440dbe7b6350f2dae8ed0be3858584b03824f1
+V2 package /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/6/tests/package/work/pkg/hello-app-v2.neapp
+  sha256 55f06937a735823cdf9299365537a41877b586600ee4b84f14f9f32e0a39a579
