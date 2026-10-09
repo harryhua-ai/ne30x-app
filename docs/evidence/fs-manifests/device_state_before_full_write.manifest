@@ -1,0 +1,17 @@
+/aicam.log|1385|bc7eb1d15048c14d188cc60b6ca4c59d8079766799a522cffbd089d3fa8af3ae
+/captures/data/unknown/unknown/cap_00000000_00001_p.jpg|41061|1811b1e984a39bc31306aa3d5a0fdf56d327374ceba761bff22ea7121b1f2958
+/captures/data/unknown/unknown/cap_00000000_00002_p.jpg|40849|e6216ddf5fa04dbd06d8776d0127852ebbb7053eb4ea7ff288586349ca898e9f
+/captures/data/unknown/unknown/cap_00000000_00003_a.json|279|14aaf198700a234e8058adaa6ed5e8882779f031af2e253721559b22e88cdbaf
+/captures/data/unknown/unknown/cap_00000000_00003_p.jpg|40961|2375d446a334e2f7018ebb0ddeace48f62da90cfc59865ebf4b96dc7e91d2dbd
+/captures/data/unknown/unknown/cap_00000000_00004_p.jpg|40917|4630a5f74a25447c0382495ce2161c40bbfd51294cc492b2be3430b034dcbc03
+/captures/index/unknown.idx|144|99d46d2aa53581cb3827f89c0a092e400ea147a4ebb9ef4d387acf3ca672d80a
+/captures/meta/unknown/unknown/cap_00000000_00001.json|439|d9589764122193e706d8fdf31301833b929c32917830e91444683ada6e577025
+/captures/meta/unknown/unknown/cap_00000000_00002.json|439|f0bf6ca10a4425aca9775db9204dce83f746e5fb4398945f701066d7364ffe59
+/captures/meta/unknown/unknown/cap_00000000_00003.json|464|8d597212a67f54d14c3e058e0588e5bc3886248e06a12a735c353abf5c17a763
+/captures/meta/unknown/unknown/cap_00000000_00004.json|439|0503246902818efe3d85dfcb752a265775aefb977b57f72a524b45f3ae5b4980
+# fs_manifest v1 generated=2026-10-08T14:04:52Z
+# image_label=device_state_before_full_write(lfs_current.bin@/tmp/ne301-poc-evidence)
+# image_size=100663296
+# image_sha256=3edfff8b29aab3467ce90e00bf7cb9e9ee5af41b524135b2fbbdd4d8d65d75d2
+# geometry: block_size=4096 read=1024 prog=1024 cache=1024 lookahead=3072 (device-exact, pinned storage.h/storage.c)
+# totals files=11 dirs=8 bytes=167377 unreadable=0

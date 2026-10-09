@@ -23,7 +23,22 @@ NE30x 系列应用仓库，用于开发、测试、打包和发布面向 NE301�
 
 **技术可行性验证；尚无可发布 App。**
 
-先完成 [Issue #1：独立 App Binary 与 Host API 可行性验证](https://github.com/harryhua-ai/ne30x-app/issues/1)。验证独立 `hello-app` 能否在不修改已部署 Host 固件的条件下装载、执行、调用受控 Host API，并能停止与恢复。未经证实，不把 RAM 加载、固定地址、Flash XIP 或某个内存分区当作既定生产方案。
+- [Issue #1：独立 App Binary 与 Host API 可行性调查](https://github.com/harryhua-ai/ne30x-app/issues/1)已完成。
+- [Issue #2：独立 hello-app 构建与 NE301 Host ABI 集成验证](https://github.com/harryhua-ai/ne30x-app/issues/2)进行中：
+  首个独立应用 `hello-app` 已可复现构建——见
+  [docs/app-hello-poc.md](docs/app-hello-poc.md)（ABI 版本、pinned 上游头、
+  执行区与入口约束、一条命令复现）与
+  [docs/evidence/build-evidence.md](docs/evidence/build-evidence.md)（实际构建与坏镜像拒绝输出）。
+  一条命令验证：
+
+  ```bash
+  bash tests/run_build_checks.sh
+  ```
+
+  该验证证明应用可独立编译为镜像并通过稳定函数表消费平台能力；
+  真机装载/替换/拒绝路径（设备侧 AC）仍以受权开发板上的实际日志为准，
+  不以模拟或源码检查代替。未经证实，不把 RAM 加载、固定地址、Flash XIP
+  或某个内存分区当作既定生产方案。
 
 实现变更使用可审查的分支／PR，`main` 作为集成来源；任何真机风险、内存冲突或二进制兼容阻塞必须用证据报告，不允许以削弱平台/应用边界掩盖。
 
