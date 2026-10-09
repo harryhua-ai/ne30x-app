@@ -12,7 +12,24 @@
  "heartbeat_at": "2026-10-09T12:21:04Z",
  "supersedes": null,
  "contract_digest": "b21a4a5105d34ffdbb4783fd6b97d1834a95fe268dd7238cbab004365afbfd0a",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/4/15bb7354",
+  "sha": "7a5efab4f68d275c47c294643e0b42a3d5753e7f",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "docs/app-package-protocol-v1.md": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 1,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-09T12:24:14Z"
+ },
  "runtime": {
   "digest": "0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f",
   "release": "v1.1.3",
