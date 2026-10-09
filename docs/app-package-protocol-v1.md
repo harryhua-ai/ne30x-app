@@ -115,6 +115,18 @@ manifest 至少有以下逻辑字段；名称、字节编码、排序、是否�
 
 **未决而非默认通过**：`target_board_id` 与实际硬件身份如何安全判别，真实设备 2 MiB 容量与 DER/PKA 边界、Host 内置密钥部署/撤销、管理员认证、存储断电提交安全，尚需独立证据；#27/#32 都没有证明这些机制的实现。这个 manifest 提议可以在 Draft 中逐字评审，但不是 P3/P4 可以据以提前编写兼容产品代码的协议冻结信号。
 
+### 2.4 设备型号映射的证据边界（A 候选决策；部分可确定）
+
+**已经核对的源码事实**：[NE301 实验分支 Makefile](https://github.com/harryhua-ai/ne301/blob/c97ee19b19f0055a269ebf57c9d6f1b7d7f07d6b/Makefile#L7-L14) 将 `DEVICE_MODEL ?= 0x3010` 定为既有 OTA 设备型号门槛的单一来源；它经 `-DOTA_DEVICE_MODEL=$(DEVICE_MODEL)` 编进主机固件，并写入 OTA / bundle 头。相同 [Makefile 的通用构建定义](https://github.com/harryhua-ai/ne301/blob/c97ee19b19f0055a269ebf57c9d6f1b7d7f07d6b/Makefile#L119-L126) 固定 `BOARD_PSRAM_SIZE=64`、默认 `BOARD_FLASH_SIZE=128`（后者可在编译时改为其它受支持配置）。这些是**构建模型与默认配置**，不是对板上真实外设容量的自动探测。历史 [设备证据](https://github.com/harryhua-ai/ne30x-app/blob/main/docs/evidence/device-evidence.md) 记录 STM32N657 Rev B（芯片 Device ID `0x486`）及 96MiB LittleFS 布局，但芯片 ID 本身不是 App 协议的板型 ID。
+
+**对 v1 的最小候选映射**：§2.3 的 `target_board_id` 暂定义为固件构建采用的 **OTA 逻辑 `DEVICE_MODEL` 值**；受控实验 Host 唯一候选为 `0x00003010`，其 `u32-le` 字节为 `10 30 00 00`。它**不是**芯片 Device ID `0x486`、序列号、不可伪造的硬件身份或密钥授权来源；不可由 App 包声明来覆盖设备自己编入的型号。其它型号一律拒绝，直到有独立受审的兼容配置，不进行数字范围猜测或近似匹配。
+
+**硬件配置须另外校验**：此候选仅适用于受控实验的 64MiB PSRAM + 128MiB NOR Flash 配置。签名包中的 `required_psram_mib=64`（字节 `40 00 00 00`）不能替代设备侧核对；同一 `DEVICE_MODEL` 若被用于另一种真实 Flash / PSRAM 组合，也**不自动**获得兼容资格。P4 准入层须使用已可信的当前 Host 构建身份、有效执行区链接地址/实际大小、现存持久化卷尺寸与可用容量进行拒绝式核对；实际板卡与固件所声明内存/分区关系未经独立核实，则仅允许离线解析/验签实验，不得宣称设备安装兼容。**本条不暗示运行时已经存在可信容量探测器**，也不授权 B 修改 OTA 设备型号系统。
+
+**构建与状态漂移**：Makefile 明确提示修改 `DEVICE_MODEL` 后须重新 clean/build（普通 `make` 不跟踪编译参数变化，旧对象可能保留旧型号）。因此型号/PSRAM/Flash 的兼容性证据至少需要可追溯的构建选项、固件产物身份以及部署板卡的只读核对。该 evidence gate 不要求在本 Draft 阶段访问或写入设备，亦不等价于生产可信启动。
+
+**定稿判断**：先保留该逻辑型号映射，作为 P2 规范候选而非已完成的板卡检测实现。如果后续只读设备核对或 Host 构建证据证明 `0x3010` 被多种互不兼容的板卡配置共用，A 必须在开放 P3/P4 READY 前缩窄支持范围或修订字段/型号版本；不能默认信任 signed manifest 自己的设备声明来修复这一问题。
+
 ## 3. 身份、版本和互操作（A 候选语义）
 
 - 以发行者身份 + App ID 确定 App 逻辑身份；同身份的新版本才是升级，换发行者不能静默接管旧 ID。
