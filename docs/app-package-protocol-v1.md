@@ -108,7 +108,7 @@ manifest 的逻辑字段如下；§2.3 已给出**160B 定长字节布局候选*
 
 标识字符集候选为小写 ASCII `a-z`、数字 `0-9` 和中间 `-`；首字符须为 `a-z`，末字符为字母或数字（单字符 ID 可为单个字母），禁止 `-` 首尾、空字符串、非 ASCII、内嵌 NUL、非零右填充、大小写折叠或 Unicode 多种归一化。标识长度不得含糊：从右侧连续零填充逆向确定文本结束位置；恰好占满槽位时无零填充。未知 `publisher_id` 或其 `publisher_key_sha256` 与设备独立保存的唯一 `publisher_id → SHA-256(SPKI DER)` 映射不一致，必须拒绝。
 
-**原生镜像交叉检查必须收紧而不能削弱 Host ABI**：包中固定 `native_file_len = 32 + native_image_size`、原生头的 `header_size = 32`、`magic = NEA1`、`format_version = 1`；将原生 `target_addr`、`entry_offset`、`image_size`、`abi_version` 与 manifest 字段逐字比较，并运行现有 CRC32/边界检查。当前 `app_host_validate` 对 `header_size` 只要求 **至少** 32、对文件尾部不强制恰好消费；P4 的**签名准入层必须额外执行 v1 的更严格检查**，不得把旧 loader 的宽松验收当成已满足该候选。
+**原生镜像交叉检查必须收紧而不能削弱 Host ABI**：包中固定 `native_file_len = 32 + native_image_size`、原生头的 `header_size = 32`、`magic = NEA1`、`format_version = 1`，并要求原生 32B 头偏移 `24..27` 的 `reserved0` **全零**；将原生 `target_addr`、`entry_offset`、`image_size`、`abi_version` 与 manifest 字段逐字比较，并运行现有 CRC32/边界检查。现有 `app_host_validate` 对 `header_size` 只要求 **至少** 32、对文件尾部不强制恰好消费，也**不检查 `reserved0`**；所以 P4 的**签名准入层必须额外执行 v1 的更严格检查**。不得改写已有 loader/ABI 宽松行为来偷换包准入证据；本条只限定新 `.neapp` v1 的签名安装边界。
 
 **资源上限候选与证据分级**：根据 #27 的 64 MiB PSRAM PoC，原生 Host 执行区为 2 MiB；建议首版 `native_file_len` 上限不超过 `2,097,152` 字节（设备仍须以**实际** `region_size` 复核），包头 16B + manifest 160B + 严格 DER P-256 签名最多 72B，候选整个包上限为 `2,097,400` 字节。文件必须严格按 `16 + 160 + native_file_len + DER_len` 完全消费，DER_len 候选区间 8–72B，并由严格 ASN.1 解码器校验序列/整数长度、值范围与无尾随数据；若设备实际存储写入配额、解析栈或 PKA 边界不能证明支持这些值，A **先修改并重审协议上限**，不能由 B 分别自行扩容。
 
@@ -122,7 +122,7 @@ manifest 的逻辑字段如下；§2.3 已给出**160B 定长字节布局候选*
 | manifest 长度不等于 160、文本带非零右填充/嵌入 NUL/大写、保留字节非零 | `BAD_PACKAGE`，不得启动 |
 | 版本字段及地址/长度改一个字节、图片/镜像头 CRC 自洽但 manifest 不匹配 | 结构/摘要/签名核验拒绝；不得被误认为同一包 |
 | `publisher_id` 相同但 `publisher_key_sha256` 错误，或包自带其它公钥 | `PUBLISHER_UNTRUSTED`；不得自授信 |
-| 原生头 `header_size > 32`、`native_file_len != 32 + image_size`、无效 entry/ABI/target | 不接受为 v1，即使旧 loader 曾可解析某些宽松形态 |
+| 原生头 `header_size > 32`、`reserved0 != 0`（头偏移 24..27）、`native_file_len != 32 + image_size`、无效 entry/ABI/target | 即使包由受信测试钥**重新签名**且验签成功，仍须拒绝为 v1；旧 loader 的宽松行为不可替代签名准入 |
 | DER 截断、尾随数据、多重 DER、错误公钥、DER 编码歧义 | 全部拒绝；硬件 PKA 路径待设备验证 |
 | 同一 TBS 配两个不同但都合法的 ECDSA DER 签名 | 两包的**内容身份摘要相同**，可视为相同内容的重试；须分别验证各自签名合法 |
 
@@ -178,6 +178,8 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 ```
 
 **离线复核步骤**：将以上两个 HEX 各自去除空白并解码为 `golden.neapp`、`test-pub.spki.der`；独立确认文件 SHA-256。再提取 `golden.neapp[0:212]` 为 `tbs.bin`、`[212:]` 为 `sig.der`；从 SPKI DER 导出 PEM 公钥后执行 `openssl dgst -sha256 -verify pub.pem -signature sig.der tbs.bin`，预期 `Verified OK`。实际生成时使用 Python `cryptography` 46.0.4 签名，并由 OpenSSL 3.5.5 独立验签成功；**两者均为主机侧**，不是 NE301 固件或 mbedTLS 硬件 ALT 的实际验收。
+
+**针对现有黄金包的新增静态字段复核（A，本轮非新增设备测试）**：§2.5 `golden.neapp` 的原生 32B 头始于文件偏移 `16 + 160 = 176`；其头内 `reserved0` 位于包偏移 `200..203`，四字节均为零，符合本候选。测试矩阵所列“**合法重新签名、但原生头 reserved0 非零**”目前仅是应由 P3/设备验证器分别验收的**新增负例要求**，不是已运行 PASS；直接改动既有黄金包的一个签名字节覆盖位置而不重新签名，首先可能只是 `SIGNATURE_INVALID`，**不能**单凭这种改动证明 `reserved0` 校验。
 
 **已运行的有限离线拒绝/幂等证据**：
 
