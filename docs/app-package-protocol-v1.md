@@ -173,10 +173,29 @@ ffb44219fb9b36b39c82665748577ac016c9e8e4648b1cdd54910038
 | 已签名内容被篡改：`d415350f633ca1d6de57b2b9ffcb766c836762545ef37d332e464fb3c7808b8d` | `SIGNATURE_INVALID` |
 | 受信测试钥重新签过的非规范大写 `app_id`：`61c00538d0679e8a57baeb8afc5e7cb5c38a51da65dd6c601a1dabb6d6c3b61f` | `BAD_PACKAGE`（证明“签名正确”不自动放行非法编码） |
 | 受信测试钥重新签过的错误逻辑板型：`3969a54a2727747af5d3a84a70f0a6efca6b7b64a7e54a84ec07d0ba28b68b28` | `TARGET_INCOMPATIBLE` |
-| 正确包 DER 后追加一个字节：`4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201` | `BAD_PACKAGE`（DER 必须完整消费） |
+| 正确包的 72B DER 后追加 1 字节：`4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201` | `BAD_PACKAGE`（签名段变成 73B，**此例只证明候选长度上限拒绝**；并未单独验证 ASN.1 完整消费尾随数据的行为） |
 
 **证明边界与后续门槛**：这是一套 A 候选格式的**离线规格向量**，已用本地 Python 参考检查与独立 OpenSSL 验签验证相应正例；并非 P3 签名打包器、设备签名准入、Host 目标代码、STM32 PKA 或真机故障恢复的测试 PASS。还需要 P3/P4 **分别**消费同一冻结数据、补充非规范 DER/镜像头/溢出长度的负例和设备资源边界，并由 A 复核签名格式与 Host 安全门槛。候选包不准部署，也不能作为生产发行方签名凭据。
 
+### 2.6 真实 hello-app 工件与独立校验边界（已读证据，未重新构建）
+
+**已由既有受审证据支持**： [独立构建报告](https://github.com/harryhua-ai/ne30x-app/blob/main/docs/evidence/build-evidence.md)、[PoC 复现说明](https://github.com/harryhua-ai/ne30x-app/blob/main/docs/app-hello-poc.md) 与 [历史真机记录](https://github.com/harryhua-ai/ne30x-app/blob/main/docs/evidence/device-evidence.md) 记录过两版独立 hello-app 镜像。但仓库当前未提交 build/ 下的原始镜像文件；**SHA-256 和完整头部记录不能代替真实 payload 字节**，不能据此伪造一份“已复现的真实 App 包”。
+
+| 对象 | 有据可查的内容 | 仍缺什么 |
+| --- | --- | --- |
+| 工具链与来源 | ne30x-app `07724f1f98a3a4151c61b876861a7e0e64539975`；Arm GNU 15.2.Rel1（gcc 15.2.1）；NE301 ABI pinned `a5b4bf3dd25931d612680aff200e4e0ac8d8e64e`，头文件 SHA-256 `9337f684893cf2a06aea6f6f8c448708d91e8f9c6c86c24905ced8a7d5df23f4` | 本轮未重跑构建 |
+| hello-app V1 | 608B = 32B 原生头 + 576B payload；SHA-256 `d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03`；原生头 ABI `0x00010000`、target `0x93E00000`、entry `0x50`、CRC32 `0x1eb77cb6` | 本轮未取得原始 608B |
+| hello-app V2 | 历史设备证据记录 608B，SHA-256 `db1c6d60b398cab11a276e15770fdcdf9d42b9c96b4de6ef2cc93c1ecdec8744`，真机运行返回值与 V1 不同 | 原始 V2 字节、可复现的源码补丁/构建锚点 |
+
+**生成真正的跨端 App 包向量之前必须有的可核验输入**：
+
+- 在不更改 ne301 工作树的环境下，取得 V1 的原始镜像并逐字核实大小、哈希、完整原生头及 CRC；如需重建，使用文档固定的 Arm GNU/ABI 输入并运行既有 `bash tests/run_build_checks.sh`，保存完整构建输出及两次 clean-build 的哈希。不同编译器产出的“功能等价”镜像不得冒充旧哈希重现。
+- V2 需取得原始 608B 或提供准确源码改动、工具链及重建核对；若 hash 与历史记录不同，明确登记为**新的实验工件**，不得冒充原 V2。
+- 用两份有完整原始 bytes 的镜像作为 §2.2–§2.4 候选格式的 image 输入，仅使用公开标注的非生产测试公钥/私钥；存档完整 manifest/TBS、原生镜像 SHA-256、DER 签名和已签名内容摘要，并交给独立验签实现重算。这样得到的仍是**离线候选互操作样本**，不是 P3 DONE 或真机安装 PASS。
+- **装载容量独立于元数据**：现有实验 Host 先把包含 32B 镜像头的整份原生文件读进 2MiB 执行区，再剥去头执行。因此除 payload 的 `native_image_size` 上限外，还必须按实际 `region_size` 拒绝 `native_file_len` 越界；§2.3 中 `required_exec_region_bytes` 不能单独代替这个检查。签名正确不保证设备能装载。
+- §2.5 的“DER 后追加一字节”反例在现有 72B 签名后得到 73B，测试走长度上限拒绝，不足以验证 ASN.1 对**上限以内的尾随字节**的完整消费。冻结前需增加能隔离 DER 尾随检查本身的反例，并将长度拒绝与语法拒绝分别验收。
+
+**执行边界**：A 当前环境没有 `arm-none-eabi-gcc`，且无法连接 GitHub Git 远程；本轮仅复核 GitHub 保存的源码与报告，未重新构建、签署真实 hello-app，未运行目标 STM32 PKA，未写板。后续 P3/P4 仍须等待 P2 经审查冻结和独立 READY。
 ## 3. 身份、版本和互操作（A 候选语义）
 
 - 以发行者身份 + App ID 确定 App 逻辑身份；同身份的新版本才是升级，换发行者不能静默接管旧 ID。
