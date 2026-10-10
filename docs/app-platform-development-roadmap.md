@@ -24,10 +24,10 @@
 - [ne30x-app#1](https://github.com/harryhua-ai/ne30x-app/issues/1)：独立 App 可行性调查（DONE）。
 - [ne30x-app#2：独立 hello-app 构建与 NE301 Host ABI 集成验证](https://github.com/harryhua-ai/ne30x-app/issues/2)：已完成。独立编译的 hello-app V1/V2 镜像在不重刷主固件的前提下于实验 Host 上完成真机替换运行；证据见 [docs/app-hello-poc.md](app-hello-poc.md)。
 - [ne30x-app#4](https://github.com/harryhua-ai/ne30x-app/issues/4)：**包协议 v1 已定稿入库**，canonical 文本为 [`docs/app-package-protocol-v1.md`](app-package-protocol-v1.md)（内容 blob `c7df6e79e53845c6a08416e9940b84fa4e19fbaf`），经 [PR #7](https://github.com/harryhua-ai/ne30x-app/pull/7) 合并。
-- [ne30x-app#6](https://github.com/harryhua-ai/ne30x-app/issues/6)：**v1 签名打包与离线验证已完成**（`tools/neapp_pack.py` / `tools/neapp_verify.py`，说明见 [docs/p3-packaging.md](p3-packaging.md)），经 [PR #10](https://github.com/harryhua-ai/ne30x-app/pull/10) 合并。其中 hello-app `1.0.0 → 2.0.0` 是**同应用的两份 v1 `.neapp` 包**，与下述 v2 容器/ABI 无关。
+- [ne30x-app#6](https://github.com/harryhua-ai/ne30x-app/issues/6)：**v1 签名打包与离线验证已完成**（`package/neapp_pack.py` / `package/neapp_verify.py`，说明见 [docs/p3-packaging.md](p3-packaging.md)），经 [PR #10](https://github.com/harryhua-ai/ne30x-app/pull/10) 合并。其中 hello-app `1.0.0 → 2.0.0` 是**同应用的两份 v1 `.neapp` 包**，与下述 v2 容器/ABI 无关。
 - [ne30x-app#8](https://github.com/harryhua-ai/ne30x-app/issues/8)：counting 过线（Line Crossing）算法核心已离线等价移植至 `apps/line-crossing`（[PR #9](https://github.com/harryhua-ai/ne30x-app/pull/9) 合并）；**离线 PASS 不等于真机 PASS**。
 - [ne30x-app#12](https://github.com/harryhua-ai/ne30x-app/issues/12)：**持续业务 App 包及 Host ABI v2 规范已定稿入库**（[PR #14](https://github.com/harryhua-ai/ne30x-app/pull/14) 合并）。现行唯一已集成 v2 规范基线 = [`docs/app-package-protocol-v2-draft.md`](app-package-protocol-v2-draft.md)（文件名中的 "draft" 为历史命名）+ `tests/spec-v2/**`。v2 是**独立 major**（独立容器/manifest magic、`required_host_abi` 编号与函数表），不是 v1 的向后兼容延伸。
-- [ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13)：**v2 受信签名打包与跨版本离线验证工具已完成**（`tools/neapp_pack_v2.py` / `tools/neapp_verify_v2.py`，说明见 [docs/p6-packaging.md](p6-packaging.md)），经 [PR #15](https://github.com/harryhua-ai/ne30x-app/pull/15) 合并。
+- [ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13)：**v2 受信签名打包与跨版本离线验证工具已完成**（`package/neapp_pack_v2.py` / `package/neapp_verify_v2.py`，说明见 [docs/p6-packaging.md](p6-packaging.md)），经 [PR #15](https://github.com/harryhua-ai/ne30x-app/pull/15) 合并。
 
 **在途（OPEN，修正中，均未 ACCEPTED / 未完成）**：
 
@@ -69,7 +69,7 @@
 
 ### P0 — 固定跨仓库与硬件验证基线（基线已完成；安全基线在途）
 
-**已固定并投入使用**：`ne301/experiment/app-host-poc@a5b4bf3d...`、唯一公开 ABI 头、64 MiB PSRAM 限制。P1/P3 的真机替换与打包验证均在该基线上完成。
+**已固定并投入使用**：`ne301/experiment/app-host-poc@a5b4bf3d...`、唯一公开 ABI 头、64 MiB PSRAM 限制。该基线上的既有证据须严格区分归属：P1（ne30x-app #2）的 hello-app 独立镜像替换运行为**真机**证据（真机日志与分区哈希见 [docs/app-hello-poc.md](app-hello-poc.md) 与 [docs/evidence/](evidence/)）；P3（ne30x-app #6/#13）的 v1/v2 签名打包与验签为**离线 PASS**，未涉及设备端安装/验签；P4/P5 的设备端安装与验签仍待实现。
 
 **持续约束（受控设备授权/数据备份，不因阶段完成而失效）**：开发板当前固件/boot slot、LittleFS/NVS/WEB/AI 等需保护数据的核实与可恢复性仍是硬约束；不得把历史开发板授权解释为允许覆盖未知现有数据。若板卡承载需要保留的 `counting` 演示数据且不能证明恢复方案，停止刷写并报告 A。该非破坏性安全基线现由在途的 [ne301#37](https://github.com/harryhua-ai/ne301/issues/37) 承载（PR #53 修正中）。
 
@@ -96,8 +96,8 @@
 
 原定最低结果已达成：在本仓库独立生成固定 ABI 的原生镜像及符合 P2 规范的包，版本可追溯，可重复生成/离线校验，构建不修改 NE301 工作树，不静态链接平台私有代码；失败路径覆盖错误版本、目标板、入口/尺寸、损坏包和不可信签名。
 
-- **v1**：[ne30x-app#6](https://github.com/harryhua-ai/ne30x-app/issues/6)（PR #10 合并）——`tools/neapp_pack.py` / `tools/neapp_verify.py`，覆盖 hello-app `1.0.0 → 2.0.0` 两份 v1 包，说明见 [docs/p3-packaging.md](p3-packaging.md)。
-- **v2**：[ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13)（PR #15 合并）——`tools/neapp_pack_v2.py` / `tools/neapp_verify_v2.py`，含跨版本验证与 v1 回归，说明见 [docs/p6-packaging.md](p6-packaging.md)。
+- **v1**：[ne30x-app#6](https://github.com/harryhua-ai/ne30x-app/issues/6)（PR #10 合并）——`package/neapp_pack.py` / `package/neapp_verify.py`，覆盖 hello-app `1.0.0 → 2.0.0` 两份 v1 包，说明见 [docs/p3-packaging.md](p3-packaging.md)。
+- **v2**：[ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13)（PR #15 合并）——`package/neapp_pack_v2.py` / `package/neapp_verify_v2.py`，含跨版本验证与 v1 回归，说明见 [docs/p6-packaging.md](p6-packaging.md)。
 
 以上均为**离线**验证产物；离线 PASS 不等于真机 PASS。
 
