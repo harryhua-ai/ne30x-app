@@ -2,7 +2,7 @@
 
 > 维护责任：Role A / Project Steward。本文是跨仓库长期产品与架构规划，不是 `ght` Execution Plan、实施授权、当前进度数据库或已批准的产品发布规范。
 >
-> 当前状态核对日期：2026-10-08。动态执行状态以各仓库的 GitHub Issues、Task Contracts、`ready`、`refs/ght/*`、PR 和最新验证证据为准；本文的阶段状态仅为该日期的快照。
+> 当前状态核对日期：2026-10-10。动态执行状态以各仓库的 GitHub Issues、Task Contracts、`ready`、`refs/ght/*`、PR 和最新验证证据为准；本文的阶段状态仅为该日期的快照。
 >
 > 核心目标：**让管理员最终能够通过 NE301 Web 界面安全安装、运行、更新和卸载由 `ne30x-app` 独立构建的应用，不因更换业务 App 而重新编译或刷写 NE301 主固件。** 普通用户可用与生产发布需经过独立安全、稳定性与发布验收。
 
@@ -19,10 +19,22 @@
 
 ### 1.2 当前 ne30x-app 状态
 
-- 本仓库当前仅有 `README.md`，尚无可交付 App、独立构建工具或安装包实现。
-- [ne30x-app#1](https://github.com/harryhua-ai/ne30x-app/issues/1) 为已完成的调查。
-- [ne30x-app#2：独立 hello-app 构建与 NE301 Host ABI 集成验证](https://github.com/harryhua-ai/ne30x-app/issues/2) 已有 `ght-contract`，但截至上述日期 **OPEN、未 READY、无执行 Claim、无 PR**。
-- 首个下一步是完成 **P0 前置核对并使 #2 达到可授权条件**，不是把整个 Web 安装产品一次性交给 B。
+**已完成（CLOSED / `completed`）**：
+
+- [ne30x-app#1](https://github.com/harryhua-ai/ne30x-app/issues/1)：独立 App 可行性调查（DONE）。
+- [ne30x-app#2：独立 hello-app 构建与 NE301 Host ABI 集成验证](https://github.com/harryhua-ai/ne30x-app/issues/2)：已完成。独立编译的 hello-app V1/V2 镜像在不重刷主固件的前提下于实验 Host 上完成真机替换运行；证据见 [docs/app-hello-poc.md](app-hello-poc.md)。
+- [ne30x-app#4](https://github.com/harryhua-ai/ne30x-app/issues/4)：**包协议 v1 已定稿入库**，canonical 文本为 [`docs/app-package-protocol-v1.md`](app-package-protocol-v1.md)（内容 blob `c7df6e79e53845c6a08416e9940b84fa4e19fbaf`），经 [PR #7](https://github.com/harryhua-ai/ne30x-app/pull/7) 合并。
+- [ne30x-app#6](https://github.com/harryhua-ai/ne30x-app/issues/6)：**v1 签名打包与离线验证已完成**（`package/neapp_pack.py` / `package/neapp_verify.py`，说明见 [docs/p3-packaging.md](p3-packaging.md)），经 [PR #10](https://github.com/harryhua-ai/ne30x-app/pull/10) 合并。其中 hello-app `1.0.0 → 2.0.0` 是**同应用的两份 v1 `.neapp` 包**，与下述 v2 容器/ABI 无关。
+- [ne30x-app#8](https://github.com/harryhua-ai/ne30x-app/issues/8)：counting 过线（Line Crossing）算法核心已离线等价移植至 `apps/line-crossing`（[PR #9](https://github.com/harryhua-ai/ne30x-app/pull/9) 合并）；**离线 PASS 不等于真机 PASS**。
+- [ne30x-app#12](https://github.com/harryhua-ai/ne30x-app/issues/12)：**持续业务 App 包及 Host ABI v2 规范已定稿入库**（[PR #14](https://github.com/harryhua-ai/ne30x-app/pull/14) 合并）。现行唯一已集成 v2 规范基线 = [`docs/app-package-protocol-v2-draft.md`](app-package-protocol-v2-draft.md)（文件名中的 "draft" 为历史命名）+ `tests/spec-v2/**`。v2 是**独立 major**（独立容器/manifest magic、`required_host_abi` 编号与函数表），不是 v1 的向后兼容延伸。
+- [ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13)：**v2 受信签名打包与跨版本离线验证工具已完成**（`package/neapp_pack_v2.py` / `package/neapp_verify_v2.py`，说明见 [docs/p6-packaging.md](p6-packaging.md)），经 [PR #15](https://github.com/harryhua-ai/ne30x-app/pull/15) 合并。
+
+**在途（OPEN，修正中，均未 ACCEPTED / 未完成）**：
+
+- [ne30x-app#11](https://github.com/harryhua-ai/ne30x-app/issues/11)：独立 Line Crossing App 统计业务与 Host 组合；[PR #16](https://github.com/harryhua-ai/ne30x-app/pull/16) 收到 A 的 REQUEST_CHANGES，正在修正。
+- [ne301#37](https://github.com/harryhua-ai/ne301/issues/37)：LittleFS/NVS 非破坏性启动与故障恢复安全基线；[PR #53](https://github.com/harryhua-ai/ne301/pull/53) 收到 A 的 REQUEST_CHANGES，正在修正。
+
+设备端可行性核验 [ne301#27](https://github.com/harryhua-ai/ne301/issues/27)（安装事务/验签/故障恢复，只读）与 [ne301#32](https://github.com/harryhua-ai/ne301/issues/32)（签名验签与公钥信任模型，离线）亦已完成。上述打包/移植证据均为**离线**验证；安装后端、Web 管理入口与真机端到端链路尚未落地（见第 3、5 节）。
 
 ## 2. 双仓库责任边界
 
@@ -41,67 +53,75 @@
 
 ## 3. 分阶段路线图（建议目标，非已经授权的任务）
 
-| 阶段 | 独立可验收的主要成果 | 主责 | 进入下一阶段的证据 |
-| --- | --- | --- | --- |
-| **P0** 基线/设备准备 | 固定 ABI/Host SHA，核实板卡、保护范围、恢复方案 | A 定义边界，B 做技术核对 | 可安全复现的设备与固定依赖 |
-| **P1** 跨仓库 hello-app PoC | 从 `ne30x-app` 独立编译两个版本、真机替换运行 | `ne30x-app` | 不重刷主固件的两次运行、坏镜像拒绝、分区哈希 |
-| **P2** 包与运行协议 | 决定包格式、兼容规则、安全边界和生命周期 | A 主导双方确认 | 可实施、可测试的版本化规则 |
-| **P3** App 构建/打包 | 独立生成可验证包及相应工具 | `ne30x-app` | 可复现产物、签名/兼容性验证 |
-| **P4** 安装后端 | 在设备端可靠接收、验证、安装、更新与卸载 | `ne301` | 有故障恢复证据的安装管理 API |
-| **P5** Web 安装 MVP | Web 查看、上传、安装、运行、更新、卸载受信任 App | `ne301` | 全程不接串口、不重刷固件的演示 |
-| **P6** 平台能力与执行模型 | 按首个业务 App 的实际需求扩展 Host API/生命周期 | `ne301` | API 兼容、资源边界与故障恢复验证 |
-| **P7** 首个真实业务 App | 以 Line Crossing 为候选，独立消费 Camera/AI 所需公开能力 | `ne30x-app` | 业务 App 安装/更新和系统隔离的真实验收 |
-| **P8** 生产发布准备 | 安全、稳定性、断电/异常恢复、OTA 兼容、回退验证 | 双方 | User 明确的产品发布授权 |
+| 阶段 | 当前状态（2026-10-10） | 独立可验收的主要成果 | 主责 | 进入下一阶段的证据 |
+| --- | --- | --- | --- | --- |
+| **P0** 基线/设备准备 | 基线已固定并由 P1 使用；安全基线 ne301#37 在途 | 固定 ABI/Host SHA，核实板卡、保护范围、恢复方案 | A 定义边界，B 做技术核对 | 可安全复现的设备与固定依赖 |
+| **P1** 跨仓库 hello-app PoC | **已完成**（ne30x-app #2） | 从 `ne30x-app` 独立编译两个版本、真机替换运行 | `ne30x-app` | 不重刷主固件的两次运行、坏镜像拒绝、分区哈希 |
+| **P2** 包与运行协议 | **已完成**（v1=ne30x-app #4，v2=ne30x-app #12；设备可行性=ne301 #27/#32） | 决定包格式、兼容规则、安全边界和生命周期 | A 主导双方确认 | 可实施、可测试的版本化规则 |
+| **P3** App 构建/打包 | **已完成**（v1=ne30x-app #6，v2=ne30x-app #13） | 独立生成可验证包及相应工具 | `ne30x-app` | 可复现产物、签名/兼容性验证 |
+| **P4** 安装后端 | 待实现（ne301 #29/#30/#31，Prepared） | 在设备端可靠接收、验证、安装、更新与卸载 | `ne301` | 有故障恢复证据的安装管理 API |
+| **P5** Web 安装 MVP | 待实现（ne301 #39/#40，Prepared） | Web 查看、上传、安装、运行、更新、卸载受信任 App | `ne301` | 全程不接串口、不重刷固件的演示 |
+| **P6** 平台能力与执行模型 | 应用侧 v2 打包已完成（ne30x-app #13）；设备侧待实现（ne301 #47/#43/#44/#46/#49，Prepared） | 按首个业务 App 的实际需求扩展 Host API/生命周期 | `ne301` | API 兼容、资源边界与故障恢复验证 |
+| **P7** 首个真实业务 App | 算法核心离线移植已完成（ne30x-app #8）；Host 组合在途（ne30x-app #11）；设备全链路待实现（ne301 #48，Prepared） | 以 Line Crossing 为候选，独立消费 Camera/AI 所需公开能力 | `ne30x-app` | 业务 App 安装/更新和系统隔离的真实验收 |
+| **P8** 生产发布准备 | 未开始 | 安全、稳定性、断电/异常恢复、OTA 兼容、回退验证 | 双方 | User 明确的产品发布授权 |
 
-**依赖关系**：`P0 → P1 → P2 → (P3 与 P4 可并行) → P5`，形成首个 Web 安装 MVP；`P6 → P7 → P8` 面向真实业务与生产化。P6 的接口需求调查可提前进行，安全/恢复验证应贯穿每个实现阶段，而不等到 P8 才考虑。阶段不是自动激活的 Issue；真正的实现要由 A 按可独立评审的行为建立/授权 Task Contract。
+**依赖关系**：`P0 → P1 → P2 → (P3 与 P4 可并行) → P5`，形成首个 Web 安装 MVP；`P6 → P7 → P8` 面向真实业务与生产化。P0–P3 的应用侧成果已完成；设备侧主线现为安全基线（[ne301#37](https://github.com/harryhua-ai/ne301/issues/37)）→ 口令认证基线（[ne301#36](https://github.com/harryhua-ai/ne301/issues/36)）→ P4（#29/#30/#31）→ P5（#39/#40），以及 P6/P7 链（#47/#43/#44/#46/#49 → #48），逐步按各 Issue 现行 `ght-contract` 授权。安全/恢复验证应贯穿每个实现阶段，而不等到 P8 才考虑。阶段不是自动激活的 Issue；真正的实现要由 A 按可独立评审的行为建立/授权 Task Contract。
 
-### P0 — 固定跨仓库与硬件验证基线（当前优先）
+### P0 — 固定跨仓库与硬件验证基线（基线已完成；安全基线在途）
 
-**已固定**：`ne301/experiment/app-host-poc@a5b4bf3d...`、唯一公开 ABI 头、64 MiB PSRAM 限制。
+**已固定并投入使用**：`ne301/experiment/app-host-poc@a5b4bf3d...`、唯一公开 ABI 头、64 MiB PSRAM 限制。该基线上的既有证据须严格区分归属：P1（ne30x-app #2）的 hello-app 独立镜像替换运行为**真机**证据（真机日志与分区哈希见 [docs/app-hello-poc.md](app-hello-poc.md) 与 [docs/evidence/](evidence/)）；P3（ne30x-app #6/#13）的 v1/v2 签名打包与验签为**离线 PASS**，未涉及设备端安装/验签；P4/P5 的设备端安装与验签仍待实现。
 
-**尚须核实**：开发板当前固件/boot slot、LittleFS/NVS/WEB/AI 等需保护的数据，受控实验 Host 部署和失败恢复路径；不得把历史开发板授权解释为允许覆盖未知现有数据。若板卡承载需要保留的 `counting` 演示数据且不能证明恢复方案，停止刷写并报告 A。
+**持续约束（受控设备授权/数据备份，不因阶段完成而失效）**：开发板当前固件/boot slot、LittleFS/NVS/WEB/AI 等需保护数据的核实与可恢复性仍是硬约束；不得把历史开发板授权解释为允许覆盖未知现有数据。若板卡承载需要保留的 `counting` 演示数据且不能证明恢复方案，停止刷写并报告 A。该非破坏性安全基线现由在途的 [ne301#37](https://github.com/harryhua-ai/ne301/issues/37) 承载（PR #53 修正中）。
 
-**完成判据**：可固定取得 ABI 与实验 Host；具有可复核的板卡与备份/恢复方案，缺失时如实报告，不把真机实验标为 PASS。
+**完成判据（已满足部分）**：可固定取得 ABI 与实验 Host；板卡与备份/恢复方案可复核，缺失时如实报告，不把真机实验标为 PASS。
 
-### P1 — 执行现有 ne30x-app#2（下一优先任务）
+### P1 — 跨仓库 hello-app PoC（已完成：ne30x-app #2）
 
-不创建重复 hello-app Issue。按其**现行 `ght-contract`** 执行：独立编译 V1/V2 镜像，唯一消费 NE301 公开 ABI；在部署的一次性实验 Host 上运行、替换并再次执行；验证读取真实 Host 信息、非法/不兼容镜像拒绝，以及更换 App **没有重新编译、重刷 NE301 主固件、改写基础 Web**。留存构建步骤、ABI/产物尺寸、真机日志、前后镜像和分区完整哈希、失败路径证据。
+[ne30x-app#2](https://github.com/harryhua-ai/ne30x-app/issues/2) 已按其现行 `ght-contract` 完成并关闭：独立编译 hello-app V1/V2 两个版本，唯一消费 NE301 公开 ABI；在部署的一次性实验 Host 上运行、替换并再次执行；验证了读取真实 Host 信息、非法/不兼容镜像拒绝，以及更换 App **没有重新编译、重刷 NE301 主固件、改写基础 Web**。构建步骤、ABI/产物尺寸、真机日志、前后镜像和分区完整哈希、失败路径证据见 [docs/app-hello-poc.md](app-hello-poc.md) 与 [docs/evidence/](evidence/)。
 
-**禁止范围扩张**：不开发 Line Crossing、`.neapp` 产品安装器、多 App 调度、动态加载器、Web 管理 UI；未有设备授权或恢复条件时停在静态验证，不能冒称真机通过。
+该阶段的边界约束（不把 PoC 扩张成 Line Crossing、产品安装器、多 App 调度、动态加载器或 Web 管理 UI；无设备授权时停在静态验证，不冒称真机通过）对后续阶段仍然有效。
 
-**READY 门槛**：A 先 fresh-read #2 及跨仓库基线/设备证据，完成语义检查和可用的 canonical `ght validate-ready` 检查，再按协议决定是否发一次性的 `ready`；本文**不是授权**。
+### P2 — 安装包与执行模型决策（已完成：v1 与 v2 两份规范已定稿入库）
 
-### P2 — 安装包与执行模型的重要决策
+安装包扩展名 `.neapp` 的格式已定稿为两份独立规范：
 
-建议最终安装包扩展名为 `.neapp`，但**格式尚未定案**。需明确版本化应用 ID/版本、硬件/ABI、独立二进制及入口、资源预算、能力声明、摘要、签名等元信息；厘清 host 拒绝不兼容包的错误语义和可验证回退。
+- **v1**：[`docs/app-package-protocol-v1.md`](app-package-protocol-v1.md)（[ne30x-app#4](https://github.com/harryhua-ai/ne30x-app/issues/4)，PR #7 合并）。覆盖版本化应用 ID/版本、签名/身份、严格 DER、未知能力位与未知容器版本拒绝、hello-app 单次运行语义；ABI `0x00010000`（16B 函数表，仅 `log`/`tick_ms`）不变。
+- **v2**：[`docs/app-package-protocol-v2-draft.md`](app-package-protocol-v2-draft.md)（[ne30x-app#12](https://github.com/harryhua-ai/ne30x-app/issues/12)，PR #14 合并；文件名为历史命名，内容为已定稿规范）。v2 是**独立 major**：独立容器/manifest magic、`required_host_abi` 编号与函数表，不复用 v1 保留位扩权；为持续业务 App 引入能力声明与 Host ABI v2 调用面。
 
-安装/运行规则须覆盖：安装前检查、暂存/提交、升级与旧版本保留、卸载数据处理、重启行为、启动与停止/异常退出；不能把当前**同步执行后返回**的 PoC 当成完整后台应用生命周期，也不能假设已有强制停止机制。
+**关键区分**：hello-app `1.0.0 → 2.0.0`（P3/#6 基线）是**两份 v1 `.neapp` 包**的同应用升级，与 v2 容器/ABI（独立 major）有别，不得混用叙述。
 
-**信任边界建议**：首版 Web MVP 只允许管理员安装可信来源、签名可验证的应用；未经认证的文件上传不等于执行授权。CRC/SHA 只证明数据完整性，**不是来源认证**。原生程序可能共享主固件执行环境，若缺少可信故障隔离，不得对不受信任第三方 App 承诺沙箱安全。
+安装/运行的产品语义决策保持不变：首版 Web MVP 只允许管理员安装可信来源、签名可验证的应用；未经认证的文件上传不等于执行授权；CRC/SHA 只证明数据完整性，**不是来源认证**；原生程序可能共享主固件执行环境，缺少可信故障隔离时不得对不受信任第三方 App 承诺沙箱安全。不能把 PoC **同步执行后返回**当成完整后台应用生命周期，也不能假设已有强制停止机制。设备端安装事务/验签可行性已由 [ne301#27](https://github.com/harryhua-ai/ne301/issues/27) 与 [ne301#32](https://github.com/harryhua-ai/ne301/issues/32) 完成（只读/离线），安装后端本身仍待 P4 实现。如涉及开放第三方代码或允许普通用户直接执行原生代码，仍由 User 决定风险取舍。
 
-这些属于实现前必须确定的架构/产品语义；如涉及开放第三方代码或允许普通用户直接执行原生代码，应由 User 决定风险取舍。
+### P3 — ne30x-app 构建和打包（已完成：v1 与 v2 工具均已落地）
 
-### P3 — ne30x-app 构建和打包
+原定最低结果已达成：在本仓库独立生成固定 ABI 的原生镜像及符合 P2 规范的包，版本可追溯，可重复生成/离线校验，构建不修改 NE301 工作树，不静态链接平台私有代码；失败路径覆盖错误版本、目标板、入口/尺寸、损坏包和不可信签名。
 
-构建命令与目录 HOW 由 B 决定；最低结果是：在本仓库独立生成固定 ABI 的原生镜像及符合 P2 规范的包，版本可追溯，可重复生成/校验，构建不修改 NE301 工作树，不静态链接平台私有代码。失败路径至少覆盖错误版本、目标板、入口/尺寸、损坏包和不可信签名。
+- **v1**：[ne30x-app#6](https://github.com/harryhua-ai/ne30x-app/issues/6)（PR #10 合并）——`package/neapp_pack.py` / `package/neapp_verify.py`，覆盖 hello-app `1.0.0 → 2.0.0` 两份 v1 包，说明见 [docs/p3-packaging.md](p3-packaging.md)。
+- **v2**：[ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13)（PR #15 合并）——`package/neapp_pack_v2.py` / `package/neapp_verify_v2.py`，含跨版本验证与 v1 回归，说明见 [docs/p6-packaging.md](p6-packaging.md)。
 
-### P4 — NE301 设备端 App 安装服务
+以上均为**离线**验证产物；离线 PASS 不等于真机 PASS。
+
+### P4 — NE301 设备端 App 安装服务（待实现）
 
 设计受认证、具授权的安装 API，借鉴已有文件上传与 OTA 的受控流式传输能力，**不直接把普通文件上传或调试 CLI 等价为任意代码安装**。最低语义：接收并暂存、包/签名/ABI/资源检查、原子或可恢复安装提交、应用清单、升级、卸载及故障状态。不得覆盖 FSBL、APP1/APP2、OTA、基础 Web 或 AI 分区；必须真实验证意外断电、空间不足、写入/校验失败与回滚行为。
 
-### P5 — NE301 Web「应用管理」MVP
+对应 Prepared Issue：[ne301#29](https://github.com/harryhua-ai/ne301/issues/29)（验签/兼容检查/管理准入）、[ne301#30](https://github.com/harryhua-ai/ne301/issues/30)（安装升级/卸载与掉电恢复）、[ne301#31](https://github.com/harryhua-ai/ne301/issues/31)（已安装 App 手动单次执行）；前置为安全基线 [ne301#37](https://github.com/harryhua-ai/ne301/issues/37) 与口令认证基线 [ne301#36](https://github.com/harryhua-ai/ne301/issues/36)。逐步授权以各 Issue 现行 `ght-contract` 为准，本文不构成授权。
 
-建议管理员能在 Web 页面查看已安装应用、上传 `.neapp`、看到兼容性/签名验证结果、安装/手动执行一次性 App、更新、卸载、查看结果与失败原因。**第一个 MVP 的验收**：无需串口或开发者刷写工具，从 Web 安装 hello-app V1、替换为 V2 并运行，主固件及基础 Web 前后不变；失败时可恢复到一致状态。App 商店、在线分发、复杂多任务管理不是首版目标。
+### P5 — NE301 Web「应用管理」MVP（待实现）
 
-### P6 — 按真实业务需求扩展 Host API 与运行模型
+目标不变：管理员能在 Web 页面查看已安装应用、上传 `.neapp`、看到兼容性/签名验证结果、安装/手动执行一次性 App、更新、卸载、查看结果与失败原因。**第一个 MVP 的验收**：无需串口或开发者刷写工具，从 Web 安装 hello-app V1、替换为 V2 并运行，主固件及基础 Web 前后不变；失败时可恢复到一致状态。App 商店、在线分发、复杂多任务管理不是首版目标。该 MVP 中的 hello-app V1/V2 仍是**两份 v1 包**。
 
-当前只有 `log` / `tick_ms`。未来 Camera 图像/AI 检测结果、配置、存储、网络事件等必须由 NE301 按需暴露为**稳定、受控、可版本协商**的接口，应用只消费这些接口。先确定首个业务 App 的真实最小数据需要，优先考虑暴露检测结果而非整个驱动/AI Runtime。后台生命周期、资源回收、CPU/内存预算、App 故障影响均须独立验证；不要无证据承诺原生 App 不能使系统崩溃。
+对应 Prepared Issue：[ne301#39](https://github.com/harryhua-ai/ne301/issues/39)（Web 可信 App 管理界面与失败状态）、[ne301#40](https://github.com/harryhua-ai/ne301/issues/40)（V1→V2 跨仓库端到端验收）。
 
-### P7 — 第一个业务 App
+### P6 — 按真实业务需求扩展 Host API 与运行模型（应用侧 v2 打包已完成，设备侧待实现）
 
-Line Crossing 可作为候选，**不是当前 READY 的开发范围**。在 P6 公开接口满足需求后，由 `ne30x-app` 独立实现业务判断；验证其安装、更换、运行、事件输出、资源占用与错误恢复。NE301 不重新链接具体业务 App，不复制业务规则。
+实验 Host 当前公开 ABI 仍只有 `log` / `tick_ms`（v1）。v2 规范（[ne30x-app#12](https://github.com/harryhua-ai/ne30x-app/issues/12)）已为持续业务 App 定义能力声明与 Host ABI v2 独立调用面：Camera 图像/AI 检测结果、配置、存储、网络事件等必须由 NE301 按需暴露为**稳定、受控、可版本协商**的接口，应用只消费这些接口。应用侧 v2 受信签名打包/离线验真工具已由 [ne30x-app#13](https://github.com/harryhua-ai/ne30x-app/issues/13) 完成；设备侧对应 Prepared Issue：[ne301#47](https://github.com/harryhua-ai/ne301/issues/47)（v2 验签准入与能力版本分派）、[#43](https://github.com/harryhua-ai/ne301/issues/43)（AI 检测结果供给与运行会话）、[#44](https://github.com/harryhua-ai/ne301/issues/44)（业务结果回传/MQTT/Webhook 上行）、[#46](https://github.com/harryhua-ai/ne301/issues/46)（业务配置与累计状态持久化）、[#49](https://github.com/harryhua-ai/ne301/issues/49)（Web 会话管理与状态），均未开始实施。优先考虑暴露检测结果而非整个驱动/AI Runtime；后台生命周期、资源回收、CPU/内存预算、App 故障影响均须独立验证；不要无证据承诺原生 App 不能使系统崩溃。
 
-### P8 — 系统级验收与发布
+### P7 — 第一个业务 App（算法核心已离线移植；Host 组合在途；设备全链路待实现）
+
+Line Crossing 已确定为首个业务 App：算法核心已由 [ne30x-app#8](https://github.com/harryhua-ai/ne30x-app/issues/8)（PR #9 合并）离线等价移植至 `apps/line-crossing`（[docs/p7-line-crossing-port.md](p7-line-crossing-port.md)），但**离线 PASS 不等于真机 PASS**。统计业务与 Host 组合（[ne30x-app#11](https://github.com/harryhua-ai/ne30x-app/issues/11)，PR #16）正在按 A 的 REQUEST_CHANGES 修正，未 ACCEPTED；设备端全链路与非刷机替换验收对应 [ne301#48](https://github.com/harryhua-ai/ne301/issues/48)，待其 P4/P5/P6 依赖按各自 Contract 完成后逐步授权。实现仍由 `ne30x-app` 独立承担业务判断，验证安装、更换、运行、事件输出、资源占用与错误恢复；NE301 不重新链接具体业务 App，不复制业务规则。
+
+### P8 — 系统级验收与发布（未开始）
 
 覆盖至少：签名与身份授权、恶意/不兼容/损坏包拒绝、分区与数据隔离、更新断电/回滚、重启恢复、运行故障与资源约束、主固件 OTA 与已安装 App 的兼容策略、长时间稳定性及真实用户工作流。先做受控可信发行方产品，不宣称已实现不可信 App 沙箱。任何向 NE301 正式分支集成、生产刷写及正式发布，均需后续独立审查与 **User 明确授权**。
 
@@ -114,13 +134,11 @@ Line Crossing 可作为候选，**不是当前 READY 的开发范围**。在 P6 
 5. **审查收敛**：优先复用已闭合且不受新 delta 影响的证据；不能因修文档反复重开已验证的 NE301 App Host PoC。新问题必须与本次变更或 Contract 的实质验收直接相关。
 6. **授权边界**：本路线图写入不等于创建执行任务或颁发 `ready`；P2–P8 的协议和产品关键选择仍需要按阶段落地，避免一次性扩大范围。
 
-## 5. 最近的下一步（按优先级）
+## 5. 最近的下一步（按优先级，截至 2026-10-10）
 
-1. **Role A**：固定上述 Host SHA/ABI 作为 #2 的实验依赖；检查 #2 当前 Contract 是否需要消除过时的“跨仓库前提尚未满足”说明，且不更改其现行可执行边界。
-2. **Role A/B**：核实开发板目前运行的固件、LittleFS 残留、应保护的数据及安全回退方案；无法证明可恢复即停止刷写并向 A 报告。
-3. **Role A**：在前置事实可信后执行 #2 READY 核验与正式授权，不要求用户手工中转已有 GitHub 事实。
-4. **Role B**：完成 #2 的两个独立 hello-app 版本、同一 Host 下无主固件重刷的替换验证。
-5. **Role A**：用 #2 的真实证据开展 P2 产品/架构决策，按独立成果建立后续 Issue；P3/P4 可在协议确定后并行。
+1. **在途修正优先**：完成 [ne301#37](https://github.com/harryhua-ai/ne301/issues/37)（[PR #53](https://github.com/harryhua-ai/ne301/pull/53)）与 [ne30x-app#11](https://github.com/harryhua-ai/ne30x-app/issues/11)（[PR #16](https://github.com/harryhua-ai/ne30x-app/pull/16)）的 REQUEST_CHANGES 修正与评审收敛；二者均未 ACCEPTED/完成，低优先级文档任务不抢占其修复。
+2. **按 canonical 依赖逐步授权**：#37 之后是口令认证基线 [ne301#36](https://github.com/harryhua-ai/ne301/issues/36)；随后 P4/P5 链（[#29](https://github.com/harryhua-ai/ne301/issues/29) → [#30](https://github.com/harryhua-ai/ne301/issues/30) → [#31](https://github.com/harryhua-ai/ne301/issues/31) → [#39](https://github.com/harryhua-ai/ne301/issues/39) → [#40](https://github.com/harryhua-ai/ne301/issues/40)）与 P6/P7 链（[#47](https://github.com/harryhua-ai/ne301/issues/47) → [#43](https://github.com/harryhua-ai/ne301/issues/43) / [#44](https://github.com/harryhua-ai/ne301/issues/44) / [#46](https://github.com/harryhua-ai/ne301/issues/46) → [#49](https://github.com/harryhua-ai/ne301/issues/49) → [#48](https://github.com/harryhua-ai/ne301/issues/48)）仍待实现，每一步都以该 Issue **现行 `ght-contract`** 为准、经 A READY/评审授权推进；本文不建立第二套授权。
+3. **待实现主线**：Web 安装 MVP（hello-app V1→V2 两份 v1 包端到端）、持续业务 v2 设备链路（验签准入、AI 结果供给、结果回传、持久化、会话管理）与首个业务 App 设备全链路验收均未落地；真机验收不得以离线 PASS 代替，向正式分支集成、生产刷写与发布仍需 **User 明确授权**。
 
 ## 6. 关键链接
 
@@ -128,9 +146,22 @@ Line Crossing 可作为候选，**不是当前 READY 的开发范围**。在 P6 
 - [ne301 PR #26（已合并，仅实验分支）](https://github.com/harryhua-ai/ne301/pull/26)
 - [固定 Host/ABI 基线](https://github.com/harryhua-ai/ne301/tree/a5b4bf3dd25931d612680aff200e4e0ac8d8e64e)
 - [Host 原始设计和真机证据](https://github.com/harryhua-ai/ne301/blob/a5b4bf3dd25931d612680aff200e4e0ac8d8e64e/Docs/design/app-host-poc.md)
+- [ne301#27：安装事务/验签/故障恢复可行性（DONE）](https://github.com/harryhua-ai/ne301/issues/27) · [ne301#32：签名验签与信任模型可行性（DONE）](https://github.com/harryhua-ai/ne301/issues/32)
 - [ne30x-app#1：独立 App 可行性调查（DONE）](https://github.com/harryhua-ai/ne30x-app/issues/1)
-- [ne30x-app#2：独立 hello-app 联调（OPEN，未 READY）](https://github.com/harryhua-ai/ne30x-app/issues/2)
+- [ne30x-app#2：独立 hello-app 构建与 Host ABI 集成验证（DONE）](https://github.com/harryhua-ai/ne30x-app/issues/2) / [说明 docs/app-hello-poc.md](app-hello-poc.md)
+- [协议 v1 规范（已集成）：docs/app-package-protocol-v1.md](app-package-protocol-v1.md)（[ne30x-app#4](https://github.com/harryhua-ai/ne30x-app/issues/4)，[PR #7](https://github.com/harryhua-ai/ne30x-app/pull/7)）
+- [协议 v2 规范（已集成，历史文件名）：docs/app-package-protocol-v2-draft.md](app-package-protocol-v2-draft.md)（[ne30x-app#12](https://github.com/harryhua-ai/ne30x-app/issues/12)，[PR #14](https://github.com/harryhua-ai/ne30x-app/pull/14)）
+- [ne30x-app#6：v1 打包与离线验证（DONE）](https://github.com/harryhua-ai/ne30x-app/issues/6) / [说明 docs/p3-packaging.md](p3-packaging.md)
+- [ne30x-app#13：v2 打包与跨版本离线验证（DONE）](https://github.com/harryhua-ai/ne30x-app/issues/13) / [说明 docs/p6-packaging.md](p6-packaging.md)
+- [ne30x-app#8：Line Crossing 算法核心离线移植（DONE）](https://github.com/harryhua-ai/ne30x-app/issues/8) / [说明 docs/p7-line-crossing-port.md](p7-line-crossing-port.md)
+- [ne30x-app#11：Line Crossing 统计业务与 Host 组合（OPEN，修正中，未 ACCEPTED）](https://github.com/harryhua-ai/ne30x-app/issues/11) / [PR #16](https://github.com/harryhua-ai/ne30x-app/pull/16)
+- [ne301#37：LittleFS/NVS 非破坏性启动与故障恢复基线（OPEN，修正中，未 ACCEPTED）](https://github.com/harryhua-ai/ne301/issues/37) / [PR #53](https://github.com/harryhua-ai/ne301/pull/53)
+- [ne301#36：App 管理入口口令保护与认证授权基线（Prepared）](https://github.com/harryhua-ai/ne301/issues/36)
+- [ne301#29 / #30 / #31：P4 验签准入、安装升级/卸载、手动单次执行（Prepared）](https://github.com/harryhua-ai/ne301/issues/29)
+- [ne301#39 / #40：P5 Web 管理界面与 V1→V2 端到端验收（Prepared）](https://github.com/harryhua-ai/ne301/issues/39)
+- [ne301#47 / #43 / #44 / #46 / #49：P6 设备侧持续业务链路（Prepared）](https://github.com/harryhua-ai/ne301/issues/47)
+- [ne301#48：独立 Line Crossing App 设备全链路验收（Prepared）](https://github.com/harryhua-ai/ne301/issues/48)
 
 ---
 
-**阶段决策原则：先证明跨仓库独立 App 可以真实替换，再做用户 Web 安装；先让可信的 hello-app 端到端可用，再扩展 Camera/AI 业务和生产级安全。**
+**阶段决策原则（不变）：跨仓库独立 App 的真实替换已由 hello-app 证明；当前主线是先把可信安装与用户 Web 管理端到端做实，再扩展 Camera/AI 持续业务和生产级安全。**
