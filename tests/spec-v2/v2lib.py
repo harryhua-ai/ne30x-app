@@ -71,24 +71,13 @@ LINE_CROSSING_PROFILE = {
     "report_max": 6144,
 }
 
-# Host acceptance policy simulated from spec §4/§8/§9 for the current business.
-HOST_POLICY_V2 = {
-    "board_id": 0x00003010,
-    "psram_mib": 64,
-    "abi": ABI_V2,
-    "caps_supported": CAP_KNOWN_MASK,
-    "event_buffer_bytes": 2048,          # example host provision (>= 1576 required)
-    "report_capacity_bytes": REPORT_BUSINESS_MAX,
-    "state_quota_bytes": STATE_QUOTA_EXAMPLE,
-    "load_region_bytes": 2 * 1024 * 1024,   # v1 §2.3/§2.5 evidence baseline (2 MiB)
-    "event_min_for_ai_events": EVENT_MAX_BYTES,      # spec §4.1: >= 1576
-    "report_min_for_report_submit": REPORT_BUSINESS_MAX,  # spec §4.1/§8 M7
-}
-
 DER_SIG_MIN = 8
 DER_SIG_MAX = 72
 
-PACKAGE_MAX = 16 + V2_MANIFEST_LEN + HOST_POLICY_V2["load_region_bytes"] + DER_SIG_MAX
+# v1 §2.3/§2.5 evidence baseline for the experimental Host (2 MiB PSRAM exec region).
+EXPERIMENTAL_REGION_BYTES = 2 * 1024 * 1024
+
+PACKAGE_MAX = 16 + V2_MANIFEST_LEN + EXPERIMENTAL_REGION_BYTES + DER_SIG_MAX
 
 
 class SpecViolation(Exception):
@@ -466,8 +455,60 @@ def parse_container(pkg, expected_magic=MAGIC_V2):
 
 
 # ---------------------------------------------------------------------------
-# Host-side policy simulation (spec §4, §8, §9)
+# Host-side policy simulation (spec §2.3/§4/§8/§9)
 # ---------------------------------------------------------------------------
+
+# Public, unsafe, non-production P-256 test key (scalar d=1) standing in for the
+# Host's locally provisioned issuer key. MUST NEVER be a production trust anchor.
+TEST_PUBLISHER_SPKI = p256_spki_for_d(1)
+
+# Host acceptance policy simulated from spec §2.3/§3.1/§3.3/§4/§8/§9 for the
+# current business. Everything under "trusted_publishers"/loader_* is the
+# HOST's own independently configured state, not data taken from the package.
+HOST_POLICY_V2 = {
+    "board_id": 0x00003010,
+    "psram_mib": 64,
+    "abi": ABI_V2,
+    "caps_supported": CAP_KNOWN_MASK,
+    # §2.3 step 3 / §3.1: Host-local publisher_id -> SPKI DER trust store.
+    # The package carries only the fingerprint; the Host compares it against
+    # its own entry and verifies with its OWN key, never a package-supplied one.
+    "trusted_publishers": {
+        "test-publisher": TEST_PUBLISHER_SPKI,
+    },
+    # §3.3 / v1-inherited: Host independently known loader placement and sizes.
+    "loader_base": 0x93E00000,              # evidence-anchor controlled exec base
+    "loader_size": EXPERIMENTAL_REGION_BYTES,
+    "load_region_bytes": EXPERIMENTAL_REGION_BYTES,   # temp load capacity (v1 rule)
+    "exec_region_bytes": EXPERIMENTAL_REGION_BYTES,   # actual exec region (v1 rule 2)
+    "event_buffer_bytes": 2048,          # example host provision (>= 1576 required)
+    "report_capacity_bytes": REPORT_BUSINESS_MAX,
+    "state_quota_bytes": STATE_QUOTA_EXAMPLE,
+    "event_min_for_ai_events": EVENT_MAX_BYTES,      # spec §4.1: >= 1576
+    "report_min_for_report_submit": REPORT_BUSINESS_MAX,  # spec §4.1/§8 M7
+}
+
+
+def trusted_issuer_spki(host, manifest):
+    """Spec §2.3 step 3 / §3.1: resolve the Host-local trusted issuer key for
+    the signed manifest identity, fail-closed.
+
+    The publisher_id must exist in the Host's own configured mapping AND the
+    manifest publisher_key_sha256 must equal SHA-256 of that stored SPKI DER.
+    Returns the SPKI DER to verify with; raises PUBLISHER_UNTRUSTED otherwise.
+    """
+    pid_bytes = manifest["publisher_id"]
+    pid = pid_bytes.rstrip(b"\x00").decode("ascii")
+    mapping = host.get("trusted_publishers", {})
+    if pid not in mapping:
+        raise SpecViolation("PUBLISHER_UNTRUSTED",
+                            f"publisher_id {pid!r} not in Host trusted mapping")
+    spki = mapping[pid]
+    if manifest["publisher_key_sha256"] != sha256(spki):
+        raise SpecViolation("PUBLISHER_UNTRUSTED",
+                            f"publisher_key_sha256 mismatch for {pid!r} vs Host trust store")
+    return spki
+
 
 def policy_check_v2_host(manifest, native, host=HOST_POLICY_V2,
                          business="line-crossing-64"):
@@ -526,10 +567,23 @@ def policy_check_v2_host(manifest, native, host=HOST_POLICY_V2,
         raise SpecViolation("RESOURCE_LIMIT", "state_quota exceeds host state quota")
     if manifest["native_file_len"] > host["load_region_bytes"]:
         raise SpecViolation("RESOURCE_LIMIT", "native_file_len exceeds host load region")
+    # §3.3/v1-inherited: the target address is checked against the Host's
+    # INDEPENDENTLY known loader base/range — not merely against the package's
+    # own self-declared manifest target (which check_native_cross already
+    # cross-compares with the native header).
+    target = manifest["native_target_addr"]
+    range_hi = host["loader_base"] + host["loader_size"]
+    if not (host["loader_base"] <= target < range_hi
+            and target + manifest["native_file_len"] <= range_hi):
+        raise SpecViolation("RESOURCE_LIMIT",
+                            f"native target_addr 0x{target:08x}+{manifest['native_file_len']}B outside "
+                            f"host loader range 0x{host['loader_base']:08x}..0x{range_hi:08x}")
     if manifest["exec_region"] < manifest["native_image_size"]:
         raise SpecViolation("RESOURCE_LIMIT", "exec_region < native payload residency")
-    if manifest["exec_region"] > host["load_region_bytes"]:
-        raise SpecViolation("RESOURCE_LIMIT", "exec_region exceeds host region")
+    if manifest["exec_region"] > host["exec_region_bytes"]:
+        raise SpecViolation("RESOURCE_LIMIT",
+                            f"exec_region {manifest['exec_region']} exceeds host actual "
+                            f"execution region {host['exec_region_bytes']}")
 
 
 # ---------------------------------------------------------------------------
@@ -653,6 +707,21 @@ def encode_model_meta(loaded, model_generation, class_generation, class_count,
     return bytes(out)
 
 
+def _strict_nul_field(field, label):
+    """Spec §6.5 strict NUL-terminated/right-zero-padded UTF-8 field:
+    at least one NUL must exist, every byte after the FIRST NUL must be zero,
+    and the text must be valid UTF-8."""
+    nul = field.find(b"\x00")
+    if nul < 0:
+        raise SpecViolation("INCOMPATIBLE", f"{label} missing NUL terminator")
+    if field[nul:] != b"\x00" * (len(field) - nul):
+        raise SpecViolation("INCOMPATIBLE", f"{label} has non-zero bytes after its NUL")
+    try:
+        return field[:nul].decode("utf-8")
+    except UnicodeDecodeError:
+        raise SpecViolation("INCOMPATIBLE", f"{label} is not valid UTF-8")
+
+
 def validate_model_meta(buf):
     if len(buf) != MODEL_META_SIZE:
         raise SpecViolation("INCOMPATIBLE", "model_meta must be exactly 128B")
@@ -667,8 +736,27 @@ def validate_model_meta(buf):
     ver = buf[24 + MODEL_NAME_LEN:24 + MODEL_NAME_LEN + MODEL_VERSION_LEN]
     return {"loaded": loaded, "result_type": result_type, "model_generation": mgen,
             "class_generation": cgen, "class_count": ccount,
-            "model_name": name.split(b"\x00")[0].decode("utf-8"),
-            "model_version": ver.split(b"\x00")[0].decode("utf-8")}
+            "model_name": _strict_nul_field(name, "model_name"),
+            "model_version": _strict_nul_field(ver, "model_version")}
+
+
+# ---------------------------------------------------------------------------
+# tick_ms modulo-2^32 semantics (A decision issuecomment-6093724900)
+# ---------------------------------------------------------------------------
+
+TICK_MODULUS = 1 << 32
+
+
+def tick_delta_ms(prev_bits, cur_bits):
+    """tick_ms returns the raw modulo-2^32 monotonic millisecond bit pattern —
+    the single exception to the §6.4 negative-error-code channel. Forward
+    progress is the mod-2^32 difference of the raw bit patterns, NEVER the
+    signed int32 interpretation (whose negative values must not be read as
+    §6.4 error codes)."""
+    for bits in (prev_bits, cur_bits):
+        if not 0 <= bits < TICK_MODULUS:
+            raise SpecViolation("INVALID_ARGUMENT", f"tick bits 0x{bits:08x} outside u32")
+    return (cur_bits - prev_bits) % TICK_MODULUS
 
 
 # ---------------------------------------------------------------------------

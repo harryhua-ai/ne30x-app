@@ -162,13 +162,16 @@ def resigned_package(manifest192, native, private_scalar=D_TEST):
 
 def full_accept(pkg, host=V.HOST_POLICY_V2):
     """Full v2 Host acceptance in spec §2.3 order: bounded structure/manifest
-    unique-encoding first, then trusted-issuer ECDSA verification of the raw
-    TBS, and only after a valid signature the trust-data cross-checks (native
-    header/CRC/SHA) and the host policy (caps subset/quotas/resources)."""
+    unique-encoding first, then the Host-LOCAL trusted-issuer mapping lookup
+    (publisher_id -> SPKI store; fail-closed PUBLISHER_UNTRUSTED), then ECDSA
+    verification of the raw TBS with that mapped Host-owned key, and only then
+    the trust-data cross-checks (native header/CRC/SHA) and the host policy
+    (caps subset/quotas/Host-own loader range and exec region)."""
     c = V.parse_container(pkg)
     man = V.decode_manifest_v2(c["manifest"])
-    if not V.p256_verify(SPKI, V.sha256(c["tbs"]), c["sig"]):
-        raise V.SpecViolation("SIGNATURE_INVALID", "ECDSA verify failed")
+    issuer_spki = V.trusted_issuer_spki(host, man)
+    if not V.p256_verify(issuer_spki, V.sha256(c["tbs"]), c["sig"]):
+        raise V.SpecViolation("SIGNATURE_INVALID", "ECDSA verify failed against Host-trusted issuer key")
     V.check_native_cross(c["native"], man)
     V.policy_check_v2_host(man, c["native"], host=host)
     return c, man
@@ -303,6 +306,49 @@ def group_resigned_policy_negatives(golden_pkg):
                      lambda: full_accept(golden_pkg, host=host_no_report),
                      "ABI_INCOMPATIBLE", "caps=0x3f all known bits; Host lacks report_submit",
                      detail_contains="host does not provide capability bits")
+
+    # AC2/AC4 Rev3: publisher trust mapping (spec §2.3 step 3 / §3.1, v1-inherited).
+    # The Host resolves the issuer key from its OWN configured store keyed by the
+    # signed publisher_id and compares the manifest fingerprint against that store.
+    # a) unknown publisher id (format-valid identifier), validly re-signed
+    m = bytearray(man_bytes)
+    m[4:20] = b"untrusted-pub".ljust(16, b"\x00")
+    pkg, _, _ = resigned_package(bytes(m), native)
+    expect_rejection("unknown_publisher_id", lambda: full_accept(pkg), "PUBLISHER_UNTRUSTED",
+                     "format-valid publisher_id absent from Host trust store, re-signed",
+                     detail_contains="not in Host trusted mapping")
+    # b) trusted publisher id but altered key fingerprint, validly re-signed
+    m = bytearray(man_bytes)
+    m[128] = 0x5D                      # trusted SPKI fingerprint starts 0x5c
+    pkg, _, _ = resigned_package(bytes(m), native)
+    cb = V.parse_container(pkg)
+    vector("publisher_negative_signature_valid", "signature valid",
+           V.p256_verify(SPKI, V.sha256(cb["tbs"]), cb["sig"]),
+           "re-signed with the Host-store key: rejection below is trust mapping, not signature")
+    expect_rejection("publisher_key_fingerprint_mismatch", lambda: full_accept(pkg), "PUBLISHER_UNTRUSTED",
+                     "manifest fingerprint altered, Host store entry unchanged, re-signed",
+                     detail_contains="publisher_key_sha256 mismatch")
+
+    # AC2/AC4 Rev3: Host independently known loader placement / actual exec region
+    # (spec §3.3 / v1 §2.3 rules). a) self-consistent target outside Host range:
+    # manifest AND native header target moved together (cross-check passes), but
+    # the address is not in the Host's independently known loader range.
+    bad_native = bytearray(native)
+    struct.pack_into("<I", bad_native, 12, 0x94E00000)
+    m = bytearray(man_bytes)
+    struct.pack_into("<I", m, 92, 0x94E00000)
+    m[96:128] = V.sha256(bytes(bad_native))
+    pkg, _, _ = resigned_package(bytes(m), bytes(bad_native))
+    expect_rejection("target_outside_host_loader_range", lambda: full_accept(pkg), "RESOURCE_LIMIT",
+                     "self-consistent target 0x94E00000 outside Host loader range, re-signed",
+                     detail_contains="outside host loader range")
+    # b) required exec region far beyond the Host actual execution region
+    m = bytearray(man_bytes)
+    struct.pack_into("<I", m, 76, 3 * 1024 * 1024)
+    pkg, _, _ = resigned_package(bytes(m), native)
+    expect_rejection("exec_region_exceeds_host_actual", lambda: full_accept(pkg), "RESOURCE_LIMIT",
+                     "required_exec_region_bytes=3MiB > host actual 2MiB, re-signed",
+                     detail_contains="exceeds host actual")
 
     # native header ABI-only mismatch: manifest keeps required_host_abi=0x00020000;
     # ONLY the native header abi_version is flipped to 0x00010000 (native SHA
@@ -539,6 +585,59 @@ def group_model_meta():
            V.LINE_CROSSING_PROFILE["report_max"] == V.REPORT_BUSINESS_MAX == 6144,
            "declared report_max == LC_DQ_SLOT_CAPACITY evidence anchor")
 
+    # AC4 Rev3: strict model_meta wire decoding (spec §6.5) — a required NUL,
+    # all-zero right padding, and zero reserved are all fail-closed.
+    def malformed_meta(name_field=None, ver_field=None, tail=None):
+        b = bytearray(meta)
+        if name_field is not None:
+            b[24:24 + V.MODEL_NAME_LEN] = name_field
+        if ver_field is not None:
+            b[24 + V.MODEL_NAME_LEN:24 + V.MODEL_NAME_LEN + V.MODEL_VERSION_LEN] = ver_field
+        if tail is not None:
+            b[24 + V.MODEL_NAME_LEN + V.MODEL_VERSION_LEN:] = tail
+        return bytes(b)
+
+    expect_rejection("model_name_no_nul",
+                     lambda: V.validate_model_meta(malformed_meta(name_field=b"A" * 64)),
+                     "INCOMPATIBLE", "model_name fills all 64B without NUL",
+                     detail_contains="model_name missing NUL")
+    expect_rejection("model_name_junk_after_nul",
+                     lambda: V.validate_model_meta(malformed_meta(name_field=b"model\x00junk" + bytes(54))),
+                     "INCOMPATIBLE", "model_name carries junk after its NUL",
+                     detail_contains="model_name has non-zero bytes after its NUL")
+    expect_rejection("model_version_no_nul",
+                     lambda: V.validate_model_meta(malformed_meta(ver_field=b"9" * 32)),
+                     "INCOMPATIBLE", "model_version fills all 32B without NUL",
+                     detail_contains="model_version missing NUL")
+    expect_rejection("model_meta_trailing_reserved_nonzero",
+                     lambda: V.validate_model_meta(malformed_meta(tail=bytes([1]) + bytes(7))),
+                     "INCOMPATIBLE", "trailing 8B reserved nonzero",
+                     detail_contains="trailing reserved not zero")
+
+
+def group_tick_ms():
+    print("== [9] tick_ms modulo-2^32 semantics (spec §6.3/§6.4; A decision issuecomment-6093724900) ==")
+    vector("tick_positive_small_delta", "delta 50",
+           V.tick_delta_ms(100, 150) == 50,
+           "ordinary small forward step, well below the wrap point")
+    d1 = V.tick_delta_ms(0x7FFFFFFF, 0x80000000)
+    neg1 = struct.unpack("<i", struct.pack("<I", 0x80000000))[0]
+    vector("tick_wrap_7fffffff_to_80000000", "delta 1 (legal progress, not an error)",
+           d1 == 1,
+           "mod-2^32 wrap past 2^31; the naive signed-int32 reading of 0x80000000 is "
+           f"{neg1} and must NOT be treated as a §6.4 negative error code")
+    vector("tick_int32_trap_guard_80000000", "trap documented and guarded",
+           neg1 == -(1 << 31) and neg1 < 0 and d1 == 1,
+           "negative int32 value exists but the delta channel is uint32 mod-2^32 only")
+    d2 = V.tick_delta_ms(0xFFFFFFFF, 0x00000000)
+    neg2 = struct.unpack("<i", struct.pack("<I", 0xFFFFFFFF))[0]
+    vector("tick_wrap_ffffffff_to_00000000", "delta 1 (legal progress, not an error)",
+           d2 == 1 and neg2 == -1 and neg2 < 0,
+           "0xffffffff -> 0x00000000 is +1 mod 2^32; the int32 reading -1 is not a §6.4 error")
+    expect_rejection("tick_bits_out_of_range",
+                     lambda: V.tick_delta_ms(0, 1 << 32), "INVALID_ARGUMENT",
+                     "non-u32 bit pattern rejected")
+
 
 def write_evidence(golden_tbs, golden_der, golden_pkg, arch_pkg, v1_pkg):
     os.makedirs(EVIDENCE_DIR, exist_ok=True)
@@ -556,6 +655,29 @@ def write_evidence(golden_tbs, golden_der, golden_pkg, arch_pkg, v1_pkg):
         "note": ("Host-side spec evidence only. No v2 device parser, no STM32 target build, "
                  "no device PKA, no sustained-run or power-loss PASS (spec §12). "
                  "Test key d=1 is public and non-production."),
+        "rev3_corrections": {
+            "reviewed_candidate": "d3dab540c19861567bc5e71bd8c5e615d1302d41",
+            "ac2_publisher_trust": ("full_accept now resolves the issuer key from the Host-LOCAL "
+                                    "trusted_publishers store keyed by the signed publisher_id and compares "
+                                    "the manifest fingerprint against that store (spec §2.3 step 3/§3.1); "
+                                    "fail-closed PUBLISHER_UNTRUSTED. New negatives: unknown_publisher_id, "
+                                    "publisher_key_fingerprint_mismatch (+ signature-valid proof)."),
+            "ac2_exec_region": ("HOST_POLICY_V2 gains Host-owned loader_base/loader_size/exec_region_bytes; "
+                                "policy fail-closed checks target_addr against the independently known "
+                                "loader range and required_exec_region_bytes against the actual exec "
+                                "region (spec §3.3, v1 §2.3 rules). New negatives: "
+                                "target_outside_host_loader_range, exec_region_exceeds_host_actual. "
+                                "No production physical-memory proof is claimed."),
+            "ac4_model_meta_strict": ("validate_model_meta now requires a NUL terminator, all-zero right "
+                                      "padding, valid UTF-8 and zero reserved (spec §6.5). New malformed-wire "
+                                      "negatives: model_name_no_nul, model_name_junk_after_nul, "
+                                      "model_version_no_nul, model_meta_trailing_reserved_nonzero."),
+            "ac3_tick_ms": ("tick_ms documented as the sole exception to the §6.4 negative-error channel: "
+                            "raw mod-2^32 time bits, delta via uint32 difference (A decision "
+                            "issuecomment-6093724900). New device-independent vectors: wrap "
+                            "0x7fffffff->0x80000000 and 0xffffffff->0x00000000 are legal +1 progress with "
+                            "the int32 misreading trap documented; no ABI table/signature change."),
+        },
         "rev2_corrections": {
             "reviewed_candidate": "7564c22b740430a94ca7133697ebce3f85554f68",
             "ac2_caps_subset": ("policy_check_v2_host now fail-closed rejects KNOWN capability bits the "
@@ -605,6 +727,27 @@ def write_evidence(golden_tbs, golden_der, golden_pkg, arch_pkg, v1_pkg):
         lines.append(f"- exit **{code}**, output: `{out}`\n")
     else:
         lines.append("- openssl CLI not available; cross-proof MISSING (suite would have failed)\n")
+    lines.append("## Rev 3 corrections (A self-audit review of d3dab54, AC2/AC4/AC3)")
+    lines.append("1. **AC2 publisher trust mapping**: `full_accept` resolves the issuer key from the "
+                 "Host-LOCAL `trusted_publishers` store keyed by the signed `publisher_id` and compares "
+                 "the manifest fingerprint against that store before verifying (spec §2.3 step 3/§3.1, "
+                 "fail-closed `PUBLISHER_UNTRUSTED`). Negatives `unknown_publisher_id` and "
+                 "`publisher_key_fingerprint_mismatch` are validly re-signed with attributable detail.")
+    lines.append("2. **AC2 host loader/region admission**: the simulated Host now carries its own "
+                 "`loader_base`/`loader_size`/`exec_region_bytes`; policy checks `native_target_addr` "
+                 "against the independently known loader range and `required_exec_region_bytes` against "
+                 "the actual exec region (spec §3.3, v1 §2.3). Negatives `target_outside_host_loader_range` "
+                 "and `exec_region_exceeds_host_actual` are validly re-signed. No production physical "
+                 "memory proof is claimed.")
+    lines.append("3. **AC4 strict model_meta wire**: `validate_model_meta` requires a NUL terminator, "
+                 "all-zero right padding, valid UTF-8 and zero reserved; malformed-wire negatives "
+                 "`model_name_no_nul`, `model_name_junk_after_nul`, `model_version_no_nul`, "
+                 "`model_meta_trailing_reserved_nonzero` added (INCOMPATIBLE).")
+    lines.append("4. **AC3 tick_ms semantics** (A decision issuecomment-6093724900): documented in spec "
+                 "§6.3/§6.4 as the sole exception to the negative-error-code channel — raw mod-2^32 time "
+                 "bits, progress measured by uint32 difference. Vectors: 0x7fffffff->0x80000000 and "
+                 "0xffffffff->0x00000000 both advance +1; the signed-int32 misreading trap is documented. "
+                 "48B table, C signatures and v1 code unchanged.\n")
     lines.append("## Rev 2 corrections (A review of 7564c22, AC2/AC4 blockers)")
     lines.append("1. **AC2 caps subset**: `policy_check_v2_host` now fail-closed rejects KNOWN capability "
                  "bits the current Host does not provide (`ABI_INCOMPATIBLE`); negatives "
@@ -660,6 +803,7 @@ def main():
     group_interop_v1(golden_pkg)
     group_event_wire()
     group_model_meta()
+    group_tick_ms()
     write_evidence(golden_tbs, golden_der, golden_pkg, arch_pkg, v1_pkg)
 
     failed = [v for v in VECTORS if v["status"] != "PASS"]

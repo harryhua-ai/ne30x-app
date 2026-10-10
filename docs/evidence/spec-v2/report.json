@@ -3,14 +3,21 @@
   "issue": 12,
   "suite": "tests/spec-v2/run_all_tests.py",
   "note": "Host-side spec evidence only. No v2 device parser, no STM32 target build, no device PKA, no sustained-run or power-loss PASS (spec §12). Test key d=1 is public and non-production.",
+  "rev3_corrections": {
+    "reviewed_candidate": "d3dab540c19861567bc5e71bd8c5e615d1302d41",
+    "ac2_publisher_trust": "full_accept now resolves the issuer key from the Host-LOCAL trusted_publishers store keyed by the signed publisher_id and compares the manifest fingerprint against that store (spec §2.3 step 3/§3.1); fail-closed PUBLISHER_UNTRUSTED. New negatives: unknown_publisher_id, publisher_key_fingerprint_mismatch (+ signature-valid proof).",
+    "ac2_exec_region": "HOST_POLICY_V2 gains Host-owned loader_base/loader_size/exec_region_bytes; policy fail-closed checks target_addr against the independently known loader range and required_exec_region_bytes against the actual exec region (spec §3.3, v1 §2.3 rules). New negatives: target_outside_host_loader_range, exec_region_exceeds_host_actual. No production physical-memory proof is claimed.",
+    "ac4_model_meta_strict": "validate_model_meta now requires a NUL terminator, all-zero right padding, valid UTF-8 and zero reserved (spec §6.5). New malformed-wire negatives: model_name_no_nul, model_name_junk_after_nul, model_version_no_nul, model_meta_trailing_reserved_nonzero.",
+    "ac3_tick_ms": "tick_ms documented as the sole exception to the §6.4 negative-error channel: raw mod-2^32 time bits, delta via uint32 difference (A decision issuecomment-6093724900). New device-independent vectors: wrap 0x7fffffff->0x80000000 and 0xffffffff->0x00000000 are legal +1 progress with the int32 misreading trap documented; no ABI table/signature change."
+  },
   "rev2_corrections": {
     "reviewed_candidate": "7564c22b740430a94ca7133697ebce3f85554f68",
     "ac2_caps_subset": "policy_check_v2_host now fail-closed rejects KNOWN capability bits the current Host does not provide (ABI_INCOMPATIBLE); new negatives caps_subset_host_missing_report_submit (+ signature-valid proof).",
     "ac4_verify_order": "full_accept now follows spec §2.3 order: bounded structure/manifest unique-encoding -> ECDSA over raw TBS -> native cross-checks -> policy; payload tamper flips a dynamically computed TRUE payload byte (TBS[240:244], DER byte-identical) and asserts exactly SIGNATURE_INVALID; DER-region corruption is a separately labeled vector.",
     "ac4_abi_attribution": "native_header_abi_mismatch_vs_manifest keeps manifest abi=0x00020000, flips ONLY the native header abi to 0x00010000 (manifest native SHA updated), re-signs, and asserts the rejection detail names the native<->manifest cross mismatch; the v2-container-declares-v1-ABI case remains a separate independent test."
   },
-  "vectors_total": 59,
-  "vectors_passed": 59,
+  "vectors_total": 73,
+  "vectors_passed": 73,
   "vectors": [
     {
       "name": "golden_tbs_length",
@@ -143,6 +150,36 @@
       "expected": "reject ABI_INCOMPATIBLE",
       "status": "PASS",
       "detail": "caps=0x3f all known bits; Host lacks report_submit -> ABI_INCOMPATIBLE: host does not provide capability bits 0x00000008 (known but unsupported)"
+    },
+    {
+      "name": "unknown_publisher_id",
+      "expected": "reject PUBLISHER_UNTRUSTED",
+      "status": "PASS",
+      "detail": "format-valid publisher_id absent from Host trust store, re-signed -> PUBLISHER_UNTRUSTED: publisher_id 'untrusted-pub' not in Host trusted mapping"
+    },
+    {
+      "name": "publisher_negative_signature_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "re-signed with the Host-store key: rejection below is trust mapping, not signature"
+    },
+    {
+      "name": "publisher_key_fingerprint_mismatch",
+      "expected": "reject PUBLISHER_UNTRUSTED",
+      "status": "PASS",
+      "detail": "manifest fingerprint altered, Host store entry unchanged, re-signed -> PUBLISHER_UNTRUSTED: publisher_key_sha256 mismatch for 'test-publisher' vs Host trust store"
+    },
+    {
+      "name": "target_outside_host_loader_range",
+      "expected": "reject RESOURCE_LIMIT",
+      "status": "PASS",
+      "detail": "self-consistent target 0x94E00000 outside Host loader range, re-signed -> RESOURCE_LIMIT: native target_addr 0x94e00000+36B outside host loader range 0x93e00000..0x94000000"
+    },
+    {
+      "name": "exec_region_exceeds_host_actual",
+      "expected": "reject RESOURCE_LIMIT",
+      "status": "PASS",
+      "detail": "required_exec_region_bytes=3MiB > host actual 2MiB, re-signed -> RESOURCE_LIMIT: exec_region 3145728 exceeds host actual execution region 2097152"
     },
     {
       "name": "native_header_abi_mismatch_vs_manifest",
@@ -365,6 +402,60 @@
       "expected": "6144B",
       "status": "PASS",
       "detail": "declared report_max == LC_DQ_SLOT_CAPACITY evidence anchor"
+    },
+    {
+      "name": "model_name_no_nul",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "model_name fills all 64B without NUL -> INCOMPATIBLE: model_name missing NUL terminator"
+    },
+    {
+      "name": "model_name_junk_after_nul",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "model_name carries junk after its NUL -> INCOMPATIBLE: model_name has non-zero bytes after its NUL"
+    },
+    {
+      "name": "model_version_no_nul",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "model_version fills all 32B without NUL -> INCOMPATIBLE: model_version missing NUL terminator"
+    },
+    {
+      "name": "model_meta_trailing_reserved_nonzero",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "trailing 8B reserved nonzero -> INCOMPATIBLE: model_meta trailing reserved not zero"
+    },
+    {
+      "name": "tick_positive_small_delta",
+      "expected": "delta 50",
+      "status": "PASS",
+      "detail": "ordinary small forward step, well below the wrap point"
+    },
+    {
+      "name": "tick_wrap_7fffffff_to_80000000",
+      "expected": "delta 1 (legal progress, not an error)",
+      "status": "PASS",
+      "detail": "mod-2^32 wrap past 2^31; the naive signed-int32 reading of 0x80000000 is -2147483648 and must NOT be treated as a §6.4 negative error code"
+    },
+    {
+      "name": "tick_int32_trap_guard_80000000",
+      "expected": "trap documented and guarded",
+      "status": "PASS",
+      "detail": "negative int32 value exists but the delta channel is uint32 mod-2^32 only"
+    },
+    {
+      "name": "tick_wrap_ffffffff_to_00000000",
+      "expected": "delta 1 (legal progress, not an error)",
+      "status": "PASS",
+      "detail": "0xffffffff -> 0x00000000 is +1 mod 2^32; the int32 reading -1 is not a §6.4 error"
+    },
+    {
+      "name": "tick_bits_out_of_range",
+      "expected": "reject INVALID_ARGUMENT",
+      "status": "PASS",
+      "detail": "non-u32 bit pattern rejected -> INVALID_ARGUMENT: tick bits 0x100000000 outside u32"
     }
   ],
   "digests": {

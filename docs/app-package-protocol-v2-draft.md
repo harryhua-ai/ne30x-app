@@ -215,6 +215,8 @@ int32_t state_commit(const void *blob, uint32_t len, uint32_t expected_revision,
 int32_t should_stop(void);
 ```
 
+**`tick_ms` 返回语义例外（A 决定 2026-10-10，[issuecomment-6093724900](https://github.com/harryhua-ai/ne30x-app/issues/12#issuecomment-6093724900)；非布局变更）**：`tick_ms` 继承现行 v1 的 `int32_t tick_ms(void)`（实验 Host 实现为 `return (int)osKernelGetTickCount();`），是 §6.4 负数错误码枚举的**唯一例外**：其返回值恒为**当前 32 位单调毫秒计数的原始比特模式**，调用方必须先按 `uint32_t` 比特模式解释、再以**模 2³² 差分**度量推进量；其返回值的负数数值解释**不得**当作 §6.4 的负错误码。该函数不承诺通过返回值报告错误状态；Host/会话可用性由既有入口授权/生命周期（§7）或其它可观察调用处理。若目标真实固件时钟无法保证该语义，须交回 A 修订 ABI major，不得偷改 wire 或在停机后返回无标签错误。48B 表、函数数量/偏移与 C 签名逐字节不变。
+
 ### 6.4 返回码（固定枚举）
 
 | 值 | 名称 | 适用 |
@@ -233,11 +235,13 @@ int32_t should_stop(void);
 | -9 | `IO_ERROR` | 持久化 IO 失败 |
 | -10 | `STOPPING` | 会话正在结束 |
 
+**例外**：`tick_ms` 不适用上表负数枚举（§6.3 例外语义）。合法回绕示例（设备无关）：位模式 `0x7fffffff → 0x80000000` 与 `0xffffffff → 0x00000000` 都是 **+1 ms 的合法推进**——尽管按 signed int32 裸读分别为 `-2147483648` 与 `-1`，它们**不是错误码**；连续 tick 的时间差恒按 `(cur − prev) mod 2³²` 计算。
+
 不支持的调用/能力必须返回 `UNAUTHORIZED` 或 `INCOMPATIBLE`；**不能让失败作为运行成功继续**。
 
 ### 6.5 模型与类别元数据
 
-- `model_meta` 输出固定 **128B**：前 6 个 `u32-le` 依次 `loaded`、`result_type`（本业务仅支持 `1 = PP_TYPE_OD`）、`model_generation`、`class_generation`、`class_count`、`reserved0 = 0`；随后 64B `model_name`、32B `model_version`，均为严格 NUL 终止/右零填充的 UTF-8 字节串；末尾 8B reserved 全零。无法规范表示的 metadata 必须返回 `INCOMPATIBLE`，**不得截断**。
+- `model_meta` 输出固定 **128B**：前 6 个 `u32-le` 依次 `loaded`、`result_type`（本业务仅支持 `1 = PP_TYPE_OD`）、`model_generation`、`class_generation`、`class_count`、`reserved0 = 0`；随后 64B `model_name`、32B `model_version`，均为严格 NUL 终止/右零填充的 UTF-8 字节串——**必须存在 NUL 终止符、首个 NUL 之后所有字节必须为零、必须为合法 UTF-8**，字段无 NUL、NUL 后夹带非零字节或 reserved 非零一律 fail-closed 拒绝；末尾 8B reserved 全零。无法规范表示的 metadata 必须返回 `INCOMPATIBLE`，**不得截断**。
 - `class_name` 查询**必须绑定传入的 `(model_gen, class_gen)` 两种代次**与 `class_index`；返回 UTF-8 **实际长度（不含终止 NUL）**，要求缓冲可容纳数据 + 1B NUL（否则 `BUFFER_TOO_SMALL`）；代次过期拒绝；**绝不以动态指针裸传类别表**。
 
 ### 6.6 报告提交与状态观察
@@ -298,6 +302,8 @@ v1 §7 错误主分类**原样复用**（`AUTH_REQUIRED`、`FORBIDDEN`、`BAD_PA
 | manifest `required_host_abi` ≠ `0x00020000`（v2 容器内） | `BAD_PACKAGE`（v2 格式不变量违例） |
 | 包声明 ABI ≠ 当前 Host 支持 ABI（未来版本容器等） | `ABI_INCOMPATIBLE` |
 | 包声明**已知**能力位但当前 Host 实际不提供（§4.2） | `ABI_INCOMPATIBLE`（运行期 `UNAUTHORIZED`/`INCOMPATIBLE`） |
+| `publisher_id` 不在 Host 本地受信映射，或 `publisher_key_sha256` 与该映射条目不一致（§2.3 步骤③/§3.1，v1 继承） | `PUBLISHER_UNTRUSTED` |
+| `native_target_addr` 不在 Host 独立已知的真实 loader 基址/范围内，或 `required_exec_region_bytes` > Host 实际执行区大小（§3.3，v1 §2.3 两条规则） | `RESOURCE_LIMIT`（不代表生产物理内存证明） |
 | manifest ABI ≠ 原生头 ABI / 原生头任一交叉检查失败 | `BAD_PACKAGE` |
 | `event_max`/`report_max`/`state_quota` 超过 Host 实际可提供容量 | `RESOURCE_LIMIT`（运行期对应 `QUOTA_EXCEEDED`） |
 | 原生 `native_file_len` > 真实装载区 | `RESOURCE_LIMIT` |
@@ -315,7 +321,7 @@ v1 §7 错误主分类**原样复用**（`AUTH_REQUIRED`、`FORBIDDEN`、`BAD_PA
 python3 tests/spec-v2/run_all_tests.py
 ```
 
-辅助验证器 `full_accept` 严格按 §2.3 判定序执行：**有界结构/manifest 唯一编码先行 → 可信发行者对原样 TBS 的 ECDSA 验签 → 之后才做需要信任数据的原生头/CRC/SHA 交叉检查与 Host 策略**；因此"签名段被改"与"已签 payload 被改"都能得到确切的 `SIGNATURE_INVALID`，而不会先被 `BAD_PACKAGE` 掩盖。
+辅助验证器 `full_accept` 严格按 §2.3 判定序执行：**有界结构/manifest 唯一编码先行 → Host 本地受信发行者映射解析（`publisher_id → SPKI` 信任库，fail-closed `PUBLISHER_UNTRUSTED`）→ 用映射到的 Host 自有密钥对原样 TBS 做 ECDSA 验签 → 之后才做需要信任数据的原生头/CRC/SHA 交叉检查与 Host 策略**（能力子集、配额、Host 独立已知 loader 基址/范围与实际执行区）；因此"签名段被改"与"已签 payload 被改"都能得到确切的 `SIGNATURE_INVALID`，而不会先被 `BAD_PACKAGE` 掩盖。模拟 Host 的信任映射与 loader 位置是其**独立配置**，不来自包声明。
 
 证据（黄金包字节、TBS、DER、SPKI、逐向量结果、OpenSSL 输出、全部 SHA-256）输出至 `docs/evidence/spec-v2/`。
 
@@ -346,11 +352,13 @@ python3 tests/spec-v2/run_all_tests.py
 
 1. **已签内容篡改（按黄金包真实布局动态定位）**：TBS 布局为 `[0,16)` 容器头、`[16,208)` manifest、`[208,240)` 原生 32B 头、`[240,244)` 真 payload、`[244,314)` DER 签名段。翻转**真 payload** 字节（DER 保持逐字节不变）→ `SIGNATURE_INVALID`，OpenSSL 非零退出；篡改 manifest 字节 → `SIGNATURE_INVALID`；**篡改 DER 签名字节本身**（TBS 不变）→ `SIGNATURE_INVALID`（该项只证明签名字节损坏会被验签拒绝，不作为已签 payload 覆盖的证明）。
 2. **DER 结构**：合法 DER 后追加字节 → `BAD_PACKAGE`（DER 必须完整消费尾部）；DER 截断 → `BAD_PACKAGE`。
-3. **重签后的策略拒绝**（证明"签名正确 ≠ 放行"）：未知能力位（bit6）、Host 不提供的已知能力（能力子集反向 fail-closed，M10）、[176..191] reserved 非零、manifest [58..59] 非零、未知 `run_profile`、profile 1 缺 bit5、能力-配额不匹配、`required_host_abi=0x00010000`（manifest 格式不变量，独立用例）、**仅原生头 ABI 改为 `0x00010000` 而 manifest 保持 `0x00020000`**（同步更新 manifest native SHA 后合法重签 → 真正验证原生头↔manifest 交叉不匹配）、原生头 `reserved0≠0`——均以 d=1 重签为合法签名后仍拒绝，并断言拒绝原因可归因到对应规则。
+3. **重签后的策略拒绝**（证明"签名正确 ≠ 放行"）：未知能力位（bit6）、Host 不提供的已知能力（能力子集反向 fail-closed，M10）、**发行者信任映射**（未知 `publisher_id`、`publisher_key_sha256` 与 Host 本地映射不一致 → `PUBLISHER_UNTRUSTED`）、**Host 独立已知 loader 范围/实际执行区**（自洽但越界的 `target_addr`、超大 `required_exec_region_bytes` → `RESOURCE_LIMIT`）、[176..191] reserved 非零、manifest [58..59] 非零、未知 `run_profile`、profile 1 缺 bit5、能力-配额不匹配、`required_host_abi=0x00010000`（manifest 格式不变量，独立用例）、**仅原生头 ABI 改为 `0x00010000` 而 manifest 保持 `0x00020000`**（同步更新 manifest native SHA 后合法重签 → 真正验证原生头↔manifest 交叉不匹配）、原生头 `reserved0≠0`——均以 d=1 重签为合法签名后仍拒绝，并断言拒绝原因可归因到对应规则。
 4. **新旧交叉拒绝**：v2 包过 v1 Host 结构规则拒绝；v1 容器声明 v2/`NMF2` 混搭拒绝；v1 黄金包过 v2 Host 仅获 v1 16B 表语义（M3）。
 5. **容量判别**：1024/4096 归档样本在 64 框业务判 `RESOURCE_LIMIT`（M7）；黄金包 2048/6144 判通过（M1）。
 6. **事件 wire 负例**：未知 kind、未知 flags 位、`flags.bit1=1` 但 `lost_frame_count≠0xFFFFFFFF`、65 检测（>64/>1576B）、`total_len` 与 `detection_count` 不一致、非有限 float 位型、`class_index` 越界——全部拒绝，不截断、不静默丢弃。
 7. **结构不变量**：`manifest_len≠192`、原生文件长度不等外层 `image_len`、缺签名、整包截断。
+8. **严格 model_meta wire 负例**：`model_name`/`model_version` 无 NUL 终止、NUL 后夹带非零字节、末尾 8B reserved 非零——全部 `INCOMPATIBLE`。
+9. **`tick_ms` 模 2³² 语义例证（设备无关）**：位模式 `0x7fffffff → 0x80000000`、`0xffffffff → 0x00000000` 均为 +1 ms 合法推进；signed int32 裸读的负值（`-2147483648`/`-1`）**不得**被解释为 §6.4 负错误码（误判防护）。
 
 ### 10.4 事件 wire 正向参考编码
 
@@ -397,6 +405,8 @@ python3 tests/spec-v2/run_all_tests.py
 | §3 should_stop 语义、有限等待、scrub 前提、BUSY、无抢占/隔离、特权风险 | §6.8 |
 | §1/§4 旧 1024/4096 仅负例、新 2048/6144 正向量、全部摘要/DER/包哈希、OpenSSL 交叉证明、B 应转正式 tests | §10.1、§10.2、§10.3 |
 | §4 反证与停止条件（64 框、6144B、PP_TYPE_OD=1、16B 表、一次入口 scrub 已核对；目标宿主假设未证；不改字段/静默降级须交 A） | §12、文件头证据锚点 |
+| [tick_ms 32 位回绕语义纠偏（2026-10-10，issuecomment-6093724900）](https://github.com/harryhua-ai/ne30x-app/issues/12#issuecomment-6093724900)：`tick_ms` 为 §6.4 负错误码通道的唯一例外，恒为模 2³² 原始时间位模式，按 uint32 差分处理回绕；不改 48B 表/签名/v1 代码 | §6.3、§6.4、§10.3.9 |
+| [A 对 d3dab54 的 self-audit REQUEST_CHANGES](https://github.com/harryhua-ai/ne30x-app/pull/14)：发行者信任映射、Host 独立 loader 范围/实际执行区准入、严格 model_meta wire 解码 | §2.3 步骤③、§3.3、§6.5、§9、§10.3 |
 | 历史归档（6092263046）244B TBS/DER 原始字节 | §10.2、`tests/spec-v2`（归档负例重建） |
 
 本文与固定证据锚点（ne301 `app_host_abi.h` blob `9c13b87d`、`line_counting.h`/`pp.h`/`lc_delivery_queue.h`/`line_counting_config.h` @`de25a6f1`）已逐项核对，未发现与 A 决定实质冲突的编译器/资源/型号事实。

@@ -18,12 +18,15 @@ signature cross-proof). No `cryptography` package, no network, no device.
 Proves (host side): byte-exact rebuild of the spec §10.1 golden v2 package
 (314B, SHA-256 pinned), pure-Python + OpenSSL cross-verified ECDSA-P-256
 signature, structural/manifest/policy acceptance in spec §2.3 order
-(signature before trust-data cross-checks/policy), host capability-subset
-fail-closed rejection, and the §8/§10.3 negative matrix (true signed-payload
-tamper with DER untouched, DER tail/truncation/corruption, re-signed policy
-rejections with rejection-attribution detail checks, v1/v2 interop
-discrimination, 1024/4096 archive as resource-insufficient negative,
-event-wire rejections).
+(Host-local publisher trust mapping -> signature -> trust-data cross-checks ->
+policy), host capability-subset fail-closed rejection, Host-owned loader
+base/range and actual-exec-region admission, and the §8/§10.3 negative matrix
+(true signed-payload tamper with DER untouched, DER tail/truncation/corruption,
+re-signed policy rejections with rejection-attribution detail checks,
+unknown/altered publisher identities, v1/v2 interop discrimination,
+1024/4096 archive as resource-insufficient negative, event-wire rejections,
+strict model_meta malformed-wire rejections, tick_ms mod-2^32 wraparound
+semantics with the signed-int32 misreading trap documented).
 
 Does NOT prove (spec §12): any device-side v2 parser, STM32 target build or
 static asserts, device mbedTLS/PKA, sustained AI event delivery, cooperative

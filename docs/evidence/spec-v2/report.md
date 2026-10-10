@@ -2,7 +2,7 @@
 
 - Spec: `docs/app-package-protocol-v2-draft.md` (Issue #12 candidate, NOT integrated)
 - Suite: `python3 tests/spec-v2/run_all_tests.py` (stdlib-only; OpenSSL used as independent verifier)
-- Vectors: **59/59 PASS**
+- Vectors: **73/73 PASS**
 
 ## Golden v2 package (spec §10.1)
 - `golden.neapp.v2` — 314B, SHA-256 `3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e`
@@ -14,6 +14,12 @@
 ## Independent OpenSSL cross-proof
 - `$ openssl dgst -sha256 -verify pub.pem -signature golden-sig.der golden-tbs.bin`
 - exit **0**, output: `Verified OK`
+
+## Rev 3 corrections (A self-audit review of d3dab54, AC2/AC4/AC3)
+1. **AC2 publisher trust mapping**: `full_accept` resolves the issuer key from the Host-LOCAL `trusted_publishers` store keyed by the signed `publisher_id` and compares the manifest fingerprint against that store before verifying (spec §2.3 step 3/§3.1, fail-closed `PUBLISHER_UNTRUSTED`). Negatives `unknown_publisher_id` and `publisher_key_fingerprint_mismatch` are validly re-signed with attributable detail.
+2. **AC2 host loader/region admission**: the simulated Host now carries its own `loader_base`/`loader_size`/`exec_region_bytes`; policy checks `native_target_addr` against the independently known loader range and `required_exec_region_bytes` against the actual exec region (spec §3.3, v1 §2.3). Negatives `target_outside_host_loader_range` and `exec_region_exceeds_host_actual` are validly re-signed. No production physical memory proof is claimed.
+3. **AC4 strict model_meta wire**: `validate_model_meta` requires a NUL terminator, all-zero right padding, valid UTF-8 and zero reserved; malformed-wire negatives `model_name_no_nul`, `model_name_junk_after_nul`, `model_version_no_nul`, `model_meta_trailing_reserved_nonzero` added (INCOMPATIBLE).
+4. **AC3 tick_ms semantics** (A decision issuecomment-6093724900): documented in spec §6.3/§6.4 as the sole exception to the negative-error-code channel — raw mod-2^32 time bits, progress measured by uint32 difference. Vectors: 0x7fffffff->0x80000000 and 0xffffffff->0x00000000 both advance +1; the signed-int32 misreading trap is documented. 48B table, C signatures and v1 code unchanged.
 
 ## Rev 2 corrections (A review of 7564c22, AC2/AC4 blockers)
 1. **AC2 caps subset**: `policy_check_v2_host` now fail-closed rejects KNOWN capability bits the current Host does not provide (`ABI_INCOMPATIBLE`); negatives `caps_subset_host_missing_report_submit` + `caps_subset_negative_signature_valid` added.
@@ -49,43 +55,57 @@
 | 20 | `v2_container_v1_abi` | reject BAD_PACKAGE | PASS |
 | 21 | `caps_subset_negative_signature_valid` | signature valid | PASS |
 | 22 | `caps_subset_host_missing_report_submit` | reject ABI_INCOMPATIBLE | PASS |
-| 23 | `native_header_abi_mismatch_vs_manifest` | reject BAD_PACKAGE | PASS |
-| 24 | `native_reserved0_nonzero` | reject BAD_PACKAGE | PASS |
-| 25 | `manifest_native_len_mismatch` | reject BAD_PACKAGE | PASS |
-| 26 | `der_trailing_byte` | reject BAD_PACKAGE | PASS |
-| 27 | `der_truncated` | reject BAD_PACKAGE | PASS |
-| 28 | `manifest_len_160_in_v2` | reject BAD_PACKAGE | PASS |
-| 29 | `v1_magic_on_v2_container` | reject BAD_PACKAGE | PASS |
-| 30 | `v2_package_on_v1_host` | reject BAD_PACKAGE | PASS |
-| 31 | `nmf1_magic_in_v2` | reject BAD_PACKAGE | PASS |
-| 32 | `payload_tamper_detected` | SIGNATURE_INVALID | PASS |
-| 33 | `payload_tamper_openssl_rejects` | non-zero exit | PASS |
-| 34 | `manifest_tamper_detected` | SIGNATURE_INVALID | PASS |
-| 35 | `der_region_tamper_detected` | SIGNATURE_INVALID | PASS |
-| 36 | `v1_golden_digest` | 9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679 | PASS |
-| 37 | `v1_golden_structural` | v1 gate PASS | PASS |
-| 38 | `v1_golden_signature_valid` | signature valid | PASS |
-| 39 | `v1_on_v2_host_caps_limited` | only v1 16B table semantics (M3) | PASS |
-| 40 | `v1_golden_openssl` | Verified OK, exit 0 | PASS |
-| 41 | `frame64_length_1576` | 1576B | PASS |
-| 42 | `frame64_roundtrip` | kind=1 count=64 | PASS |
-| 43 | `frame0_is_40b` | 40B FRAME(count=0) | PASS |
-| 44 | `kind_model_changed_encodes` | 40B valid | PASS |
-| 45 | `kind_gap_encodes` | 40B valid | PASS |
-| 46 | `kind_stopping_encodes` | 40B valid | PASS |
-| 47 | `event_unknown_kind` | reject BAD_EVENT | PASS |
-| 48 | `event_unknown_flag_bit` | reject BAD_EVENT | PASS |
-| 49 | `event_flag1_without_sentinel` | reject BAD_EVENT | PASS |
-| 50 | `event_sentinel_without_flag1` | reject BAD_EVENT | PASS |
-| 51 | `event_65_detections_encode` | reject BAD_EVENT | PASS |
-| 52 | `event_65_detections_wire` | reject BAD_EVENT | PASS |
-| 53 | `event_total_len_mismatch` | reject BAD_EVENT | PASS |
-| 54 | `event_nonfinite_confidence` | reject BAD_EVENT | PASS |
-| 55 | `event_class_index_oob` | reject BAD_EVENT | PASS |
-| 56 | `model_meta_layout` | 128B, PP_TYPE_OD, fields ok | PASS |
-| 57 | `model_meta_wrong_type_incompatible` | INCOMPATIBLE | PASS |
-| 58 | `report_oversize_rejected` | QUOTA_EXCEEDED | PASS |
-| 59 | `report_capacity_aligns_lc_dq` | 6144B | PASS |
+| 23 | `unknown_publisher_id` | reject PUBLISHER_UNTRUSTED | PASS |
+| 24 | `publisher_negative_signature_valid` | signature valid | PASS |
+| 25 | `publisher_key_fingerprint_mismatch` | reject PUBLISHER_UNTRUSTED | PASS |
+| 26 | `target_outside_host_loader_range` | reject RESOURCE_LIMIT | PASS |
+| 27 | `exec_region_exceeds_host_actual` | reject RESOURCE_LIMIT | PASS |
+| 28 | `native_header_abi_mismatch_vs_manifest` | reject BAD_PACKAGE | PASS |
+| 29 | `native_reserved0_nonzero` | reject BAD_PACKAGE | PASS |
+| 30 | `manifest_native_len_mismatch` | reject BAD_PACKAGE | PASS |
+| 31 | `der_trailing_byte` | reject BAD_PACKAGE | PASS |
+| 32 | `der_truncated` | reject BAD_PACKAGE | PASS |
+| 33 | `manifest_len_160_in_v2` | reject BAD_PACKAGE | PASS |
+| 34 | `v1_magic_on_v2_container` | reject BAD_PACKAGE | PASS |
+| 35 | `v2_package_on_v1_host` | reject BAD_PACKAGE | PASS |
+| 36 | `nmf1_magic_in_v2` | reject BAD_PACKAGE | PASS |
+| 37 | `payload_tamper_detected` | SIGNATURE_INVALID | PASS |
+| 38 | `payload_tamper_openssl_rejects` | non-zero exit | PASS |
+| 39 | `manifest_tamper_detected` | SIGNATURE_INVALID | PASS |
+| 40 | `der_region_tamper_detected` | SIGNATURE_INVALID | PASS |
+| 41 | `v1_golden_digest` | 9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679 | PASS |
+| 42 | `v1_golden_structural` | v1 gate PASS | PASS |
+| 43 | `v1_golden_signature_valid` | signature valid | PASS |
+| 44 | `v1_on_v2_host_caps_limited` | only v1 16B table semantics (M3) | PASS |
+| 45 | `v1_golden_openssl` | Verified OK, exit 0 | PASS |
+| 46 | `frame64_length_1576` | 1576B | PASS |
+| 47 | `frame64_roundtrip` | kind=1 count=64 | PASS |
+| 48 | `frame0_is_40b` | 40B FRAME(count=0) | PASS |
+| 49 | `kind_model_changed_encodes` | 40B valid | PASS |
+| 50 | `kind_gap_encodes` | 40B valid | PASS |
+| 51 | `kind_stopping_encodes` | 40B valid | PASS |
+| 52 | `event_unknown_kind` | reject BAD_EVENT | PASS |
+| 53 | `event_unknown_flag_bit` | reject BAD_EVENT | PASS |
+| 54 | `event_flag1_without_sentinel` | reject BAD_EVENT | PASS |
+| 55 | `event_sentinel_without_flag1` | reject BAD_EVENT | PASS |
+| 56 | `event_65_detections_encode` | reject BAD_EVENT | PASS |
+| 57 | `event_65_detections_wire` | reject BAD_EVENT | PASS |
+| 58 | `event_total_len_mismatch` | reject BAD_EVENT | PASS |
+| 59 | `event_nonfinite_confidence` | reject BAD_EVENT | PASS |
+| 60 | `event_class_index_oob` | reject BAD_EVENT | PASS |
+| 61 | `model_meta_layout` | 128B, PP_TYPE_OD, fields ok | PASS |
+| 62 | `model_meta_wrong_type_incompatible` | INCOMPATIBLE | PASS |
+| 63 | `report_oversize_rejected` | QUOTA_EXCEEDED | PASS |
+| 64 | `report_capacity_aligns_lc_dq` | 6144B | PASS |
+| 65 | `model_name_no_nul` | reject INCOMPATIBLE | PASS |
+| 66 | `model_name_junk_after_nul` | reject INCOMPATIBLE | PASS |
+| 67 | `model_version_no_nul` | reject INCOMPATIBLE | PASS |
+| 68 | `model_meta_trailing_reserved_nonzero` | reject INCOMPATIBLE | PASS |
+| 69 | `tick_positive_small_delta` | delta 50 | PASS |
+| 70 | `tick_wrap_7fffffff_to_80000000` | delta 1 (legal progress, not an error) | PASS |
+| 71 | `tick_int32_trap_guard_80000000` | trap documented and guarded | PASS |
+| 72 | `tick_wrap_ffffffff_to_00000000` | delta 1 (legal progress, not an error) | PASS |
+| 73 | `tick_bits_out_of_range` | reject INVALID_ARGUMENT | PASS |
 
 ## Boundary (spec §12)
 This evidence proves host-side byte/math/policy behavior of the candidate vectors only. No PASS is claimed or implied for: real v2 parsers, STM32 target builds/static asserts, device mbedTLS/PKA verification, sustained AI event delivery, cooperative-stop reclaim, storage atomicity/power-loss, or actual host resource capacities.
