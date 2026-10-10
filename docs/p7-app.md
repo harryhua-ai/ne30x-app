@@ -124,7 +124,7 @@ make -C apps/line-crossing/app package
 
 实测（本 worktree，2026-10-10；含 AC3 四态持久化修正后的复跑）：
 
-- native 镜像 13184B（32B NEA1 v2 头 + 13152B payload），`text=13152
+- native 镜像 13188B（32B NEA1 v2 头 + 13156B payload），`text=13156
   data=0`（.data==0 链接断言通过）、`bss=108120`（arena 96KiB 等），
   entry_offset `0x9cc`，abi `0x00020000`，target `0x93E00000`；
   **重复构建逐字节一致**（sha256
