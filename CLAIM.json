@@ -12,7 +12,36 @@
  "heartbeat_at": "2026-10-10T03:39:31Z",
  "supersedes": null,
  "contract_digest": "bc9c865f7a909cd1f255eee9091bcc09b100956b880f4dad8d2249be32ba184d",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/12/bc1ce4ca",
+  "sha": "7564c22b740430a94ca7133697ebce3f85554f68",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "docs/app-package-protocol-v2-draft.md": "ALLOWED",
+    "docs/evidence/spec-v2/golden-sig.der": "ALLOWED",
+    "docs/evidence/spec-v2/golden-tbs.bin": "ALLOWED",
+    "docs/evidence/spec-v2/golden.neapp.v2": "ALLOWED",
+    "docs/evidence/spec-v2/negative-archive-1024-4096.neapp.v2": "ALLOWED",
+    "docs/evidence/spec-v2/report.json": "ALLOWED",
+    "docs/evidence/spec-v2/report.md": "ALLOWED",
+    "docs/evidence/spec-v2/test-publisher.spki.der": "ALLOWED",
+    "docs/evidence/spec-v2/v1-golden.neapp": "ALLOWED",
+    "tests/spec-v2/.gitignore": "ALLOWED",
+    "tests/spec-v2/README.md": "ALLOWED",
+    "tests/spec-v2/run_all_tests.py": "ALLOWED",
+    "tests/spec-v2/v2lib.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 13,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-10T03:40:18Z"
+ },
  "runtime": {
   "digest": "0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f",
   "release": "v1.1.3",
