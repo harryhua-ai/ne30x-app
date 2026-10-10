@@ -12,7 +12,24 @@
  "heartbeat_at": "2026-10-10T10:36:29Z",
  "supersedes": null,
  "contract_digest": "baf4e3ba0a1eb121f3c8ffe174c642c407b7fc11a35130d079c7d9fd3b3524a4",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/17/dbf054ee",
+  "sha": "f871dd558a61404cd2299d3306244a5c1bc31b57",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "docs/app-platform-development-roadmap.md": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 1,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-10T10:38:12Z"
+ },
  "runtime": {
   "digest": "0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f",
   "release": "v1.1.3",
