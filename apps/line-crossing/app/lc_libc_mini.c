@@ -1,12 +1,4 @@
-/*
- * lc_libc_mini.c — freestanding string primitives for the native v2 image.
- *
- * Compiled ONLY into the target build (-nostdlib -ffreestanding).  Besides
- * the lc_* wrappers it defines the ISO names the compiler is allowed to
- * emit calls to for struct assignment / initialization even under
- * -fno-builtin (memcpy, memmove, memset, strlen...), so the link never
- * pulls in a host libc.
- */
+
 #include <stddef.h>
 
 typedef unsigned long lc_word;
@@ -15,7 +7,7 @@ void *memcpy(void *dst, const void *src, size_t n)
 {
     unsigned char *d = (unsigned char *)dst;
     const unsigned char *s = (const unsigned char *)src;
-    /* word copies keep image size and speed sane; alignment checked per byte */
+
     while (n && ((lc_word)d & (sizeof(lc_word) - 1u))) { *d++ = *s++; n--; }
     while (n >= sizeof(lc_word) * 4u) {
         lc_word w0, w1, w2, w3;
@@ -99,15 +91,8 @@ int memcmp(const void *a, const void *b, size_t n)
     return 0;
 }
 
-/* ---- lc_compat.h wrappers (target build) ---- */
 #include "lc_compat.h"
 
-/* ---- sqrtf: the lc core uses sqrtf for match distance / line length ----
- * Newlib's sqrtf drags in __errno; the freestanding image instead uses the
- * Cortex-M55 FPU's IEEE-754 correctly-rounded VSQRT.F32 directly (same
- * numerics as the host libm for the finite non-negative inputs the core
- * feeds it).  Negative/NaN inputs return 0.0f — unreachable in the core,
- * which only squares differences. */
 float sqrtf(float x)
 {
 #if defined(__arm__) || defined(__thumb__)
@@ -118,7 +103,7 @@ float sqrtf(float x)
 #else
     float r = x;
     if (!(x > 0.0f)) return 0.0f;
-    /* Newton-Raphson fallback (non-ARM targets only) */
+
     union { float f; unsigned int u; } v;
     v.f = x;
     v.u = 0x5f3759dfu - (v.u >> 1);

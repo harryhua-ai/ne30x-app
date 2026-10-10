@@ -1,11 +1,4 @@
-/*
- * test_business.c — counting-parity business scenarios driven through the
- * real business layer (lcbus) bound to the real ABI adapter and the stub
- * v2 table.  Covers Issue #11 AC2/AC3 semantics: window IN/OUT, cumulative
- * totals, target switch / manual reset, counter-name edit, model
- * incompatible/recovery, missing frames + backpressure visibility,
- * persistence with revision semantics, report accepted-vs-delivered split.
- */
+
 #include "test_common.h"
 #include "host_stub.h"
 #include "lc_bus.h"
@@ -18,8 +11,6 @@ static lcstub_t *s;
 static lc_app_api_v2_t tbl;
 static lcbus_t bus;
 
-/* ---- helpers -------------------------------------------------------------- */
-
 static void setup(void)
 {
     s = lcstub_new();
@@ -30,7 +21,7 @@ static void setup(void)
     lcbus_host_ops_t ops = *lcbus_abi_ops();
     ops.user = &tbl;
     lcbus_init(&bus, &ops);
-    lcbus_restore(&bus);   /* no state: verified absence */
+    lcbus_restore(&bus);
     lcbus_rebind(&bus, 1);
 }
 
@@ -48,7 +39,6 @@ static lc_bus_config_t cfg1(void)
     return c;
 }
 
-/* push one crossing sequence and feed each frame through the business layer */
 static void run_crossing(int down, uint32_t x_center_permille, uint32_t mono0)
 {
     static const float ys_down[4] = { 0.30f, 0.44f, 0.58f, 0.72f };
@@ -58,7 +48,7 @@ static void run_crossing(int down, uint32_t x_center_permille, uint32_t mono0)
     for (int i = 0; i < 4; i++) {
         lcstub_det_t d = { x - 0.05f, ys[i] - 0.02f, 0.1f, 0.04f, 0.9f, 0 };
         lcstub_push_frame(s, 1, mono0 + (uint32_t)i * 100u, 7, 3, 0, 0, &d, 1);
-        /* fetch what the stub queued (single-event slot) and dispatch it */
+
         uint8_t buf[LC_APP_EVENT_BUF_CAP];
         uint32_t alen = 0;
         int slot = s->ev_head;
@@ -70,7 +60,6 @@ static void run_crossing(int down, uint32_t x_center_permille, uint32_t mono0)
     }
 }
 
-/* consume the oldest queued event through the business layer */
 static void pump_event(void)
 {
     uint8_t buf[LC_APP_EVENT_BUF_CAP];
@@ -83,7 +72,6 @@ static void pump_event(void)
     lcbus_on_event(&bus, buf, alen);
 }
 
-/* close the current window at the given tick */
 static const lcstub_report_t *close_window(uint32_t tick)
 {
     uint32_t submits_before = lcstub_calls(s, LCSTUB_FN_REPORT_SUBMIT);
@@ -93,7 +81,6 @@ static const lcstub_report_t *close_window(uint32_t tick)
     return lcstub_report_by_seq(s, bus.report_seq);
 }
 
-/* find a top-level numeric value for "key" inside a JSON region */
 static long json_num_region(const char *json, const char *region, const char *key)
 {
     char pat[64];
@@ -116,8 +103,6 @@ static long json_num_region(const char *json, const char *region, const char *ke
     return neg ? -v : v;
 }
 
-/* ---- scenarios -------------------------------------------------------------- */
-
 static void t01(void)
 {
     printf("B01 window IN + counters + commit\n");
@@ -126,9 +111,9 @@ static void t01(void)
     CHECK_EQ_I(lcbus_apply_config(&bus, &c), 0);
     CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
     CHECK_EQ_I(bus.binding.target_index, 0);
-    CHECK_EQ_I(bus.revision, 1);            /* config commit landed */
+    CHECK_EQ_I(bus.revision, 1);
 
-    run_crossing(1 /*down=IN*/, 500, 100);
+    run_crossing(1, 500, 100);
     CHECK_EQ_I(bus.window_in, 1);
     CHECK_EQ_I(bus.total_in, 1);
     CHECK_EQ_I(bus.window_out, 0);
@@ -137,8 +122,8 @@ static void t01(void)
     CHECK_EQ_I(bus.state_dirty, 1);
 
     lcstub_set_tick(s, 6000);
-    lcbus_flush(&bus, 0);                   /* pacing elapsed -> commit */
-    CHECK_EQ_I(bus.st.state_commits_ok, 2); /* config commit + crossing commit */
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_commits_ok, 2);
     CHECK_EQ_I(s->state_present, 1);
     CHECK_EQ_I(s->state_revision, 2);
 
@@ -158,7 +143,7 @@ static void t02(void)
     setup();
     lc_bus_config_t c = cfg1();
     lcbus_apply_config(&bus, &c);
-    run_crossing(0 /*up=OUT*/, 500, 100);
+    run_crossing(0, 500, 100);
     CHECK_EQ_I(bus.window_out, 1);
     CHECK_EQ_I(bus.total_out, 1);
     CHECK_EQ_I(bus.window_in, 0);
@@ -175,10 +160,9 @@ static void t03(void)
     run_crossing(1, 500, 100);
     const lcstub_report_t *r = close_window(61000);
     CHECK(r != NULL);
-    CHECK_EQ_I(bus.window_in, 0);           /* window reset on close */
-    CHECK_EQ_I(bus.total_in, 1);            /* totals persist */
+    CHECK_EQ_I(bus.window_in, 0);
+    CHECK_EQ_I(bus.total_in, 1);
 
-    /* second window, different x -> fresh track, same direction */
     run_crossing(1, 200, 500);
     CHECK_EQ_I(bus.window_in, 1);
     CHECK_EQ_I(bus.total_in, 2);
@@ -192,12 +176,11 @@ static void t04(void)
     lc_bus_config_t c = cfg1();
     lcbus_apply_config(&bus, &c);
 
-    /* car (class 1) crosses while person (class 0) stays put: only person counts */
     float xs[4] = { 0.30f, 0.44f, 0.58f, 0.72f };
     for (int i = 0; i < 4; i++) {
         lcstub_det_t dets[2] = {
-            { 0.45f, xs[i] - 0.02f, 0.1f, 0.04f, 0.9f, 1 }, /* car crossing */
-            { 0.70f, 0.20f - 0.02f, 0.1f, 0.04f, 0.9f, 0 }, /* person static */
+            { 0.45f, xs[i] - 0.02f, 0.1f, 0.04f, 0.9f, 1 },
+            { 0.70f, 0.20f - 0.02f, 0.1f, 0.04f, 0.9f, 0 },
         };
         lcstub_push_frame(s, 1, 100u + (uint32_t)i * 100u, 7, 3, 0, 0, dets, 2);
         pump_event();
@@ -205,7 +188,6 @@ static void t04(void)
     CHECK_EQ_I(bus.window_in, 0);
     CHECK_EQ_I(bus.total_in, 0);
 
-    /* now person crosses, car crosses too: only person counted */
     for (int i = 0; i < 4; i++) {
         lcstub_det_t dets[2] = {
             { 0.45f, xs[i] - 0.02f, 0.1f, 0.04f, 0.9f, 0 },
@@ -217,7 +199,6 @@ static void t04(void)
     CHECK_EQ_I(bus.window_in, 1);
     CHECK_EQ_I(bus.total_in, 1);
 
-    /* low-confidence person crossing: filtered by threshold 0.25 */
     for (int i = 0; i < 4; i++) {
         lcstub_det_t d = { 0.30f - 0.05f, xs[i] - 0.02f, 0.1f, 0.04f, 0.1f, 0 };
         lcstub_push_frame(s, 1, 900u + (uint32_t)i * 100u, 7, 3, 0, 0, &d, 1);
@@ -239,7 +220,7 @@ static void t05(void)
     lc_bus_config_t edited = c;
     snprintf(edited.counter_name, sizeof(edited.counter_name), "counter-B");
     CHECK_EQ_I(lcbus_apply_config(&bus, &edited), 0);
-    CHECK_EQ_I(bus.total_in, 1);            /* label edit keeps counters */
+    CHECK_EQ_I(bus.total_in, 1);
     CHECK_EQ_I(bus.window_in, 1);
     CHECK(strcmp(bus.cfg.counter_name, "counter-B") == 0);
 
@@ -262,12 +243,11 @@ static void t06(void)
     lc_bus_config_t switched = c;
     snprintf(switched.target_class_name, sizeof(switched.target_class_name), "car");
     CHECK_EQ_I(lcbus_apply_config(&bus, &switched), 0);
-    CHECK_EQ_I(bus.total_in, 0);            /* frozen counting principle */
+    CHECK_EQ_I(bus.total_in, 0);
     CHECK_EQ_I(bus.window_in, 0);
     CHECK_EQ_I(bus.binding.target_index, 1);
     CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
 
-    /* person crossing now ignored; car crossing counted */
     float xs[4] = { 0.30f, 0.44f, 0.58f, 0.72f };
     for (int i = 0; i < 4; i++) {
         lcstub_det_t dets[2] = {
@@ -294,7 +274,7 @@ static void t07(void)
     CHECK_EQ_I(bus.total_in, 0);
     CHECK_EQ_I(bus.total_out, 0);
     CHECK_EQ_I(bus.window_in, 0);
-    CHECK_EQ_I(bus.report_seq, seq_before); /* report identity continuity */
+    CHECK_EQ_I(bus.report_seq, seq_before);
     lc_bus_config_t scfg;
     uint32_t ti, to, wi, wo, seq;
     CHECK_EQ_I(lc_st_decode(s->state_blob, s->state_len, &scfg, &ti, &to, &wi, &wo, &seq),
@@ -310,11 +290,10 @@ static void t08(void)
     lc_bus_config_t c = cfg1();
     lcbus_apply_config(&bus, &c);
     run_crossing(1, 500, 100);
-    bus.report_seq = 5;                     /* pretend two reports were sent */
+    bus.report_seq = 5;
     lcstub_set_tick(s, 6000);
     lcbus_flush(&bus, 0);
 
-    /* "restart": a fresh business instance over the SAME Host state store */
     lcbus_t bus2;
     lcbus_host_ops_t ops = *lcbus_abi_ops();
     ops.user = &tbl;
@@ -329,7 +308,6 @@ static void t08(void)
     CHECK_EQ_I(bus2.carried_in, 1);
     CHECK(strcmp(bus2.cfg.counter_name, c.counter_name) == 0);
 
-    /* close a window on the restarted instance */
     uint32_t submits_before = lcstub_calls(s, LCSTUB_FN_REPORT_SUBMIT);
     lcstub_set_tick(s, 67000);
     lcbus_on_idle(&bus2);
@@ -362,7 +340,7 @@ static void t10(void)
     lcbus_restore(&bus);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_DEGRADED);
     lc_bus_config_t c = cfg1();
-    lcbus_apply_config(&bus, &c);           /* forces a flush; commit OK */
+    lcbus_apply_config(&bus, &c);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
     CHECK_EQ_I(bus.st.state_commits_ok >= 1, 1);
     teardown();
@@ -375,8 +353,7 @@ static void t11(void)
     lcstub_state_commit_fault(s, LC_RET_REVISION_CONFLICT, 1);
     lc_bus_config_t c = cfg1();
     CHECK_EQ_I(lcbus_apply_config(&bus, &c), 0);
-    /* first commit conflicted (revision 0 vs stored empty state);
-     * the recovery path re-read and re-committed */
+
     CHECK_EQ_I(bus.st.state_conflicts, 1);
     CHECK_EQ_I(bus.st.state_commits_ok, 1);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
@@ -388,21 +365,21 @@ static void t12(void)
     printf("B12 persistent conflict -> CONFLICT state, counting continues\n");
     setup();
     lc_bus_config_t c = cfg1();
-    lcbus_apply_config(&bus, &c);           /* clean first commit */
+    lcbus_apply_config(&bus, &c);
     lcstub_state_commit_fault(s, LC_RET_REVISION_CONFLICT, 2);
     run_crossing(1, 500, 100);
     lcstub_set_tick(s, 20000);
-    lcbus_flush(&bus, 0);                   /* conflict x2 -> CONFLICT */
+    lcbus_flush(&bus, 0);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CONFLICT);
     CHECK_EQ_I(bus.st.state_conflicts, 1);
     uint32_t frozen = lcstub_calls(s, LCSTUB_FN_STATE_COMMIT);
-    lcbus_flush(&bus, 0);                   /* auto-flush stays disabled */
+    lcbus_flush(&bus, 0);
     CHECK_EQ_I(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT), frozen);
-    /* a forced flush retries once and recovers */
+
     lcbus_flush(&bus, 1);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
     CHECK_EQ_I(bus.st.state_commits_ok, 2);
-    /* business keeps counting the whole time */
+
     CHECK_EQ_I(bus.total_in, 1);
     teardown();
 }
@@ -421,9 +398,9 @@ static void t13(void)
     lcbus_init(&bus, &ops);
     lcbus_restore(&bus);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CORRUPT);
-    CHECK_EQ_I(bus.total_in, 0);            /* fresh counters, loudly flagged */
+    CHECK_EQ_I(bus.total_in, 0);
     lc_bus_config_t c = cfg1();
-    lcbus_apply_config(&bus, &c);           /* commit replaces corrupt blob */
+    lcbus_apply_config(&bus, &c);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
     lcstub_destroy(s);
 }
@@ -439,8 +416,6 @@ static void t14(void)
     CHECK_EQ_I(bus.total_in, 0);
     CHECK_EQ_I(bus.st.frames_unusable, 4);
 
-    /* model loads again (new generation): next frame triggers rate-limited
-     * rebind -> counting resumes */
     lcstub_set_model(s, 1, 8, 3, 2, "od-demo", "1.2");
     lcstub_set_tick(s, 2000);
     run_crossing(1, 500, 1000);
@@ -461,15 +436,12 @@ static void t15(void)
     lcbus_rebind(&bus, 0);
     CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
 
-    /* a class table change is only observable through a class_generation
-     * bump (that is what the generation is for); the app correctly keeps
-     * the old binding if the Host does not bump it */
     lcstub_set_class(s, 0, "vehicle");
     lcstub_set_tick(s, 4000);
     lcbus_rebind(&bus, 1);
-    CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING); /* no gen bump: unchanged */
+    CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
 
-    lcstub_set_model(s, 1, 7, 5, 2, "od-demo", "1.2"); /* class_gen bump */
+    lcstub_set_model(s, 1, 7, 5, 2, "od-demo", "1.2");
     lcstub_set_class(s, 0, "vehicle");
     lcstub_set_class(s, 1, "car");
     lcstub_set_tick(s, 6000);
@@ -490,14 +462,12 @@ static void t16(void)
     CHECK_EQ_I(bus.gaps_window, 1);
     CHECK_EQ_I(bus.lost_window, 3);
 
-    /* gap-flagged frame (bit0, lost 2) still counts its detections */
     lcstub_det_t d = { 0.45f, 0.28f, 0.1f, 0.04f, 0.9f, 0 };
     lcstub_push_frame(s, 2, 100, 7, 3, LC_EVT_FLAG_LOST_KNOWN, 2, &d, 1);
     pump_event();
     CHECK_EQ_I(bus.gaps_window, 2);
     CHECK_EQ_I(bus.lost_window, 5);
 
-    /* unknown loss (bit1 + 0xFFFFFFFF) */
     lcstub_push_kind(s, LC_EVT_KIND_GAP, 3, 150, 7, 3, LC_EVT_FLAG_LOST_UNKNOWN,
                      LC_EVT_LOST_UNKNOWN_MARK);
     pump_event();
@@ -522,31 +492,30 @@ static void t17(void)
     lcbus_apply_config(&bus, &c);
     uint8_t raw[128];
 
-    /* unknown kind 9 */
     lcstub_push_kind(s, 9, 1, 10, 7, 3, 0, 0);
-    /* unknown flags bit5 */
+
     lcstub_push_kind(s, LC_EVT_KIND_FRAME, 1, 10, 7, 3, 0x20, 0);
-    /* bit1 but lost != 0xFFFFFFFF */
+
     lcstub_push_kind(s, LC_EVT_KIND_FRAME, 1, 10, 7, 3, LC_EVT_FLAG_LOST_UNKNOWN, 3);
-    /* non-FRAME kind with detections != 0 */
+
     {
         uint8_t b[LC_EVT_HDR_SIZE];
         memset(b, 0, sizeof(b));
         lcstub_wr32(b + 0, LC_EVT_HDR_SIZE);
         lcstub_wr32(b + 4, LC_EVT_KIND_GAP);
-        lcstub_wr32(b + 28, 1); /* detection_count = 1 */
+        lcstub_wr32(b + 28, 1);
         lcstub_push_raw(s, b, sizeof(b));
     }
-    /* total_len inconsistent with detection_count */
+
     {
         uint8_t b[LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE];
         memset(b, 0, sizeof(b));
-        lcstub_wr32(b + 0, LC_EVT_HDR_SIZE); /* claims 40 but carries 1 record */
+        lcstub_wr32(b + 0, LC_EVT_HDR_SIZE);
         lcstub_wr32(b + 4, LC_EVT_KIND_FRAME);
         lcstub_wr32(b + 28, 1);
         lcstub_push_raw(s, b, sizeof(b));
     }
-    /* reserved0 != 0 */
+
     {
         memset(raw, 0, 40);
         lcstub_wr32(raw + 0, 40);
@@ -554,26 +523,26 @@ static void t17(void)
         lcstub_wr32(raw + 36, 7);
         lcstub_push_raw(s, raw, 40);
     }
-    /* non-finite float (Inf x) */
+
     {
         memset(raw, 0, LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE);
         lcstub_wr32(raw + 0, LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE);
         lcstub_wr32(raw + 4, LC_EVT_KIND_FRAME);
         lcstub_wr32(raw + 28, 1);
-        lcstub_wr32(raw + 40, 0x7F800000u); /* +Inf bits */
+        lcstub_wr32(raw + 40, 0x7F800000u);
         lcstub_push_raw(s, raw, LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE);
     }
-    /* class_index out of range */
+
     {
         memset(raw, 0, LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE);
         lcstub_wr32(raw + 0, LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE);
         lcstub_wr32(raw + 4, LC_EVT_KIND_FRAME);
         lcstub_wr32(raw + 28, 1);
-        lcstub_wr32(raw + 40, 0x3F800000u); /* 1.0f x */
-        lcstub_wr32(raw + 60, 99);          /* class_index */
+        lcstub_wr32(raw + 40, 0x3F800000u);
+        lcstub_wr32(raw + 60, 99);
         lcstub_push_raw(s, raw, LC_EVT_HDR_SIZE + LC_EVT_REC_SIZE);
     }
-    /* truncated header */
+
     lcstub_push_raw(s, raw, 12);
 
     while (s->ev_count) pump_event();
@@ -597,7 +566,7 @@ static void t18(void)
     pump_event();
     CHECK_EQ_I(bus.st.frames_total, 1);
     CHECK_EQ_I(bus.st.frames_empty, 1);
-    CHECK_EQ_I(bus.st.frames_unusable, 0);  /* empty frame while running is fine */
+    CHECK_EQ_I(bus.st.frames_unusable, 0);
     teardown();
 }
 
@@ -614,7 +583,7 @@ static void t19(void)
     CHECK_EQ_I(bus.st.reports_dropped, 1);
     CHECK_EQ_I(bus.st.reports_submitted, 0);
     CHECK_EQ_I(bus.report_seq, 1);
-    CHECK_EQ_I(bus.window_in, 0);           /* window still closed */
+    CHECK_EQ_I(bus.window_in, 0);
 
     run_crossing(1, 200, 500);
     r = close_window(121000);
@@ -634,7 +603,7 @@ static void t20(void)
     const lcstub_report_t *r = close_window(61000);
     CHECK(r != NULL);
     CHECK_EQ_I(bus.st.reports_submitted, 1);
-    CHECK_EQ_I(bus.st.reports_delivered_mqtt, 0);   /* accepted != delivered */
+    CHECK_EQ_I(bus.st.reports_delivered_mqtt, 0);
 
     lcstub_set_report_state(s, 1, LC_RSTATE_TRANSPORT_SUCCEEDED, LC_RSTATE_PENDING);
     lcbus_on_idle(&bus);
@@ -643,9 +612,8 @@ static void t20(void)
 
     lcstub_set_report_state(s, 1, LC_RSTATE_TRANSPORT_SUCCEEDED, LC_RSTATE_NOT_CONFIGURED);
     lcbus_on_idle(&bus);
-    CHECK_EQ_I(bus.st.reports_delivered_webhook, 0); /* not configured: not delivered */
+    CHECK_EQ_I(bus.st.reports_delivered_webhook, 0);
 
-    /* second report: mqtt fails, webhook not configured */
     run_crossing(1, 200, 500);
     lcstub_set_report_channels(s, LC_RSTATE_PENDING, LC_RSTATE_NOT_CONFIGURED);
     r = close_window(121000);
@@ -670,11 +638,11 @@ static void t21(void)
     pump_event();
     CHECK_EQ_I(bus.binding.model_generation, 8);
     CHECK_EQ_I(bus.binding.class_generation, 4);
-    CHECK_EQ_I(bus.total_in, 1);            /* counters preserved */
-    CHECK(bus.tracker == NULL);             /* transient cleared */
+    CHECK_EQ_I(bus.total_in, 1);
+    CHECK(bus.tracker == NULL);
 
     run_crossing(1, 500, 600);
-    CHECK_EQ_I(bus.total_in, 2);            /* fresh tracker counts again */
+    CHECK_EQ_I(bus.total_in, 2);
     teardown();
 }
 

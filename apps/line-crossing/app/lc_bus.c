@@ -1,25 +1,11 @@
-/*
- * lc_bus.c — Line Crossing App business layer implementation.
- *
- * Consumes the frozen v2 Host ABI through lcbus_host_ops (bound to the real
- * function table by lc_app_entry.c) and drives the already-accepted lc_*
- * core.  Counting-parity principles are kept where the frozen counting
- * semantics define them (target switch resets counters, counter-name edits
- * do not, model generation changes clear transient tracker state but keep
- * counters, manual reset zeroes everything); everything the v2 spec defines
- * (wire validation, generations, state revision, report delivery states) is
- * implemented exactly as specified — see docs/p7-app.md for the mapping.
- */
+
 #include "lc_bus.h"
 #include "lc_json.h"
 #include "lc_stateblob.h"
 #include "lc_line_cross.h"
 #include "lc_compat.h"
 
-/* file-scope .bss buffers (the Host loader never initializes .data) */
 static char lc_report_buf[LC_APP_REPORT_MAX];
-
-/* ---- small helpers ------------------------------------------------------ */
 
 static float bits_to_f32(uint32_t bits)
 {
@@ -35,19 +21,17 @@ static void lc_log(lcbus_t *b, const char *s)
     if (b->ops.log) b->ops.log(b->ops.user, s);
 }
 
-/* ---- strict 128B model metadata decode (§6.5, fail-closed) -------------- */
-
 static int meta_cstr_ok(const uint8_t *field, uint32_t flen)
 {
     uint32_t nul = 0xFFFFFFFFu;
     for (uint32_t i = 0; i < flen; i++) {
         if (field[i] == 0u) { nul = i; break; }
     }
-    if (nul == 0xFFFFFFFFu) return 0;             /* no NUL terminator      */
+    if (nul == 0xFFFFFFFFu) return 0;
     for (uint32_t i = nul; i < flen; i++) {
-        if (field[i] != 0u) return 0;             /* garbage after NUL      */
+        if (field[i] != 0u) return 0;
     }
-    /* field is NUL-terminated within its length by construction */
+
     return lc_bus_utf8_valid((const char *)field);
 }
 
@@ -65,7 +49,7 @@ static int parse_meta_strict(const uint8_t *m, lcbus_binding_t *out)
     if (!meta_cstr_ok(m + 24, LC_MODEL_NAME_LEN)) return 0;
     if (!meta_cstr_ok(m + 88, LC_MODEL_VERSION_LEN)) return 0;
     for (uint32_t i = 120u; i < 128u; i++) {
-        if (m[i] != 0u) return 0;                 /* tail reserved must be 0 */
+        if (m[i] != 0u) return 0;
     }
     out->model_generation = mgen;
     out->class_generation = cgen;
@@ -73,10 +57,8 @@ static int parse_meta_strict(const uint8_t *m, lcbus_binding_t *out)
     lc_strlcpy(out->model_name, (const char *)m + 24, sizeof(out->model_name));
     lc_strlcpy(out->model_version, (const char *)m + 88, sizeof(out->model_version));
     return (loaded != 0u && result_type == LC_MODEL_META_RESULT_OD) ? 1 : 2;
-    /* 1 = usable, 2 = strict-valid but unusable for this business */
-}
 
-/* ---- transient state (counting lc_clear_transient parity) --------------- */
+}
 
 static void clear_transient(lcbus_t *b)
 {
@@ -110,8 +92,6 @@ static int ensure_resources(lcbus_t *b)
     return 1;
 }
 
-/* ---- binding ------------------------------------------------------------- */
-
 static void unbind(lcbus_t *b, lcbus_model_state_t st)
 {
     b->binding.bound = 0;
@@ -138,8 +118,7 @@ void lcbus_rebind(lcbus_t *b, int force)
         return;
     }
     if (r != LC_RET_OK) {
-        /* BUFFER_TOO_SMALL for a fixed-128 query is a host contract breach;
-         * INCOMPATIBLE means the Host cannot represent its metadata. */
+
         if (r == LC_RET_INCOMPATIBLE) {
             unbind(b, LCBUS_MSTATE_UNSUPPORTED_MODEL);
         } else {
@@ -153,12 +132,12 @@ void lcbus_rebind(lcbus_t *b, int force)
     parsed.target_index = -1;
     int pr = parse_meta_strict(meta, &parsed);
     if (pr == 0) {
-        unbind(b, LCBUS_MSTATE_UNSUPPORTED_MODEL);   /* malformed meta wire */
+        unbind(b, LCBUS_MSTATE_UNSUPPORTED_MODEL);
         return;
     }
-    if (pr == 2) {                                   /* valid but unusable  */
+    if (pr == 2) {
         unbind(b, LCBUS_MSTATE_UNSUPPORTED_MODEL);
-        /* keep generations/counters/names so change detection still works */
+
         b->binding.model_generation = parsed.model_generation;
         b->binding.class_generation = parsed.class_generation;
         b->binding.class_count = parsed.class_count;
@@ -167,8 +146,6 @@ void lcbus_rebind(lcbus_t *b, int force)
         return;
     }
 
-    /* unchanged generations with a live binding: keep counting (parity with
-     * counting's lc_rebind short-circuit; no transient reset) */
     if (b->binding.bound &&
         b->binding.model_generation == parsed.model_generation &&
         b->binding.class_generation == parsed.class_generation &&
@@ -177,8 +154,6 @@ void lcbus_rebind(lcbus_t *b, int force)
         return;
     }
 
-    /* generation change: clear transient tracker state, keep counters
-     * (counting lc_rebind parity) */
     if (b->binding.bound) clear_transient(b);
 
     b->binding.model_generation = parsed.model_generation;
@@ -187,7 +162,6 @@ void lcbus_rebind(lcbus_t *b, int force)
     lc_strlcpy(b->binding.model_name, parsed.model_name, sizeof(b->binding.model_name));
     lc_strlcpy(b->binding.model_version, parsed.model_version, sizeof(b->binding.model_version));
 
-    /* generation-bound class scan for the configured target (§6.5) */
     char name[64];
     int32_t found = -1;
     for (uint32_t i = 0; i < parsed.class_count; i++) {
@@ -200,12 +174,11 @@ void lcbus_rebind(lcbus_t *b, int force)
             return;
         }
         if (cr == LC_RET_BUFFER_TOO_SMALL) {
-            /* longer than 63 bytes: can never equal a <=31-byte target
-             * (§5.4: never truncate into a seemingly valid label) */
+
             continue;
         }
         if (cr == LC_RET_INCOMPATIBLE) {
-            /* generation expired mid-scan; retry via the idle path */
+
             unbind(b, LCBUS_MSTATE_TARGET_CLASS_INVALID);
             return;
         }
@@ -214,7 +187,7 @@ void lcbus_rebind(lcbus_t *b, int force)
             unbind(b, LCBUS_MSTATE_TARGET_CLASS_INVALID);
             return;
         }
-        if (alen >= (uint32_t)sizeof(name)) {        /* contract breach      */
+        if (alen >= (uint32_t)sizeof(name)) {
             b->st.host_faults++;
             unbind(b, LCBUS_MSTATE_TARGET_CLASS_INVALID);
             return;
@@ -236,11 +209,6 @@ void lcbus_rebind(lcbus_t *b, int force)
                sizeof(b->binding.target_name));
     b->model_state = LCBUS_MSTATE_RUNNING;
 }
-
-/* ---- gap / quality accounting (never silently exact, §5.3) -------------- */
-/* handled inline in lcbus_on_event; see apply of flags + GAP kind there.   */
-
-/* ---- event validation (§5, fail-closed) ---------------------------------- */
 
 typedef struct lc_evt_hdr {
     uint32_t total_len, kind, sequence, monotonic_ms;
@@ -279,14 +247,12 @@ static int validate_event(lcbus_t *b, const uint8_t *ev, uint32_t len,
             }
             uint32_t cls = lc_rd_u32(rec + 4 * LC_EVT_REC_CLASS_INDEX);
             if (b->binding.class_count != 0u && cls >= b->binding.class_count) {
-                return 0;                             /* §5.2 class_index bound */
+                return 0;
             }
         }
     }
     return 1;
 }
-
-/* ---- frame processing ----------------------------------------------------- */
 
 static void heat_cb(const lc_track_t *trk, void *user)
 {
@@ -306,7 +272,6 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
     b->st.frames_total++;
     if (h->detection_count == 0u) b->st.frames_empty++;
 
-    /* binding currency: generation changes force a rebind (§5.1 field 4/5) */
     if (b->binding.bound &&
         (h->model_gen != b->binding.model_generation ||
          h->class_gen != b->binding.class_generation)) {
@@ -315,8 +280,7 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
         lcbus_rebind(b, 0);
     }
     if (!b->binding.bound || b->model_state != LCBUS_MSTATE_RUNNING) {
-        /* deliverable frame the business cannot consume: visible, never
-         * silently treated as counted-or-empty (§5.2) */
+
         b->st.frames_unusable++;
         b->unusable_window++;
         return;
@@ -328,7 +292,7 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
     for (uint32_t i = 0; i < h->detection_count; i++) {
         const uint8_t *rec = ev + LC_EVT_HDR_SIZE + i * LC_EVT_REC_SIZE;
         if (lc_rd_u32(rec + 4 * LC_EVT_REC_CLASS_INDEX) != (uint32_t)b->binding.target_index) {
-            continue;                                  /* single target class */
+            continue;
         }
         float conf = bits_to_f32(lc_rd_u32(rec + 4 * LC_EVT_REC_CONF_BITS));
         if (conf < thr) continue;
@@ -347,7 +311,7 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
         b->st.frames_unusable++;
         b->unusable_window++;
         if (b->consecutive_alloc_failures >= 16u) {
-            /* persistent resource exhaustion is fatal for the session */
+
             b->resource_fatal = 1;
         }
         return;
@@ -376,8 +340,6 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
         lc_tracker_for_each_stable(b->tracker, heat_cb, b->heat);
     }
 }
-
-/* ---- report construction (schema_version=1, type=line_counting) ---------- */
 
 static void lcj_key(lc_json_t *j, const char *key)
 {
@@ -457,7 +419,7 @@ static uint32_t build_window_report(lcbus_t *b, uint32_t end_ms,
     lcj_raw(&j, ",");
     lcj_key(&j, "report_seq"); lcj_u32(&j, b->report_seq + 1u);
     lcj_raw(&j, ",");
-    /* no RTC in the App session: honest absence, counting shape preserved */
+
     lcj_key(&j, "clock_valid"); lcj_bool(&j, 0);
     lcj_raw(&j, ",");
     lcj_key(&j, "reported_at"); lcj_null(&j);
@@ -576,11 +538,9 @@ static uint32_t build_window_report(lcbus_t *b, uint32_t end_ms,
     }
     lcj_raw(&j, "}");
 
-    if (j.overflow) return 0;   /* never submit a truncated report (§4.1) */
+    if (j.overflow) return 0;
     return j.len;
 }
-
-/* ---- report submit + status ---------------------------------------------- */
 
 static void pending_push(lcbus_t *b, uint32_t seq)
 {
@@ -594,7 +554,7 @@ static void pending_push(lcbus_t *b, uint32_t seq)
             return;
         }
     }
-    /* ring full: oldest slot is evicted; its delivery state stays unknown */
+
     b->st.reports_status_unresolved++;
     b->pending[0].in_use = 1;
     b->pending[0].seq = seq;
@@ -608,7 +568,7 @@ static void submit_window_report(lcbus_t *b, uint32_t end_ms,
 {
     uint32_t len = build_window_report(b, end_ms, records, n_records);
     if (len == 0u) {
-        /* overflow (or builder fault): dropped visibly, never truncated */
+
         b->st.reports_dropped++;
         lc_log(b, "LC_APP: window report overflow -> dropped (no truncation)");
         b->state_dirty = 1;
@@ -618,11 +578,11 @@ static void submit_window_report(lcbus_t *b, uint32_t end_ms,
     uint32_t boot = 0;
     int32_t r = b->ops.report_submit(b->ops.user, (const uint8_t *)lc_report_buf,
                                      len, seq, &boot);
-    b->report_seq = seq;                 /* identity advanced regardless     */
+    b->report_seq = seq;
     b->state_dirty = 1;
     switch (r) {
     case LC_RET_OK:
-        b->st.reports_submitted++;       /* platform acceptance ONLY (§6.6)  */
+        b->st.reports_submitted++;
         if (!b->host_boot_known) {
             b->host_boot_id = boot;
             b->host_boot_known = 1;
@@ -687,7 +647,7 @@ static void poll_statuses(lcbus_t *b)
             b->session_fatal = 1;
             return;
         } else {
-            p->polls++;                  /* transient host faults: keep trying */
+            p->polls++;
         }
         if (p->mqtt_done && p->web_done) {
             p->in_use = 0;
@@ -697,8 +657,6 @@ static void poll_statuses(lcbus_t *b)
         }
     }
 }
-
-/* ---- window lifecycle ------------------------------------------------------ */
 
 static void close_window(lcbus_t *b, uint32_t now)
 {
@@ -731,8 +689,6 @@ static void maybe_close_window(lcbus_t *b, uint32_t now)
     if (lc_tick_diff(now, b->window_start_ms) < period) return;
     close_window(b, now);
 }
-
-/* ---- persistence ------------------------------------------------------------ */
 
 static void encode_state(lcbus_t *b, uint8_t *buf, uint32_t cap, uint32_t *len)
 {
@@ -769,10 +725,10 @@ void lcbus_flush(lcbus_t *b, int force)
         if (b->persist_state == LCBUS_PERSIST_DEGRADED) {
             lc_log(b, "LC_APP: state storage recovered");
         } else if (b->persist_state == LCBUS_PERSIST_CORRUPT) {
-            /* our valid blob now overwrote the corrupt stored bytes */
+
             lc_log(b, "LC_APP: corrupt state replaced with valid state");
         }
-        /* a successful commit is the definition of healthy persistence */
+
         b->persist_state = LCBUS_PERSIST_OK;
         return;
     }
@@ -784,9 +740,7 @@ void lcbus_flush(lcbus_t *b, int force)
     b->state_dirty = 1;
     if (r == LC_RET_REVISION_CONFLICT) {
         b->st.state_conflicts++;
-        /* single-writer session: re-read the stored revision and re-commit
-         * our current state; a second conflict is escalated to a visible
-         * CONFLICT state with auto-flush disabled */
+
         uint8_t rb[LC_ST_BLOB_MAX];
         uint32_t rlen = 0, rrev = 0;
         int32_t rr = b->ops.state_read(b->ops.user, rb, (uint32_t)sizeof(rb), &rlen, &rrev);
@@ -817,8 +771,7 @@ void lcbus_flush(lcbus_t *b, int force)
         b->persist_state = LCBUS_PERSIST_CONFLICT;
         return;
     }
-    /* QUOTA_EXCEEDED / STORAGE_UNKNOWN / IO_ERROR / BUSY: keep dirty, retry
-     * on a later flush; visibility through persist_degraded quality flag */
+
     if (b->persist_state != LCBUS_PERSIST_CONFLICT) {
         b->persist_state = LCBUS_PERSIST_DEGRADED;
     }
@@ -849,7 +802,7 @@ void lcbus_restore(lcbus_t *b)
             lc_log(b, "LC_APP: persisted state restored");
             return;
         }
-        /* corrupt stored blob: never silently treated as valid data */
+
         b->persist_state = LCBUS_PERSIST_CORRUPT;
         b->revision = rev;
         b->state_dirty = 1;
@@ -857,7 +810,7 @@ void lcbus_restore(lcbus_t *b)
         return;
     }
     if (r == LC_RET_NOT_FOUND) {
-        /* verified absence (§6.7): a fresh start, not a data-loss claim */
+
         b->persist_state = LCBUS_PERSIST_NONE;
         b->revision = 0;
         b->state_dirty = 0;
@@ -868,15 +821,12 @@ void lcbus_restore(lcbus_t *b)
         b->session_fatal = 1;
         return;
     }
-    /* STORAGE_UNKNOWN and friends: cannot be determined — do NOT silently
-     * zero and do NOT claim completeness */
+
     b->persist_state = LCBUS_PERSIST_DEGRADED;
     b->revision = 0;
     b->state_dirty = 1;
     lc_log(b, "LC_APP: persisted state unreadable -> degraded persistence");
 }
-
-/* ---- event dispatch ---------------------------------------------------------- */
 
 void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
 {
@@ -884,12 +834,11 @@ void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
     if (!validate_event(b, ev, len, &h)) {
         b->st.malformed_events++;
         b->st.host_faults++;
-        b->gaps_window++;      /* an undecodable event is a stream gap */
+        b->gaps_window++;
         b->unusable_window++;
         return;
     }
 
-    /* gap flags can ride any event kind (§5.3); GAP kind is a dedicated gap */
     int is_gap = (h.kind == LC_EVT_KIND_GAP) ||
                  (h.flags & (LC_EVT_FLAG_LOST_KNOWN | LC_EVT_FLAG_LOST_UNKNOWN)) != 0u;
     if (is_gap) {
@@ -912,7 +861,7 @@ void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
         lcbus_rebind(b, 1);
         break;
     case LC_EVT_KIND_GAP:
-        break;                    /* already accounted above */
+        break;
     case LC_EVT_KIND_STOPPING:
         b->stop_requested = 1;
         break;
@@ -933,8 +882,6 @@ void lcbus_on_idle(lcbus_t *b)
     }
     lcbus_flush(b, 0);
 }
-
-/* ---- business actions (counting parity) --------------------------------------- */
 
 int lcbus_apply_config(lcbus_t *b, const lc_bus_config_t *candidate)
 {
@@ -957,8 +904,7 @@ int lcbus_apply_config(lcbus_t *b, const lc_bus_config_t *candidate)
 
     uint32_t now = now_tick(b);
     if (target_changed) {
-        /* frozen counting principle: a target switch resets window AND
-         * cumulative counters, transient tracker state and the binding */
+
         b->total_in = 0;
         b->total_out = 0;
         b->window_in = 0;
@@ -1012,8 +958,6 @@ void lcbus_reset(lcbus_t *b)
     b->state_dirty = 1;
     lcbus_flush(b, 1);
 }
-
-/* ---- init ----------------------------------------------------------------------- */
 
 void lcbus_init(lcbus_t *b, const lcbus_host_ops_t *ops)
 {

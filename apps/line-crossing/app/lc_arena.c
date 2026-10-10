@@ -1,25 +1,13 @@
-/*
- * lc_arena.c — first-fit free-list allocator over a static .bss arena.
- *
- * Design constraints:
- *  - no libc, no constructors, no initialized data (the Host loader never
- *    initializes .data; the arena lives in zeroed .bss);
- *  - fail-closed: exhaustion returns NULL and the caller (lc core / app
- *    business layer) must treat that as a visible resource failure, never
- *    as an empty-but-valid input;
- *  - allocations are 8-byte aligned; block headers are 8 bytes;
- *  - adjacent free blocks are coalesced on free to survive the tracker
- *    create/destroy plus per-frame record churn.
- */
+
 #include "lc_arena.h"
 #include "lc_compat.h"
 
 typedef union lc_block {
     struct {
-        uint32_t size;       /* payload size in bytes                  */
-        uint32_t used;       /* 0 = free                               */
+        uint32_t size;
+        uint32_t used;
     } h;
-    uint64_t align;          /* 8-byte alignment of the whole union    */
+    uint64_t align;
 } lc_block_t;
 
 static uint8_t  lc_arena_pool[LC_ARENA_SIZE];
@@ -63,8 +51,7 @@ void *lcapp_alloc(size_t sz)
         if (!b->h.used && b->h.size >= sz) {
             uint32_t rem = b->h.size - (uint32_t)sz;
             if (rem >= sizeof(lc_block_t) + LC_ARENA_ALIGN) {
-                /* split: carve the tail into a free block; the tail block's
-                 * payload excludes its own header */
+
                 lc_block_t *nb = (lc_block_t *)((uint8_t *)b + sizeof(lc_block_t) + sz);
                 nb->h.size = rem - (uint32_t)sizeof(lc_block_t);
                 nb->h.used = 0u;
@@ -77,7 +64,7 @@ void *lcapp_alloc(size_t sz)
         }
         b = lc_next(b, end);
     }
-    return NULL; /* exhausted: fail-closed */
+    return NULL;
 }
 
 void lcapp_free(void *p)
@@ -86,19 +73,18 @@ void lcapp_free(void *p)
     lc_block_t *b = (lc_block_t *)((uint8_t *)p - sizeof(lc_block_t));
     if ((uint8_t *)b < lc_arena_pool ||
         (uint8_t *)b >= lc_arena_pool + LC_ARENA_SIZE) {
-        return; /* foreign pointer: ignore (defensive) */
+        return;
     }
     b->h.used = 0u;
     lc_arena_used_now -= sizeof(lc_block_t) + b->h.size;
 
-    /* coalesce forward */
     lc_block_t *end = (lc_block_t *)(lc_arena_pool + LC_ARENA_SIZE);
     for (;;) {
         lc_block_t *n = lc_next(b, end);
         if (n == NULL || n->h.used) break;
         b->h.size += (uint32_t)(sizeof(lc_block_t) + n->h.size);
     }
-    /* coalesce backward: walk from pool start (bounded, arena is small) */
+
     lc_block_t *prev = (lc_block_t *)lc_arena_pool;
     while (prev != b) {
         lc_block_t *n = lc_next(prev, end);

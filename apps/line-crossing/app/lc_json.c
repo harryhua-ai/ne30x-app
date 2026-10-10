@@ -1,13 +1,11 @@
-/*
- * lc_json.c — minimal overflow-detecting JSON writer (no libc).
- */
+
 #include "lc_json.h"
 #include "lc_compat.h"
 
 static void lcj_put(lc_json_t *j, char c)
 {
     if (j->overflow) return;
-    if (j->len + 1u >= j->cap) { /* reserve one byte for the NUL terminator */
+    if (j->len + 1u >= j->cap) {
         j->overflow = 1u;
         if (j->cap > 0u) j->buf[j->len] = '\0';
         return;
@@ -96,9 +94,7 @@ void lcj_permille(lc_json_t *j, uint32_t permille)
 
 void lcj_coord(lc_json_t *j, float v)
 {
-    /* normalized-coordinate printer: clamp into [0, 2), scale to 1e-6 units.
-     * float mul + float->u32 conversion compile to FPU ops on the M55
-     * (hard-float); no libc conversion routines involved. */
+
     if (!(v >= 0.0f)) v = 0.0f;
     if (v > 2.0f) v = 2.0f;
     uint32_t scaled = (uint32_t)(v * 1000000.0f + 0.5f);

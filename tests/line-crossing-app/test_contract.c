@@ -1,13 +1,4 @@
-/*
- * test_contract.c — end-to-end Host-contract tests: the REAL app_entry is
- * driven through a stub v2 function table exactly the way a Host would
- * call it, proving the call/error contracts of all ten v2 functions
- * (Issue #11 DONE evidence; v2 spec §6/§7 semantics).
- *
- * BOUNDARY: these tests prove the App side of the frozen ABI only — not
- * device signature verification, installation, sustained inference,
- * MQTT/Webhook transport or power-fail recovery (v2 spec §12).
- */
+
 #include "test_common.h"
 #include "host_stub.h"
 #include "lc_app_entry.h"
@@ -38,7 +29,6 @@ static lc_bus_config_t cfg1m(void)
     return c;
 }
 
-/* seed the stub state store with a valid restored-config blob */
 static void seed_state(lcstub_t *st, const lc_bus_config_t *cfg, uint32_t revision)
 {
     uint8_t blob[LC_ST_BLOB_MAX];
@@ -46,7 +36,6 @@ static void seed_state(lcstub_t *st, const lc_bus_config_t *cfg, uint32_t revisi
     if (len) lcstub_set_state(st, blob, len, revision);
 }
 
-/* a downward crossing sequence for the default line */
 static void push_crossing_frames(lcstub_t *st, uint32_t x_permille, uint32_t mono0)
 {
     static const float ys[4] = { 0.30f, 0.44f, 0.58f, 0.72f };
@@ -77,8 +66,6 @@ static long json_num_region(const char *json, const char *region, const char *ke
     return v;
 }
 
-/* ---- entry contract -------------------------------------------------------- */
-
 static void c01_entry_validation(void)
 {
     printf("C01 entry validation (api/table/abi/fnptr)\n");
@@ -91,7 +78,7 @@ static void c01_entry_validation(void)
     CHECK_EQ_I(app_entry(&tbl, LC_APP_ABI_V2), LC_APP_EXIT_BAD_TABLE);
     tbl.table_size = LC_APP_API_TABLE_SIZE;
 
-    CHECK_EQ_I(app_entry(&tbl, 0x00010000u), LC_APP_EXIT_BAD_ABI); /* v1 ABI rejected */
+    CHECK_EQ_I(app_entry(&tbl, 0x00010000u), LC_APP_EXIT_BAD_ABI);
     CHECK_EQ_I(app_entry(&tbl, 0x00030000u), LC_APP_EXIT_BAD_ABI);
 
     lc_app_fn_log_t saved = tbl.log;
@@ -111,10 +98,10 @@ static void c02_clean_session(void)
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
     CHECK_EQ_I(rc, LC_APP_EXIT_OK);
     CHECK(lcstub_calls(s, LCSTUB_FN_EVENT_NEXT) > 0);
-    CHECK(lcstub_calls(s, LCSTUB_FN_MODEL_META) > 0);     /* binding at entry   */
-    CHECK(lcstub_calls(s, LCSTUB_FN_SHOULD_STOP) > 0);    /* cooperative stop   */
-    CHECK(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT) > 0);   /* final best-effort  */
-    CHECK_EQ_I(s->state_present, 1);                      /* session persisted  */
+    CHECK(lcstub_calls(s, LCSTUB_FN_MODEL_META) > 0);
+    CHECK(lcstub_calls(s, LCSTUB_FN_SHOULD_STOP) > 0);
+    CHECK(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT) > 0);
+    CHECK_EQ_I(s->state_present, 1);
     teardown();
 }
 
@@ -125,8 +112,8 @@ static void c03_unauthorized_session(void)
     lcstub_set_session(s, 0);
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
     CHECK_EQ_I(rc, LC_APP_EXIT_UNAUTHORIZED);
-    CHECK_EQ_I(s->state_present, 0);                      /* nothing stored    */
-    CHECK_EQ_I(s->report_count, 0);                       /* nothing submitted */
+    CHECK_EQ_I(s->state_present, 0);
+    CHECK_EQ_I(s->report_count, 0);
     teardown();
 }
 
@@ -166,15 +153,15 @@ static void c07_tick_wraparound(void)
     setup();
     lc_bus_config_t c = cfg1m();
     seed_state(s, &c, 3);
-    lcstub_set_tick(s, 0xFFFFFFF0u);   /* 4294967280; as int32 this reads -16 */
-    lcstub_set_tick_step(s, 30000u);   /* every tick_ms call advances 30s     */
+    lcstub_set_tick(s, 0xFFFFFFF0u);
+    lcstub_set_tick_step(s, 30000u);
     for (int i = 0; i < 6; i++) {
         lcstub_push_frame(s, (uint32_t)i, (uint32_t)i * 100u, 7, 3, 0, 0, NULL, 0);
     }
     s->auto_stop_after_no_events = 3;
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
     CHECK_EQ_I(rc, LC_APP_EXIT_OK);
-    /* window (60s) must have closed on the far side of the wrap */
+
     CHECK(s->report_count >= 1);
     if (s->report_count >= 1) {
         const lcstub_report_t *r = lcstub_report_by_seq(s, 1);
@@ -195,8 +182,7 @@ static void c08_crossing_report_e2e(void)
     setup();
     lc_bus_config_t c = cfg1m();
     seed_state(s, &c, 0);
-    /* 8000 ms per tick call: the whole scenario (binding + 8 events) stays
-     * inside the 60 s window; the first post-queue idle closes it */
+
     lcstub_set_tick_step(s, 8000u);
     push_crossing_frames(s, 500, 100);
     for (int i = 0; i < 4; i++) lcstub_push_frame(s, 10 + (uint32_t)i, 1000u, 7, 3, 0, 0, NULL, 0);
@@ -215,7 +201,7 @@ static void c08_crossing_report_e2e(void)
         CHECK_EQ_I(json_num_region(json, "total", "in"), 1);
         CHECK(strstr(json, "\"counter_name\":") != NULL);
         CHECK(strstr(json, "\"class_name\":\"person\"") != NULL);
-        CHECK(strstr(json, "\"persist_ok\":true") != NULL);  /* restored state */
+        CHECK(strstr(json, "\"persist_ok\":true") != NULL);
     }
     teardown();
 }
@@ -225,13 +211,13 @@ static void c09_malformed_meta_session(void)
     printf("C09 malformed model_meta -> unsupported model, session still safe\n");
     setup();
     uint8_t bad[LC_MODEL_META_SIZE];
-    memset(bad, 0x41, sizeof(bad));       /* no NUL terminator in name fields */
+    memset(bad, 0x41, sizeof(bad));
     lcstub_set_meta_raw(s, bad, sizeof(bad));
     push_crossing_frames(s, 500, 100);
     s->auto_stop_after_no_events = 3;
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
-    CHECK_EQ_I(rc, LC_APP_EXIT_OK);       /* degraded, not crashed            */
-    CHECK_EQ_I(s->report_count, 0);       /* nothing counted into a report    */
+    CHECK_EQ_I(rc, LC_APP_EXIT_OK);
+    CHECK_EQ_I(s->report_count, 0);
     teardown();
 }
 
@@ -294,7 +280,7 @@ static void c13_storage_unknown_boot(void)
     for (int i = 0; i < 6; i++) lcstub_push_frame(s, 10 + (uint32_t)i, 1000u, 7, 3, 0, 0, NULL, 0);
     s->auto_stop_after_no_events = 3;
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
-    CHECK_EQ_I(rc, LC_APP_EXIT_OK);       /* degraded but running            */
+    CHECK_EQ_I(rc, LC_APP_EXIT_OK);
     CHECK(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT) > 0);
     teardown();
 }
@@ -308,10 +294,7 @@ static void c14_report_seq_consistency(void)
     lcstub_set_tick_step(s, 30000u);
     push_crossing_frames(s, 500, 100);
     for (int i = 0; i < 4; i++) lcstub_push_frame(s, 10 + (uint32_t)i, 1000u, 7, 3, 0, 0, NULL, 0);
-    /* two windows -> two reports; the stub cross-checks each submission's
-     * JSON report_seq against the app_report_seq argument (v2 §6.6) and
-     * would return INVALID_ARGUMENT (-> drop, report_count stays behind)
-     * on any mismatch */
+
     s->auto_stop_after_no_events = 3;
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
     CHECK_EQ_I(rc, LC_APP_EXIT_OK);

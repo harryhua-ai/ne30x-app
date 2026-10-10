@@ -1,6 +1,4 @@
-/*
- * test_common.h — minimal check/count harness shared by the App test bins.
- */
+
 #ifndef TEST_COMMON_H
 #define TEST_COMMON_H
 

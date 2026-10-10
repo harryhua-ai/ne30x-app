@@ -149,3 +149,136 @@ Issue 证明范围内，属 NE301 设备侧任务：
 6. 真实 Host 资源配额对 `2048/4096/6144` 声明的满足（§4.2 逐项验证属设备）。
 
 任何把本套件 PASS 写成"设备已验证"的引用都是错误的（v2 规范 §12）。
+
+## 9. 设计要点（解释自实现注释迁移，代码内无注释）
+
+本节承载 Candidate 首轮实现中写在代码注释里的设计解释；按 User 代码洁净
+约束（#11 issuecomment-6095201082），代码不再携带解释性注释，全部集中于此。
+
+### 9.1 入口与主循环（lc_app_entry.c）
+
+- 入口校验顺序：api 非空 → `table_size==48` → `abi_version==0x00020000` →
+  10 个函数指针全非空；退出码 `-1/-2/-3/-4` 一一对应，`0`=协作停止，
+  `-5`=UNAUTHORIZED，`-6`=Host 连续契约违约，`-7`=持续分配耗尽。
+- 主循环不变量：所有等待有界（max_wait_ms=1000）；NO_EVENT、空 FRAME、
+  MODEL_CHANGED、GAP、STOPPING 五种可观察语义互不混同；tick 差分恒 mod 2³²；
+  任何 UNAUTHORIZED 在尽力强制 commit 后以 -5 结束；持续 Host 违约以
+  -6 结束而非被吸收。
+- 违约连击（fault streak）策略：**只有成功消费一个事件才清零连击**；
+  NO_EVENT/should_stop==0 不是"Host 已恢复"的证据，不清零。连续 3 次
+  should_stop 负值或 event_next 非法返回 → `-6`。
+- 每轮循环上限 10⁶ 次迭代（runaway guard，同时约束宿主测试时长）。
+- 退出前执行一次 force flush（尽力而为的最终 commit），退出不是静默状态丢失。
+
+### 9.2 业务层状态机（lc_bus.c）
+
+- model_meta 严格解码返回三态：0=wire 违例（UNSUPPORTED）、1=可用、
+  2=严格合法但业务不可用（未加载/result_type≠PP_TYPE_OD）。不可用态仍保留
+  generations/class_count/名称，用于后续代次变化检测。
+- 代次不变 + 绑定存活 → 短路 RUNNING（counting `lc_rebind` 对拍）；代次变化
+  → 清 transient（tracker 销毁并顺延 next_id、heat 清零），计数器保留。
+- class_name 扫描以 64B 缓冲查询：`BUFFER_TOO_SMALL` ⇒ 名称长于 63B，
+  永远不可能等于 ≤31B 的目标标签 → 继续扫描（§5.4：绝不把过长标签截断成
+  "看似合法"的业务类别）；`INCOMPATIBLE`（代次过期）→ TARGET_CLASS_INVALID
+  交由 idle 路径限频重试。
+- GAP 账目规则：flags bit0/bit1 可搭载任何事件 kind；GAP kind 是专用间断
+  信号。任一 gap 信号 → `gaps_window++`；bit1 或 lost==0xFFFFFFFF 记未知
+  丢失（lost_unknown_window=1），否则累加已知丢失帧数。无法解码的事件
+  （malformed）同样计入 gap——不可解码即间断，绝不静默。
+- 窗口关闭顺序：先快照+构造+提交报告（报告读到的是关闭前计数），再清零
+  窗口/质量账目并重置 window_start。tracks 快照仅在 tracks_report_enable
+  且 tracker 存活时生成。
+- report_seq 在提交结果无关的情况下递增（身份连续性）；提交 OK 才登记
+  pending（环容量 8，满时逐出最旧并计 status_unresolved）。状态轮询对每条
+  pending 上限 240 次，超限未决同样计入 unresolved。
+- 持久化状态机：OK / NONE（验证过的无旧状态，不是数据丢失宣称）/
+  DEGRADED（STORAGE_UNKNOWN 等，不可判定即不得宣称完整）/ CORRUPT
+  （blob CRC 或内容校验失败，大声记录；下一次成功 commit 用有效数据替换
+  并回到 OK）/ CONFLICT（重读+重提交一次仍冲突：停自动 flush，计数继续、
+  完全可见，force flush 可重试）。单写者会话（v2 §7 profile 1）使
+  "采纳存储 revision 后重提交当前状态"成为诚实的冲突恢复。
+- 恢复语义：NOT_FOUND → NONE + revision 0；读失败 → DEGRADED + dirty
+  （可判定前不归零也不宣称）；成功恢复的窗口计数以 `window_carried/
+  carried_in/carried_out` 显式标注到下一次窗口报告。
+- 重绑/flush 均按 tick 域限频（1000ms/5000ms）；force 绕过节流（配置变更、
+  窗口关闭、退出路径）。
+- 分配耗尽：tracker/line 创建失败 → 帧记 unusable（可见）+ 连击计数，
+  连续 16 次 → resource_fatal → 入口以 `-7` 退出。
+
+### 9.3 状态 blob 布局（lc_stateblob，152B，显式小端）
+
+```
+0   magic 'LCAS'        4   schema_version(1)    8   CRC-32(反射 IEEE, [12..152))
+12  target_class_name[32]   44  counter_name[64]
+108 line/outside 6×u16 permille      120 conf_threshold_permille u16
+122 max_dist_permille u16            124 k/max_miss/k_confirm u8×3 + flags u8
+                                     (flags bit0=tracks_report, bit1=heat_grid)
+128 window_minutes u16 (pad 2)
+132 total_in/out、window_in/out 4×u32 148 report_seq u32
+```
+
+编码器不校验配置（业务层只编码合法配置）；解码端按"尺寸→magic→schema→
+CRC→内容有效"顺序拒绝，因此 CRC 正确但内容非法（如空目标类别）返回
+ERR_CONTENT 而非 ERR_CRC。
+
+### 9.4 freestanding 目标支撑（lc_arena/lc_libc_mini/lc_compat）
+
+- lc 核心的 LC_MALLOC/LC_FREE 缝在目标构建注入静态 arena 分配器
+  （96KiB .bss，8 字节对齐，首次命中+前后合并；分裂时尾块 payload 不含
+  自身块头）。耗尽返回 NULL（fail-closed），由 9.2 的耗尽策略处置。
+  arena 零初始化 .bss：Host loader 不初始化 .data，链接脚本以
+  `SIZEOF(.data)==0` 断言守护。
+- sqrtf 用 Cortex-M55 FPU 的 `VSQRT.F32`（IEEE-754 正确舍入，与宿主
+  libm 数值一致）；Newlib sqrtf 拖入 `__errno`，与 -nostdlib 冲突。
+  负数/NaN 输入返回 0（核心只传平方差，不可达）。
+- lc_libc_mini 同时定义编译器可为结构赋值生成的 ISO 符号
+  （memcpy/memmove/memset/strlen/strcmp/strncmp/memcmp），宿主构建走
+  <string.h> 包装（lc_compat.h 一条实现缝）。
+
+### 9.5 工具与测试脚手架
+
+- pack_v2_image.py 逐字段镜像 tools/pack_app_image.py（P3/#6 布局权威），
+  唯一差别是 NEA1 头 abi_version 钉死 0x00020000（§3.3 交叉检查：
+  manifest required_host_abi 必须等于原生头 abi_version；v1-ABI 镜像永远
+  不能被当成 v2 App 打包）。
+- host_stub 的 `log(const char*)` 签名无上下文指针（v2 ABI 如此），stub 以
+  文件静态 g_cur 绑定当前实例（测试一次绑定一个 stub，lcstub_make_table
+  重绑）；stub 的 report_submit 按 §6.6 做同一会话一致性验证——解析 JSON
+  中 `"report_seq":N` 并与 app_report_seq 参数比对，不一致返回
+  INVALID_ARGUMENT，从 Host 侧反向钉住 App 的报告身份义务。
+- stub/state fault 注入分离通用 per-function 通道与 state_read/state_commit
+  专用通道（次数消耗型），以便精确构造 REVISION_CONFLICT 单次/双次等序列。
+- run_tests.sh 的 [1/6]–[6/6] 流水线即第 7 节命令的编排；证据全部来自
+  实际运行输出（native-package-hashes.txt 记录镜像固定哈希与包的每轮
+  签名身份）。
+
+## 10. 测试清单（234 项断言的构成）
+
+unit（50）：arena 分配/合并/耗尽/churn；JSON u32/i32/bool/null/转义/
+permille/coord/溢出锁存（含 NUL 保留字节）；状态 blob 往返 + SIZE/MAGIC/
+SCHEMA/CRC/CONTENT/容量负例；counting 对齐默认值/校验/UTF-8（含多字节）。
+
+business（B01–B21，134）：B01 窗口 IN+计数+提交；B02 OUT；B03 跨窗口
+累计与窗口复位；B04 类别+置信度过滤；B05 counter name 编辑不重置（报告
+携带新名）；B06 目标切换清零+重绑；B07 手动重置（report_seq 延续）；
+B08 重启恢复（totals/config/report_seq/窗口 carried）；B09 验证过的无旧
+状态≠数据丢失；B10 开机 STORAGE_UNKNOWN→降级→恢复；B11 单次
+REVISION_CONFLICT 恢复；B12 双次冲突→CONFLICT 停自动 flush、业务继续、
+force 恢复；B13 腐坏 blob→CORRUPT 可见→有效 commit 替换；B14 模型未加载
+→帧 unusable→恢复计数；B15 result_type 错→UNSUPPORTED；class 表变更需
+class_generation 递增才可观察（无 bump 保持绑定）；B16 GAP/flag/未知丢失
+全账目+报告 data_quality；B17 wire 负例 9 连（未知 kind、未知 flags、
+bit1 携带有限 lost、非 FRAME 带检测、total_len 不一致、reserved0≠0、
+Inf 位型、class_index 越界、截断头）全拒且计入 gap；B18 NO_EVENT≠空帧；
+B19 QUOTA 丢弃可见、report_seq 仍递增、窗口照常关闭；B20 接受≠送达/
+失败/未配置分通道计数；B21 MODEL_CHANGED 清 transient 保计数。
+
+contract（C01–C14，50）：C01 入口四类校验（含 v1 ABI 0x00010000 拒绝）；
+C02 干净会话（绑定/轮询/最终 commit/退出 0）；C03 未授权会话 -5 且零
+存储零报告；C04 event_next INVALID_ARGUMENT×3→-6；C05 should_stop
+负值×3→-6（绝不误读为停止）；C06 STOPPING 事件协作退出；C07 tick 跨
+2³² 回绕的窗口关闭（duration_sec=60）；C08 E2E 过线计数+报告 schema/
+身份/字段；C09 腐坏 meta 会话安全降级；C10 event_next UNAUTHORIZED→-5；
+C11 report_submit UNAUTHORIZED→-5；C12 GAP/backpressure 在提交报告可见；
+C13 STORAGE_UNKNOWN 开机会话存活+commit 尝试可见；C14 JSON report_seq
+与提交参数一致性（stub 反向验证）。

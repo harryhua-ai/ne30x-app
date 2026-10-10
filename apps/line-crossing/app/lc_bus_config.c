@@ -1,6 +1,4 @@
-/*
- * lc_bus_config.c — counting-parity defaults, validation and UTF-8 checks.
- */
+
 #include "lc_bus_config.h"
 #include "lc_compat.h"
 
@@ -8,9 +6,9 @@ void lc_bus_config_defaults(lc_bus_config_t *cfg)
 {
     if (!cfg) return;
     lc_memset(cfg, 0, sizeof(*cfg));
-    /* parity: ne301 counting@de25a6f1 line_counting_config_defaults() */
+
     lc_strlcpy(cfg->counter_name, "\xe5\xae\xa2\xe6\xb5\x81\xe7\xbb\x9f\xe8\xae\xa1",
-               sizeof(cfg->counter_name)); /* 客流统计 */
+               sizeof(cfg->counter_name));
     lc_strlcpy(cfg->target_class_name, "person", sizeof(cfg->target_class_name));
     cfg->line_x1_permille = 200u;
     cfg->line_y1_permille = 500u;

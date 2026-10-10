@@ -1,29 +1,4 @@
 #!/usr/bin/env bash
-# run_tests.sh — one-command offline evidence suite for the Line Crossing
-# App (Harry Dev Issue #11, P7 app integration).
-#
-# Pipeline (fully OFFLINE; no device, no network for the default path):
-#   [1/6] core library builds clean (apps/line-crossing, unmodified sources)
-#   [2/6] #8 equivalence regression: tests/line-crossing/run_tests.sh verbatim
-#         (upstream regression test + golden-trace diff must stay green)
-#   [3/6] unit tests (arena / json writer / state blob / config parity)
-#   [4/6] business scenario tests through the real business layer + stub v2
-#         table (AC2: windows, totals, target switch / manual reset, counter
-#         name edit, model incompatible/recovery, gaps/backpressure,
-#         persistence revision semantics, accepted-vs-delivered reports)
-#   [5/6] host-contract tests: the REAL app_entry driven through a stub v2
-#         function table (all ten functions' call/error contracts)
-#   [6/6] native v2-ABI image build (arm-none-eabi, cortex-m55) + signed
-#         .neapp v2 package (per-run NON-PRODUCTION dev key, gitignored) +
-#         package/neapp_verify_v2.py offline verification
-#
-# Evidence: docs/evidence/p7-app/ (committed).  Keys and packages stay under
-# tests/line-crossing-app/work/ (gitignored, never committed).
-#
-# A PASS of this suite proves offline implementation + call/error contracts
-# only.  It does NOT prove device install, STM32/PKA signature verification,
-# sustained AI inference, MQTT/Webhook remote delivery, or power-fail
-# recovery (v2 spec §12; those belong to the NE301 device tasks).
 
 set -euo pipefail
 

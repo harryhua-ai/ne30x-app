@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""pack_v2_image — pack the built Line Crossing App ELF into a NEA1 native
-image with the v2 Host ABI (abi_version 0x00020000).
-
-Mirrors tools/pack_app_image.py (P3, Issue #6) field-for-field except that
-the ABI version is PINNED to 0x00020000 (v2 spec §3.3: manifest
-required_host_abi must equal the native header abi_version; a v1-ABI image
-can never be presented as a v2 app).  The 32B NEA1 header layout, CRC-32
-over the payload and entry_offset resolution via arm-none-eabi-nm are the
-same frozen format.
-
-OFFLINE tooling: producing this image means nothing was installed or run on
-a device (v2 spec §12).
-"""
 
 from __future__ import annotations
 
@@ -27,10 +14,8 @@ NATIVE_HDR = struct.Struct("<IHHIIIIII")
 DEFAULT_EXEC_BASE = 0x93E00000
 DEFAULT_REGION_SIZE = 0x200000
 
-
 def parse_int(v: str) -> int:
     return int(v, 0)
-
 
 def resolve_entry_offset(elf: Path, nm: str, exec_base: int, payload_size: int) -> int:
     out = subprocess.check_output([nm, "-g", str(elf)], text=True)
@@ -52,7 +37,6 @@ def resolve_entry_offset(elf: Path, nm: str, exec_base: int, payload_size: int) 
         raise ValueError(f"entry offset {off:#x} outside payload size {payload_size}")
     return off
 
-
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--elf", required=True, type=Path)
@@ -73,14 +57,14 @@ def main() -> int:
     entry = resolve_entry_offset(args.elf, args.nm, args.exec_base, len(payload))
     crc = zlib.crc32(payload) & 0xFFFFFFFF
     header = NATIVE_HDR.pack(
-        0x3141454E,      # "NEA1"
-        32,              # header_size
-        1,               # format_version
-        ABI_V2,          # pinned v2 ABI
+        0x3141454E,
+        32,
+        1,
+        ABI_V2,
         args.exec_base,
         len(payload),
         entry,
-        0,               # reserved0
+        0,
         crc,
     )
     assert len(header) == 32
@@ -91,7 +75,6 @@ def main() -> int:
         f"entry_offset {entry:#x}, crc32 {crc:#010x}, abi {ABI_V2:#010x}, target {args.exec_base:#010x}"
     )
     return 0
-
 
 if __name__ == "__main__":
     try:

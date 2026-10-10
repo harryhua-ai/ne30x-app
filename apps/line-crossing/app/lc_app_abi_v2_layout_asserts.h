@@ -1,10 +1,4 @@
-/*
- * lc_app_abi_v2_layout_asserts.h — §6.2 mandatory target static asserts.
- *
- * Included by lc_app_abi_v2.h only on 32-bit (UINTPTR_MAX == 0xFFFFFFFF)
- * compiles, i.e. the actual cortex-m55 target build.  A v2 ABI consumer
- * (or implementation) missing these asserts is a spec violation.
- */
+
 #ifndef LC_APP_ABI_V2_LAYOUT_ASSERTS_H
 #define LC_APP_ABI_V2_LAYOUT_ASSERTS_H
 

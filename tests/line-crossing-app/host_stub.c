@@ -1,12 +1,8 @@
-/*
- * host_stub.c — fixture-driven Host ABI v2 stub (see host_stub.h).
- */
+
 #include "host_stub.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* ---- lifecycle ----------------------------------------------------------- */
 
 lcstub_t *lcstub_new(void)
 {
@@ -22,8 +18,6 @@ lcstub_t *lcstub_new(void)
 }
 
 void lcstub_destroy(lcstub_t *s) { free(s); }
-
-/* ---- fixture setup --------------------------------------------------------- */
 
 void lcstub_set_session(lcstub_t *s, int authorized) { s->authorized = authorized; }
 void lcstub_set_stop(lcstub_t *s, int stop) { s->stop_flag = stop; }
@@ -105,8 +99,6 @@ void lcstub_state_commit_fault(lcstub_t *s, int32_t code, int times)
     s->state_commit_fault_times = times;
 }
 
-/* ---- observation ------------------------------------------------------------ */
-
 uint32_t lcstub_calls(const lcstub_t *s, lcstub_fn_t fn) { return s->calls[fn]; }
 
 const char *lcstub_last_log(const lcstub_t *s)
@@ -123,8 +115,6 @@ const lcstub_report_t *lcstub_report_by_seq(const lcstub_t *s, uint32_t seq)
     }
     return NULL;
 }
-
-/* ---- wire helpers ------------------------------------------------------------ */
 
 void lcstub_wr32(uint8_t *p, uint32_t v)
 {
@@ -165,9 +155,9 @@ static void encode_hdr(uint8_t *b, uint32_t total_len, uint32_t kind, uint32_t s
     lcstub_wr32(b + 4 * 4, mgen);
     lcstub_wr32(b + 4 * 5, cgen);
     lcstub_wr32(b + 4 * 6, flags);
-    lcstub_wr32(b + 4 * 7, 0);   /* detection_count (set by caller if FRAME) */
+    lcstub_wr32(b + 4 * 7, 0);
     lcstub_wr32(b + 4 * 8, lost);
-    lcstub_wr32(b + 4 * 9, 0);   /* reserved0 */
+    lcstub_wr32(b + 4 * 9, 0);
 }
 
 void lcstub_push_kind(lcstub_t *s, uint32_t kind, uint32_t seq, uint32_t mono_ms,
@@ -199,20 +189,15 @@ void lcstub_push_frame(lcstub_t *s, uint32_t seq, uint32_t mono_ms,
     push_bytes(s, b, total);
 }
 
-/* ---- the ten ABI functions ----------------------------------------------------- */
-
 static int32_t take_fault(lcstub_t *s, lcstub_fn_t fn)
 {
     if (s->fault_times[fn] > 0) {
         s->fault_times[fn]--;
         return s->fault_code[fn];
     }
-    return LC_RET_OK; /* sentinel: no fault */
+    return LC_RET_OK;
 }
 
-/* The v2 log(const char*) signature carries no context pointer, so a stub
- * instance is bound through a file-static current target set by
- * lcstub_make_table (tests bind one stub at a time). */
 static lcstub_t *g_cur;
 
 static void record_log(lcstub_t *s, const char *text)
@@ -237,8 +222,8 @@ static int32_t fn_tick_ms(void)
     lcstub_t *s = g_cur;
     if (!s) return -1;
     s->calls[LCSTUB_FN_TICK]++;
-    s->tick_now += s->tick_step;   /* wraps modulo 2^32 exactly like hardware */
-    return (int32_t)s->tick_now;   /* §6.3: raw bit pattern, never an error code */
+    s->tick_now += s->tick_step;
+    return (int32_t)s->tick_now;
 }
 
 static int32_t fn_event_next(void *out, uint32_t cap, uint32_t *actual_len,
@@ -290,7 +275,7 @@ static int32_t fn_model_meta(void *out, uint32_t cap, uint32_t *actual_len)
     lcstub_wr32(m + 8, s->model_gen);
     lcstub_wr32(m + 12, s->class_gen);
     lcstub_wr32(m + 16, s->class_count);
-    /* 20 reserved0 = 0; names at 24 / 88; tail 120..127 = 0 */
+
     snprintf((char *)m + 24, LC_MODEL_NAME_LEN, "%s", s->model_name);
     snprintf((char *)m + 88, LC_MODEL_VERSION_LEN, "%s", s->model_version);
     memcpy(out, m, LC_MODEL_META_SIZE);
@@ -308,7 +293,7 @@ static int32_t fn_class_name(uint32_t model_gen, uint32_t class_gen, uint32_t cl
     if (f != LC_RET_OK) return f;
     if (!s->authorized) return LC_RET_UNAUTHORIZED;
     if (model_gen != s->model_gen || class_gen != s->class_gen) {
-        return LC_RET_INCOMPATIBLE;   /* stale generation query (§6.5) */
+        return LC_RET_INCOMPATIBLE;
     }
     if (class_index >= s->class_count) return LC_RET_INVALID_ARGUMENT;
     const char *name = s->classes[class_index];
@@ -319,8 +304,6 @@ static int32_t fn_class_name(uint32_t model_gen, uint32_t class_gen, uint32_t cl
     return LC_RET_OK;
 }
 
-/* extract a top-level u32 after `"key":` — sufficient for the stub's
- * report_seq consistency check (§6.6) */
 static int json_find_u32(const char *json, const char *key, uint32_t *out)
 {
     char pat[64];
@@ -328,7 +311,7 @@ static int json_find_u32(const char *json, const char *key, uint32_t *out)
     const char *p = strstr(json, pat);
     if (!p) return 0;
     p += strlen(pat);
-    /* skip spaces */
+
     while (*p == ' ') p++;
     if (*p < '0' || *p > '9') return 0;
     unsigned long v = 0;
@@ -358,11 +341,10 @@ static int32_t fn_report_submit(const void *json, uint32_t len, uint32_t app_rep
     if (s->verify_report_seq) {
         uint32_t jseq = 0;
         if (!json_find_u32(buf, "report_seq", &jseq) || jseq != app_report_seq) {
-            return LC_RET_INVALID_ARGUMENT;  /* §6.6 session consistency check */
+            return LC_RET_INVALID_ARGUMENT;
         }
     }
 
-    /* store (overwrite oldest when full) */
     int slot = -1;
     for (int i = 0; i < LCSTUB_MAX_REPORTS; i++) {
         if (!s->reports[i].present) { slot = i; break; }

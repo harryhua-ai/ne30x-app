@@ -1,25 +1,7 @@
-/*
- * lc_stateblob.c — explicit little-endian serialization + CRC-32.
- *
- * Layout (all little-endian):
- *   0  : magic 'LCAS'
- *   4  : schema_version (1)
- *   8  : crc32 (reflected IEEE) over [12 .. len)
- *   12 : target_class_name[32] NUL-padded
- *   44 : counter_name[64] NUL-padded
- *   108: line_x1..y2, outside_x/outside_y permille (6 x u16)
- *   120: conf_threshold_permille u16
- *   122: max_dist_permille u16
- *   124: track_history_k u8 / max_miss u8 / k_confirm u8 / flags u8
- *        (flags bit0 = tracks_report_enable, bit1 = heat_grid_enable)
- *   128: window_minutes u16 (pad 2)
- *   132: total_in u32, total_out u32, window_in u32, window_out u32
- *   148: report_seq u32
- *   152: (end; LC_ST_BLOB_SIZE = 152)
- */
+
 #include "lc_stateblob.h"
 #include "lc_bus_config.h"
-#include "lc_app_abi_v2.h" /* lc_rd_u32 little-endian wire reader */
+#include "lc_app_abi_v2.h"
 #include "lc_compat.h"
 
 #define LC_ST_BLOB_SIZE 152u

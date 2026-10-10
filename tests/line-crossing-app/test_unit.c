@@ -1,10 +1,4 @@
-/*
- * test_unit.c — unit tests for the App-layer utilities:
- *   lc_arena (the target LC_MALLOC/LC_FREE seam),
- *   lc_json (overflow-detecting report writer),
- *   lc_stateblob (persistent state codec + CRC),
- *   lc_bus_config (counting-parity defaults/validation/UTF-8).
- */
+
 #include "test_common.h"
 #include "lc_arena.h"
 #include "lc_json.h"
@@ -14,13 +8,11 @@
 int g_pass = 0;
 int g_fail = 0;
 
-/* test-only LE writer */
 static void wr32(uint8_t *p, uint32_t v)
 {
     p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8);
     p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
 }
-
 
 static void test_arena(void)
 {
@@ -34,28 +26,23 @@ static void test_arena(void)
     CHECK(b != NULL);
     CHECK(((uintptr_t)a % 8u) == 0);
     CHECK(((uintptr_t)b % 8u) == 0);
-    CHECK_EQ_I(lcapp_arena_used(), 8 + 104 + 8 + 200); /* headers + rounded */
+    CHECK_EQ_I(lcapp_arena_used(), 8 + 104 + 8 + 200);
 
-    /* free + coalesce forward */
     lcapp_free(a);
     lcapp_free(b);
     CHECK_EQ_I(lcapp_arena_used(), 0);
 
-    /* reuse: after coalescing a 300B request fits in the freed hole */
     void *c = lcapp_alloc(300);
     CHECK(c != NULL);
     lcapp_free(c);
 
-    /* zero-size alloc is legal */
     void *z = lcapp_alloc(0);
     CHECK(z != NULL);
     lcapp_free(z);
 
-    /* exhaustion is fail-closed (NULL), never a bogus pointer */
     void *big = lcapp_alloc(LC_ARENA_SIZE);
     CHECK(big == NULL);
 
-    /* churn: interleaved alloc/free of the tracker-ish workload */
     lcapp_arena_init();
     void *slots[32];
     for (int i = 0; i < 32; i++) slots[i] = lcapp_alloc(1000 + (size_t)i * 8);
@@ -99,13 +86,12 @@ static void test_json(void)
     CHECK(strcmp(buf, "{\"a\":4294967295,\"b\":-2147483648,\"c\":true,\"d\":null,"
                       "\"e\":\"a\\\"b\\\\c\\u000a\",\"f\":0.250,\"g\":1.000}") == 0);
 
-    /* overflow latches and never writes past cap */
     char small[8];
     lcj_init(&j, small, sizeof(small));
     lcj_string(&j, "1234567890");
     CHECK_EQ_I(j.overflow, 1);
     lcj_u32(&j, 12345);
-    CHECK_EQ_I(j.len, 7); /* stays at cap-1... cap 8 minus NUL reserve */
+    CHECK_EQ_I(j.len, 7);
 }
 
 static void test_stateblob(void)
@@ -133,7 +119,6 @@ static void test_stateblob(void)
     CHECK_EQ_I(wi, 3); CHECK_EQ_I(wo, 4);
     CHECK_EQ_I(seq, 41);
 
-    /* negative cases */
     CHECK_EQ_I(lc_st_decode(buf, len - 1, &out, &ti, &to, &wi, &wo, &seq), LC_ST_ERR_SIZE);
     CHECK_EQ_I(lc_st_decode(buf + 1, len, &out, &ti, &to, &wi, &wo, &seq), LC_ST_ERR_MAGIC);
     uint8_t bad[LC_ST_BLOB_MAX];
@@ -143,16 +128,14 @@ static void test_stateblob(void)
     memcpy(bad, buf, len);
     bad[20] ^= 0x40;
     CHECK_EQ_I(lc_st_decode(bad, len, &out, &ti, &to, &wi, &wo, &seq), LC_ST_ERR_CRC);
-    /* content invalid: the encoder does not validate the config (the business
-     * layer only ever encodes valid ones), so encoding an invalid config
-     * yields a correct CRC over content the decoder must reject */
+
     lc_bus_config_t inv;
     lc_bus_config_defaults(&inv);
-    inv.target_class_name[0] = '\0'; /* invalid business content */
+    inv.target_class_name[0] = '\0';
     len = lc_st_encode(bad, sizeof(bad), &inv, 0, 0, 0, 0, 0);
     CHECK_EQ_I(len, 152);
     CHECK_EQ_I(lc_st_decode(bad, len, &out, &ti, &to, &wi, &wo, &seq), LC_ST_ERR_CONTENT);
-    /* capacity guard */
+
     uint8_t tiny[16];
     CHECK_EQ_I(lc_st_encode(tiny, sizeof(tiny), &cfg, 0, 0, 0, 0, 0), 0);
 }
@@ -183,9 +166,9 @@ static void test_config(void)
     CHECK_EQ_I(lc_bus_config_valid(&cfg), 0);
 
     CHECK_EQ_I(lc_bus_utf8_valid("person"), 1);
-    CHECK_EQ_I(lc_bus_utf8_valid("\xe5\xae\xa2\xe6\xb5\x81"), 1);  /* 客流 */
+    CHECK_EQ_I(lc_bus_utf8_valid("\xe5\xae\xa2\xe6\xb5\x81"), 1);
     CHECK_EQ_I(lc_bus_utf8_valid("\xff\xfe"), 0);
-    CHECK_EQ_I(lc_bus_utf8_valid("\xe5\xae"), 0);                  /* truncated */
+    CHECK_EQ_I(lc_bus_utf8_valid("\xe5\xae"), 0);
 }
 
 int main(void)
