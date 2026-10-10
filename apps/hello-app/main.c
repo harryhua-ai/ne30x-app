@@ -6,6 +6,13 @@
  * Runs on the host caller's stack: no stack/heap setup, no globals that
  * need initialization, no interrupts, no constructors.
  *
+ * Build variants (P3 packaging, Issue #6): HELLO_APP_VERSION selects the
+ * independently built V1/V2 image identities.  The default (1) keeps the
+ * exact Issue #2 V1 semantics and bytes; version 2 mirrors the historical
+ * v2 single-point change (distinct banner, success code 0x4E46 "NF") as a
+ * NEW experimental build — it is NOT a byte reproduction of the historical
+ * v2 image recorded in docs/evidence/device-evidence.md.
+ *
  * Behaviour (mirrors the reference semantics of ne301 experiment
  * app-host-poc@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e
  * tests/app_host/testapp/main.c):
@@ -16,11 +23,20 @@
  *   -5  first tick_ms() returned a negative value
  *   -6  second tick_ms() returned a negative value
  *   -7  platform tick went backwards (not monotonic)
- *    0x4E45 ("NE") — success; see docs/app-hello-poc.md
+ *    V1: 0x4E45 ("NE") — success; see docs/app-hello-poc.md
+ *    V2: 0x4E46 ("NF") — success (distinguishable replacement identity)
  */
 #include "app_host_abi.h"
 
+#ifndef HELLO_APP_VERSION
+#define HELLO_APP_VERSION 1
+#endif
+
+#if HELLO_APP_VERSION >= 2
+#define HELLO_APP_EXIT_OK 0x4E46u /* "NF" — v2 replacement identity */
+#else
 #define HELLO_APP_EXIT_OK 0x4E45u /* "NE" */
+#endif
 
 /* Busy-wait length: several milliseconds even at the N6 top clock, so the
  * 1 ms platform tick is guaranteed to advance between the two reads. */
@@ -88,7 +104,11 @@ int app_entry(const app_host_api_table_t *api, uint32_t abi_version)
         return -4;
     }
 
+#if HELLO_APP_VERSION >= 2
+    api->log("hello-app v2: standalone NE301 app PoC, ABI v1.0");
+#else
     api->log("hello-app: standalone NE301 app PoC, ABI v1.0");
+#endif
 
     t1 = api->tick_ms();
     if (t1 < 0) {

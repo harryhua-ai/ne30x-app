@@ -23,17 +23,33 @@ PYTHON   ?= python3
 TOOLS_DIR := ../../tools
 EXEC_BASE ?= 0x93E00000
 
-BUILD_DIR  ?= build
+# --- build variant (P3 Issue #6): two independent image identities from one
+# audited source.  APP_VERSION=1 (default) keeps the exact Issue #2 V1 build
+# (same paths, same flags, same bytes).  APP_VERSION=2 builds the distinct
+# V2 identity (new banner, 0x4E46 success code) into its own directory.
+APP_VERSION ?= 1
+ifeq ($(APP_VERSION),1)
+BUILD_DIR       ?= build
+IMAGE_NAME      := hello-app.bin
+VERSION_CFLAGS  :=
+else ifeq ($(APP_VERSION),2)
+BUILD_DIR       ?= build-v2
+IMAGE_NAME      := hello-app-v2.bin
+VERSION_CFLAGS  := -DHELLO_APP_VERSION=2
+else
+$(error APP_VERSION must be 1 or 2)
+endif
+
 ABI_HEADER := $(BUILD_DIR)/cache/app_host_abi.h
-ELF        := $(BUILD_DIR)/hello-app.elf
-PAYLOAD    := $(BUILD_DIR)/hello-app.payload.bin
-IMAGE      := $(BUILD_DIR)/hello-app.bin
+ELF        := $(BUILD_DIR)/hello-app$(if $(filter-out 1,$(APP_VERSION)),-v$(APP_VERSION)).elf
+PAYLOAD    := $(BUILD_DIR)/hello-app$(if $(filter-out 1,$(APP_VERSION)),-v$(APP_VERSION)).payload.bin
+IMAGE      := $(BUILD_DIR)/$(IMAGE_NAME)
 
 CFLAGS := -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 \
           -Os -Wall -Werror -ffunction-sections -fdata-sections \
           -ffreestanding -fno-builtin -I$(BUILD_DIR)/cache
 LDFLAGS := -nostdlib -T hello_app.ld -Wl,--gc-sections \
-           -Wl,-Map,$(BUILD_DIR)/hello-app.map
+           -Wl,-Map,$(BUILD_DIR)/hello-app$(if $(filter-out 1,$(APP_VERSION)),-v$(APP_VERSION)).map
 
 .PHONY: all clean dump
 
@@ -46,7 +62,7 @@ $(ABI_HEADER):
 	bash $(TOOLS_DIR)/fetch_abi_header.sh $@
 
 $(ELF): main.c hello_app.ld $(ABI_HEADER)
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ main.c
+	$(CC) $(CFLAGS) $(VERSION_CFLAGS) $(LDFLAGS) -o $@ main.c
 
 $(PAYLOAD): $(ELF)
 	$(OBJCOPY) -O binary $< $@
@@ -62,3 +78,7 @@ dump: $(ELF)
 
 clean:
 	rm -rf $(BUILD_DIR)
+
+# remove every variant's outputs (used before packaging runs)
+cleanall:
+	rm -rf build build-v2

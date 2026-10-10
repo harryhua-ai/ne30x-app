@@ -1,0 +1,591 @@
+{
+  "issue": "harryhua-ai/ne30x-app#6 (P3)",
+  "boundary": "OFFLINE packaging evidence only; NOT device install/execution/power-fail-recovery PASS; signing identity is a NON-PRODUCTION test root",
+  "protocol_authority": "docs/app-package-protocol-v1.md (integrated P2 spec)",
+  "source_commit": "241fa3deb13ec34fb26102361a75fd339bb0294b",
+  "toolchain": {
+    "arm_none_eabi_gcc": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+    "python_cryptography": "48.0.0"
+  },
+  "images": {
+    "hello_app_v1": {
+      "path": "apps/hello-app/build/hello-app.bin",
+      "sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
+      "historical_issue2_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
+      "reproduction": "byte-exact"
+    },
+    "hello_app_v2": {
+      "path": "apps/hello-app/build-v2/hello-app-v2.bin",
+      "sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+      "note": "NEW experimental V2 build (HELLO_APP_VERSION=2, 0x4E46); the historical v2 db1c6d60… is not reproducible from committed sources and is not claimed"
+    }
+  },
+  "packages": {
+    "hello-app-v1": {
+      "sha256": "4a8a58fceacfcd6a48e498cafc968113c93caae0a4ec055da9dbc3b06d4bcc46",
+      "verifier_report": {
+        "app_id": "hello-app",
+        "app_version": "1.0.0",
+        "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+        "content_identity_sha256": "5350eac341b9b51fc5a77eb274e5ed5567257d7ce1303fed85498e9443a3ad3c",
+        "native_crc32": "0x1eb77cb6",
+        "native_entry_offset": "0x50",
+        "native_file_len": 608,
+        "native_file_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
+        "native_image_size": 576,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "4a8a58fceacfcd6a48e498cafc968113c93caae0a4ec055da9dbc3b06d4bcc46",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "bc5ae9a7ad68330ed025a3d9d424e1a7b19559f0d6638afb52ea6995e7007304",
+        "required_exec_region_bytes": 576,
+        "required_host_abi": "0x00010000",
+        "required_host_caps": "0x3",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "signature_len": 71,
+        "target_board_id": "0x00003010",
+        "tbs_len": 784
+      }
+    },
+    "hello-app-v2": {
+      "sha256": "c21d597e95c15f0558ce996c0ad1de7d7df579fdbd5af0ab31ea2c67b7add51c",
+      "verifier_report": {
+        "app_id": "hello-app",
+        "app_version": "2.0.0",
+        "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+        "content_identity_sha256": "4841532d0d2370c16e91cc716f1e367f294a3142bc0c9be6487de1415aca4d58",
+        "native_crc32": "0x24352317",
+        "native_entry_offset": "0x50",
+        "native_file_len": 608,
+        "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+        "native_image_size": 576,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "c21d597e95c15f0558ce996c0ad1de7d7df579fdbd5af0ab31ea2c67b7add51c",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "bc5ae9a7ad68330ed025a3d9d424e1a7b19559f0d6638afb52ea6995e7007304",
+        "required_exec_region_bytes": 576,
+        "required_host_abi": "0x00010000",
+        "required_host_caps": "0x3",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "signature_len": 70,
+        "target_board_id": "0x00003010",
+        "tbs_len": 784
+      }
+    },
+    "v2-image-as-1.0.0": {
+      "sha256": "77e2565bb5081345161e675b4af5963b86fb2316a1e69a431f5a126bb1187893",
+      "verifier_report": {
+        "app_id": "hello-app",
+        "app_version": "1.0.0",
+        "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+        "content_identity_sha256": "1968aad9bebceef1a5128a6f2ca85a139a8542daf0f7fcc66e0a5c969aff27ac",
+        "native_crc32": "0x24352317",
+        "native_entry_offset": "0x50",
+        "native_file_len": 608,
+        "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+        "native_image_size": 576,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "77e2565bb5081345161e675b4af5963b86fb2316a1e69a431f5a126bb1187893",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "bc5ae9a7ad68330ed025a3d9d424e1a7b19559f0d6638afb52ea6995e7007304",
+        "required_exec_region_bytes": 576,
+        "required_host_abi": "0x00010000",
+        "required_host_caps": "0x3",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "signature_len": 72,
+        "target_board_id": "0x00003010",
+        "tbs_len": 784
+      }
+    }
+  },
+  "spec_vector_suite": [
+    {
+      "vector": "golden_accept",
+      "spec_reference": "§2.5 golden.neapp",
+      "expected": "PASS",
+      "observed": "PASS",
+      "package_sha256": "9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679",
+      "spec_published_sha256": "9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679",
+      "hash_matched_spec": true,
+      "content_identity_sha256": "5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91"
+    },
+    {
+      "vector": "golden_low_s_accept",
+      "spec_reference": "§2.5 low-S/high-S 对照 (s→n-s)",
+      "expected": "PASS",
+      "observed": "PASS",
+      "package_sha256": "99469a8303f91ab3c8f523ac2a2435dce2ee28ef7b73385d0a2fb3da16e36685",
+      "spec_published_sha256": "99469a8303f91ab3c8f523ac2a2435dce2ee28ef7b73385d0a2fb3da16e36685",
+      "hash_matched_spec": true,
+      "content_identity_sha256": "5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91"
+    },
+    {
+      "vector": "der_70byte_valid_accept",
+      "spec_reference": "§2.5 der_70byte_valid.neapp",
+      "expected": "PASS",
+      "observed": "PASS",
+      "package_sha256": "2fcbeb5b425ac1fa35c43a54c7178e0008b0fbad04dc13298cbaab8643f5d93d",
+      "spec_published_sha256": "2fcbeb5b425ac1fa35c43a54c7178e0008b0fbad04dc13298cbaab8643f5d93d",
+      "hash_matched_spec": true,
+      "content_identity_sha256": "5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91"
+    },
+    {
+      "vector": "der_tail_within_72byte_limit",
+      "spec_reference": "§2.5 der_tail_within_72byte_limit.neapp",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "ab8391274bad0fa8ec41c3c483a5840fd0a64ca0f6602a07bb723f4c08adc2d2",
+      "spec_published_sha256": "ab8391274bad0fa8ec41c3c483a5840fd0a64ca0f6602a07bb723f4c08adc2d2",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "native_reserved0_signed_reject",
+      "spec_reference": "§2.5 reserved0 独立负例（正确签名仍须拒绝）",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "585f5f61c9621947d62783095ffe2d8701745e520b8af161038c5c1e9891e480",
+      "spec_published_sha256": "585f5f61c9621947d62783095ffe2d8701745e520b8af161038c5c1e9891e480",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "golden_der_73byte_reject",
+      "spec_reference": "§2.5 72B DER 后追加 1 字节",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201",
+      "spec_published_sha256": "4ceeff8e9a0de2a840fe2529c871bf1eeba65e37bc34502f83b7113f19b86201",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "manifest_uppercase_app_id",
+      "spec_reference": "§2.5 固定负例 manifest_uppercase_app_id",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "bee6d6132c5cd50e32c6b504ec908634d3eb2fb3df844e10021139cc813e4211",
+      "spec_published_sha256": "bee6d6132c5cd50e32c6b504ec908634d3eb2fb3df844e10021139cc813e4211",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "manifest_reserved_nonzero",
+      "spec_reference": "§2.5 固定负例 manifest_reserved_nonzero",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "32529b608cc1371a4748b1458a12e5dec951f2c6ec258b5ec24f97ccb3ceff12",
+      "spec_published_sha256": "32529b608cc1371a4748b1458a12e5dec951f2c6ec258b5ec24f97ccb3ceff12",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "wrong_board_signed",
+      "spec_reference": "§2.5 固定负例 wrong_board_signed",
+      "expected": "TARGET_INCOMPATIBLE",
+      "observed": "TARGET_INCOMPATIBLE",
+      "package_sha256": "a9e82949c0b796950d98f40164256651f64d45c794ceed2e5d2cdd883af6a50e",
+      "spec_published_sha256": "a9e82949c0b796950d98f40164256651f64d45c794ceed2e5d2cdd883af6a50e",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "untrusted_key_fingerprint",
+      "spec_reference": "§2.5 固定负例 untrusted_key_fingerprint",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "observed": "PUBLISHER_UNTRUSTED",
+      "package_sha256": "45590d2517ca13e951a2f9c6f4bb209c59dc7cf81d209ff103b98b77c423df2b",
+      "spec_published_sha256": "45590d2517ca13e951a2f9c6f4bb209c59dc7cf81d209ff103b98b77c423df2b",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "native_header_size_33",
+      "spec_reference": "§2.5 固定负例 native_header_size_33",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "97b2f926b962a34d398799c3d21bc70927b12abd960f635805304bed664d2657",
+      "spec_published_sha256": "97b2f926b962a34d398799c3d21bc70927b12abd960f635805304bed664d2657",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "native_entry_offset_oob",
+      "spec_reference": "§2.5 固定负例 native_entry_offset_oob",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "9b4d74a6f4ab72b56b1036abee60adfb73a823cfaa933e459a6dcae093beb370",
+      "spec_published_sha256": "9b4d74a6f4ab72b56b1036abee60adfb73a823cfaa933e459a6dcae093beb370",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "mismatched_manifest_native_len",
+      "spec_reference": "§2.5 固定负例 mismatched_manifest_native_len",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "f8cccc3cd59f09d266fd788320510ca550dba3c5355b717d42c71226241b2938",
+      "spec_published_sha256": "f8cccc3cd59f09d266fd788320510ca550dba3c5355b717d42c71226241b2938",
+      "hash_matched_spec": true,
+      "content_identity_sha256": null
+    },
+    {
+      "vector": "tampered_signed_content (equivalent generated locally)",
+      "spec_reference": "§2.5 表：已签名内容被篡改 d415350f… (bytes not published)",
+      "covered_by": "tests/package/generated_cases.py:tamper_payload"
+    },
+    {
+      "vector": "same TBS, second valid DER (equivalent generated locally)",
+      "spec_reference": "§2.5 表：同一 212B TBS 不同合法 DER 5af8dff5… (bytes not published)",
+      "covered_by": "golden_accept + golden_low_s_accept (two valid DERs, one content identity, distinct package hashes)"
+    }
+  ],
+  "generated_case_suite": [
+    {
+      "case": "dev_v1_accept",
+      "category": "generated",
+      "expected": "PASS",
+      "observed": "PASS",
+      "package_sha256": "4a8a58fceacfcd6a48e498cafc968113c93caae0a4ec055da9dbc3b06d4bcc46",
+      "content_identity_sha256": "5350eac341b9b51fc5a77eb274e5ed5567257d7ce1303fed85498e9443a3ad3c",
+      "detail": null,
+      "note": "P3-built V1 package"
+    },
+    {
+      "case": "dev_v2_accept",
+      "category": "generated",
+      "expected": "PASS",
+      "observed": "PASS",
+      "package_sha256": "c21d597e95c15f0558ce996c0ad1de7d7df579fdbd5af0ab31ea2c67b7add51c",
+      "content_identity_sha256": "4841532d0d2370c16e91cc716f1e367f294a3142bc0c9be6487de1415aca4d58",
+      "detail": null,
+      "note": "P3-built V2 package"
+    },
+    {
+      "case": "repack_same_content_identity",
+      "category": "generated",
+      "expected": "PASS",
+      "observed": "PASS",
+      "predicate": "repacking identical inputs yields an identical SHA-256(TBS)",
+      "package_sha256": "4a8a58fceacfcd6a48e498cafc968113c93caae0a4ec055da9dbc3b06d4bcc46",
+      "content_identity_sha256": "5350eac341b9b51fc5a77eb274e5ed5567257d7ce1303fed85498e9443a3ad3c",
+      "detail": "identical TBS; DER bytes identical under RFC-6979 deterministic signing",
+      "note": "spec §2.2: 相同签名原文可有不同合法 DER，不得造成虚假版本冲突"
+    },
+    {
+      "case": "v1_to_v2_traceable_replacement",
+      "category": "generated",
+      "expected": "PASS",
+      "observed": "PASS",
+      "predicate": "same publisher/app identity, version 1.0.0 -> 2.0.0, distinct content identities",
+      "package_sha256": "c21d597e95c15f0558ce996c0ad1de7d7df579fdbd5af0ab31ea2c67b7add51c",
+      "content_identity_sha256": "4841532d0d2370c16e91cc716f1e367f294a3142bc0c9be6487de1415aca4d58",
+      "detail": "V1 identity 5350eac341b9b51fc5a77eb274e5ed5567257d7ce1303fed85498e9443a3ad3c -> V2 identity 4841532d0d2370c16e91cc716f1e367f294a3142bc0c9be6487de1415aca4d58; image sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03 -> e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+      "note": "Issue #6 AC1/AC4: V1/V2 在可追溯包层独立替换"
+    },
+    {
+      "case": "version_content_conflict_discriminator",
+      "category": "generated",
+      "expected": "PASS",
+      "observed": "PASS",
+      "predicate": "same publisher/app/version, different content identity (SHA-256(TBS))",
+      "package_sha256": "77e2565bb5081345161e675b4af5963b86fb2316a1e69a431f5a126bb1187893",
+      "content_identity_sha256": null,
+      "detail": "V1@1.0.0 identity 5350eac341b9b51fc5a77eb274e5ed5567257d7ce1303fed85498e9443a3ad3c vs other-image@1.0.0 identity 1968aad9bebceef1a5128a6f2ca85a139a8542daf0f7fcc66e0a5c969aff27ac",
+      "note": "spec §5.1: 同身份同版本不同摘要 -> VERSION_CONTENT_CONFLICT（设备侧分类）"
+    },
+    {
+      "case": "tamper_payload",
+      "category": "generated",
+      "expected": "SIGNATURE_INVALID",
+      "observed": "SIGNATURE_INVALID",
+      "package_sha256": "51c907a110c0e3801eb99dc2674c1b358a9529af148e947ee542e1f4ea3bc1c6",
+      "content_identity_sha256": null,
+      "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+      "note": "spec §2.5 表：已签名内容被篡改（等价本地生成：native payload 区内翻一字节、不重签）",
+      "signed_len": 784,
+      "payload_region": "[208, 784)",
+      "tamper_offset": 496,
+      "predicate": "one native payload byte flipped inside the signed region; DER signature bytes untouched"
+    },
+    {
+      "case": "tamper_signature_last_byte",
+      "category": "generated",
+      "expected": "SIGNATURE_INVALID",
+      "observed": "SIGNATURE_INVALID",
+      "package_sha256": "fcb5486dce2228b816d6c219e229f540388cff1229d17a04a0a1e55de26fad83",
+      "content_identity_sha256": null,
+      "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+      "note": "签名段末字节篡改（独立 signature-tamper 用例，非 payload 篡改证据）"
+    },
+    {
+      "case": "tamper_manifest_version",
+      "category": "generated",
+      "expected": "SIGNATURE_INVALID",
+      "observed": "SIGNATURE_INVALID",
+      "package_sha256": "ba9923db91f44565c8e8c1c6fb2d8fd5d3719e48def6843bc6f690974ab03f32",
+      "content_identity_sha256": null,
+      "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+      "note": "篡改已签名 manifest 元数据（等价本地生成）"
+    },
+    {
+      "case": "wrong_signer_key",
+      "category": "generated",
+      "expected": "SIGNATURE_INVALID",
+      "observed": "SIGNATURE_INVALID",
+      "package_sha256": "5666091f1dbfaf36f3b9b3f3802fec6b4de3f54f5a3034bc9105b47c4cd0748d",
+      "content_identity_sha256": null,
+      "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+      "note": "错误签名密钥（指纹仍指向可信钥）"
+    },
+    {
+      "case": "truncate_signature",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "0ec3afb9c7db9287666bf9942b8870450532baf6f6348606692ab7ff9cb13473",
+      "content_identity_sha256": null,
+      "detail": "DER: SEQUENCE length does not consume the signature exactly",
+      "note": "签名段截断（70B→69B，DER 越界）"
+    },
+    {
+      "case": "truncate_whole_package",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "d01b1fa94981d34d1c823003da8ac6e41a32193849332ec83f0585d58735a67e",
+      "content_identity_sha256": null,
+      "detail": "file is 10 bytes, shorter than the 16-byte container header",
+      "note": "整包截断（短于 16B 容器头）"
+    },
+    {
+      "case": "append_tail_byte",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "a270c0e699c08e24f845e25f9f80e71cef36b5b1bb197a6edbd51e00550300ec",
+      "content_identity_sha256": null,
+      "detail": "DER: SEQUENCE length does not consume the signature exactly",
+      "note": "签名段 73B 超上限"
+    },
+    {
+      "case": "manifest_len_159",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "0796665ec11cdd3ca0d98e3e7521ff9ea523c461653d0afd9d01205ac8172229",
+      "content_identity_sha256": null,
+      "detail": "manifest_len is 159, v1 allows only 160",
+      "note": "manifest_len != 160"
+    },
+    {
+      "case": "manifest_len_zero",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "3acc21a71f697a20b79e375989824ed0818a49cb5cd77faea981f78ac624b35c",
+      "content_identity_sha256": null,
+      "detail": "manifest_len is 0, v1 allows only 160",
+      "note": "manifest_len 为零（§2.2 必须正数）"
+    },
+    {
+      "case": "image_len_below_header",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "6e4b95ec449bfa55d8cff952097f14a7f3b491b28f7c094304f21df4f55278cf",
+      "content_identity_sha256": null,
+      "detail": "image_len 31 cannot hold the 32-byte native header",
+      "note": "image_len < 32B 原生头"
+    },
+    {
+      "case": "image_len_overflow",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "58450e8692065d0e1d87ee953480419ef05c7642c2032c94a6914ae9e13bcabb",
+      "content_identity_sha256": null,
+      "detail": "image_len 4294967295 exceeds the v1 native file cap 2097152",
+      "note": "image_len = 0xFFFFFFFF（溢出安全拒绝）"
+    },
+    {
+      "case": "magic_corrupted",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "c100e580fd752b0d1e8e52da82109de39296d0d08f6d3909b2e7e95ae3575c70",
+      "content_identity_sha256": null,
+      "detail": "container magic is not NEAPP v1 (4e45415050 01 00 00)",
+      "note": "容器 magic 被改"
+    },
+    {
+      "case": "der_second_object",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "dc67f1dbef7b5aaffa556ddfeb8a375b4d4fa00f5cd26d07b59b6a4c00154665",
+      "content_identity_sha256": null,
+      "detail": "signature segment is 73 bytes, above the DER maximum 72",
+      "note": "第二个 DER 对象（严格完整消费）"
+    },
+    {
+      "case": "der_r_zero",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "4ceabb1732b9139666afbbbc5d27858837654bad664eaec6e42853558c307048",
+      "content_identity_sha256": null,
+      "detail": "DER: r outside P-256 range",
+      "note": "DER r=0 越界"
+    },
+    {
+      "case": "der_nonminimal_length",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "3a4b1cf12f0bfe90aab356ecf8d5595793ef12a38e8d63cecee0502efcfd6030",
+      "content_identity_sha256": null,
+      "detail": "DER: long form used for short length (non-minimal)",
+      "note": "DER 非最短长度编码"
+    },
+    {
+      "case": "app_id_nonzero_padding",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "ac4fb344462984f9b587b25cc45d6fdbe5018c6129ab988d6a6b62392960e513",
+      "content_identity_sha256": null,
+      "detail": "app_id: character outside [a-z0-9-]",
+      "note": "非零右填充（重签仍拒）"
+    },
+    {
+      "case": "app_id_embedded_nul",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "dc0df9fa19cc4cb36e0087b1cee5038b34d6c222e22fa0eb20233a22aaf49a9d",
+      "content_identity_sha256": null,
+      "detail": "app_id: embedded NUL inside identifier",
+      "note": "标识内嵌 NUL（重签仍拒）"
+    },
+    {
+      "case": "board_0x3011_signed",
+      "category": "generated",
+      "expected": "TARGET_INCOMPATIBLE",
+      "observed": "TARGET_INCOMPATIBLE",
+      "package_sha256": "0968d8314e495fbce6228c844810eafd87cc6a201ac13c557c288bbf2623aeb4",
+      "content_identity_sha256": null,
+      "detail": "target_board_id 0x00003011 != policy 0x00003010",
+      "note": "§2.3 表：错误板型重签仍拒（本地等价 wrong_board_signed）"
+    },
+    {
+      "case": "psram_32_signed",
+      "category": "generated",
+      "expected": "TARGET_INCOMPATIBLE",
+      "observed": "TARGET_INCOMPATIBLE",
+      "package_sha256": "b625619017bbd9589bc3bf41467161061f220b991a14618177098016ffc7a27c",
+      "content_identity_sha256": null,
+      "detail": "required_psram_mib 32 unsupported (policy 64)",
+      "note": "32 MiB 无兼容性证据（重签仍拒）"
+    },
+    {
+      "case": "caps_unknown_bit_signed",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "37f84003616c8ab68e4f5ad1ec6d518b556b2d5f139b70945d581f9ebce72668",
+      "content_identity_sha256": null,
+      "detail": "required_host_caps has unknown bits: 0x5",
+      "note": "未声明能力位（重签仍拒）"
+    },
+    {
+      "case": "abi_manifest_header_mismatch_signed",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "a52f0e4d27d68f3e1a6647694717d4a30c596809deb53836d192147e7c752c7a",
+      "content_identity_sha256": null,
+      "detail": "manifest required_host_abi != native header abi_version",
+      "note": "manifest ABI 与原生头不一致（重签仍拒）"
+    },
+    {
+      "case": "abi_wrong_everywhere_signed",
+      "category": "generated",
+      "expected": "ABI_INCOMPATIBLE",
+      "observed": "ABI_INCOMPATIBLE",
+      "package_sha256": "3da2405d78b2e9eee301a6db575927235c06f6c5c5ffabf5a43a0d5626d1633b",
+      "content_identity_sha256": null,
+      "detail": "required_host_abi 0x00020000 != policy 0x00010000",
+      "note": "§2.3 表：ABI 全量一致但非 v1 基线，重签验签通过仍须拒绝"
+    },
+    {
+      "case": "entry_odd_signed",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "c9b407cdc3c55fb83b0d9247d3da4a4a886e887f665f32e8166965dc6e0bc522",
+      "content_identity_sha256": null,
+      "detail": "native entry_offset is odd (Thumb entry must be even)",
+      "note": "奇数入口偏移（Thumb 约束，重签仍拒）"
+    },
+    {
+      "case": "exec_region_overcommit_signed",
+      "category": "generated",
+      "expected": "RESOURCE_LIMIT",
+      "observed": "RESOURCE_LIMIT",
+      "package_sha256": "445b026774f843c8160ee48f0a27f37250f70fd1aee7f24856036775a2494071",
+      "content_identity_sha256": null,
+      "detail": "required_exec_region_bytes 3145728 exceeds execution region 2097152",
+      "note": "运行驻留量超执行区（重签仍拒）"
+    },
+    {
+      "case": "unknown_publisher",
+      "category": "generated",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "observed": "PUBLISHER_UNTRUSTED",
+      "package_sha256": "23d79a806eaa2945c0e975290730994eb0f9d17ed66afcbdbf8457fc1fcb7318",
+      "content_identity_sha256": null,
+      "detail": "publisher_id 'other-pub' is not in the local trust mapping",
+      "note": "未知发行者（包内指纹无权自授信）"
+    },
+    {
+      "case": "resigned_payload_crc_mismatch",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "60179f7520ce543c0557db30b18cd55042231b69b93554d29e6757201ff73bb0",
+      "content_identity_sha256": null,
+      "detail": "native payload CRC-32 mismatch",
+      "note": "payload 已改 + 正确 dev 钥重签（签名有效），原生头 CRC 未同步 → 仍拒",
+      "predicate": "valid dev-key signature over modified content; stage-6 native CRC-32 cross-check rejects"
+    },
+    {
+      "case": "resigned_payload_digest_mismatch",
+      "category": "generated",
+      "expected": "BAD_PACKAGE",
+      "observed": "BAD_PACKAGE",
+      "package_sha256": "d151774521c75d7f3e4d74f9f0803ba801f03c0413ff6bf54dc2c274c5d9a67b",
+      "content_identity_sha256": null,
+      "detail": "manifest native_file_sha256 does not match the native image bytes",
+      "note": "payload 已改 + CRC 已同步 + 正确 dev 钥重签（签名有效），manifest 摘要未同步 → 仍拒",
+      "predicate": "valid dev-key signature over modified content; stage-6 manifest native_file_sha256 cross-check rejects"
+    },
+    {
+      "case": "native_file_overrides_small_region",
+      "category": "generated",
+      "expected": "RESOURCE_LIMIT",
+      "observed": "RESOURCE_LIMIT",
+      "package_sha256": "9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679",
+      "content_identity_sha256": null,
+      "detail": "native_file_len 36 exceeds the load transient budget 32 (whole file is read into the region before de-headering)",
+      "note": "§2.3：装载临时量（native_file_len=36）超 32B 执行区，即使驻留声明=4B"
+    }
+  ],
+  "key_discipline": {
+    "private_key_committed": false,
+    "private_key_location": "tests/package/work/keys/ (gitignored, generated per run)",
+    "trust_root": "NON-PRODUCTION dev/test identity; spec §2.5 d=1 key used only for spec vectors"
+  }
+}
