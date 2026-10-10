@@ -40,6 +40,15 @@ NE30x 系列应用仓库，用于开发、测试、打包和发布面向 NE301�
   不以模拟或源码检查代替。未经证实，不把 RAM 加载、固定地址、Flash XIP
   或某个内存分区当作既定生产方案。
 
+- [Issue #13：.neapp v2 受信签名打包与跨版本离线验证](https://github.com/harryhua-ai/ne30x-app/issues/13)：
+  在既有 v1 打包/离线校验工具之上增加 v2 受信包生成、离线验真、版本拒绝
+  与可复核证据——见 [docs/p6-packaging.md](docs/p6-packaging.md)
+  （模拟验真不等于 STM32 安装/持续运行/PKA 验证）。一条命令验证：
+
+  ```bash
+  bash tests/package-v2/run_checks.sh
+  ```
+
 实现变更使用可审查的分支／PR，`main` 作为集成来源；任何真机风险、内存冲突或二进制兼容阻塞必须用证据报告，不允许以削弱平台/应用边界掩盖。
 
 平台源码：[harryhua-ai/ne301](https://github.com/harryhua-ai/ne301)。
