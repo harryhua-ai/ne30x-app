@@ -1,0 +1,473 @@
+{
+  "spec": "docs/app-package-protocol-v2-draft.md",
+  "issue": 12,
+  "suite": "tests/spec-v2/run_all_tests.py",
+  "note": "Host-side spec evidence only. No v2 device parser, no STM32 target build, no device PKA, no sustained-run or power-loss PASS (spec §12). Test key d=1 is public and non-production.",
+  "rev3_corrections": {
+    "reviewed_candidate": "d3dab540c19861567bc5e71bd8c5e615d1302d41",
+    "ac2_publisher_trust": "full_accept now resolves the issuer key from the Host-LOCAL trusted_publishers store keyed by the signed publisher_id and compares the manifest fingerprint against that store (spec §2.3 step 3/§3.1); fail-closed PUBLISHER_UNTRUSTED. New negatives: unknown_publisher_id, publisher_key_fingerprint_mismatch (+ signature-valid proof).",
+    "ac2_exec_region": "HOST_POLICY_V2 gains Host-owned loader_base/loader_size/exec_region_bytes; policy fail-closed checks target_addr against the independently known loader range and required_exec_region_bytes against the actual exec region (spec §3.3, v1 §2.3 rules). New negatives: target_outside_host_loader_range, exec_region_exceeds_host_actual. No production physical-memory proof is claimed.",
+    "ac4_model_meta_strict": "validate_model_meta now requires a NUL terminator, all-zero right padding, valid UTF-8 and zero reserved (spec §6.5). New malformed-wire negatives: model_name_no_nul, model_name_junk_after_nul, model_version_no_nul, model_meta_trailing_reserved_nonzero.",
+    "ac3_tick_ms": "tick_ms documented as the sole exception to the §6.4 negative-error channel: raw mod-2^32 time bits, delta via uint32 difference (A decision issuecomment-6093724900). New device-independent vectors: wrap 0x7fffffff->0x80000000 and 0xffffffff->0x00000000 are legal +1 progress with the int32 misreading trap documented; no ABI table/signature change."
+  },
+  "rev2_corrections": {
+    "reviewed_candidate": "7564c22b740430a94ca7133697ebce3f85554f68",
+    "ac2_caps_subset": "policy_check_v2_host now fail-closed rejects KNOWN capability bits the current Host does not provide (ABI_INCOMPATIBLE); new negatives caps_subset_host_missing_report_submit (+ signature-valid proof).",
+    "ac4_verify_order": "full_accept now follows spec §2.3 order: bounded structure/manifest unique-encoding -> ECDSA over raw TBS -> native cross-checks -> policy; payload tamper flips a dynamically computed TRUE payload byte (TBS[240:244], DER byte-identical) and asserts exactly SIGNATURE_INVALID; DER-region corruption is a separately labeled vector.",
+    "ac4_abi_attribution": "native_header_abi_mismatch_vs_manifest keeps manifest abi=0x00020000, flips ONLY the native header abi to 0x00010000 (manifest native SHA updated), re-signs, and asserts the rejection detail names the native<->manifest cross mismatch; the v2-container-declares-v1-ABI case remains a separate independent test."
+  },
+  "vectors_total": 73,
+  "vectors_passed": 73,
+  "vectors": [
+    {
+      "name": "golden_tbs_length",
+      "expected": "244B",
+      "status": "PASS",
+      "detail": "TBS length 244"
+    },
+    {
+      "name": "golden_tbs_digest_pinned",
+      "expected": "e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278",
+      "status": "PASS",
+      "detail": "SHA-256(TBS)=e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278"
+    },
+    {
+      "name": "golden_pkg_length",
+      "expected": "314B",
+      "status": "PASS",
+      "detail": "package length 314"
+    },
+    {
+      "name": "golden_pkg_digest_pinned",
+      "expected": "3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e",
+      "status": "PASS",
+      "detail": "SHA-256(package)=3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e"
+    },
+    {
+      "name": "golden_structural_manifest_native_policy",
+      "expected": "full acceptance",
+      "status": "PASS",
+      "detail": "magic ok, manifest_len=192, abi=0x00020000, caps=0x3f, profile=1, quotas 2048/4096/6144"
+    },
+    {
+      "name": "golden_crypto_pure_python",
+      "expected": "ECDSA valid",
+      "status": "PASS",
+      "detail": "pure-Python P-256 verify against d=1 SPKI"
+    },
+    {
+      "name": "golden_spki_digest_pinned",
+      "expected": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+      "status": "PASS",
+      "detail": "SHA-256(SPKI DER) matches manifest publisher_key_sha256"
+    },
+    {
+      "name": "golden_crypto_openssl",
+      "expected": "Verified OK, exit 0",
+      "status": "PASS",
+      "detail": "openssl dgst -sha256 -verify: Verified OK (exit 0)"
+    },
+    {
+      "name": "archive_tbs_digest_pinned",
+      "expected": "60e708cb083a3be066420874da75eeaefcec5ec8106844456b922fc1d9bf8226",
+      "status": "PASS",
+      "detail": "archived TBS reconstructed byte-for-byte"
+    },
+    {
+      "name": "archive_pkg_digest_pinned",
+      "expected": "f05ca613d7ea2e74f61cdd5cc2bbc9f44a4406eca216366fee81894b6b664e24",
+      "status": "PASS",
+      "detail": "archived package (TBS+fixed DER) reconstructed"
+    },
+    {
+      "name": "archive_signature_math_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "proving the rejection below is resource policy, not signature"
+    },
+    {
+      "name": "archive_quota_1024_4096_resource_limit",
+      "expected": "reject RESOURCE_LIMIT",
+      "status": "PASS",
+      "detail": "event_max=1024 < 1576 (64-frame ai_events), report_max=4096 < 6144 -> RESOURCE_LIMIT: event_max 1024 < 1576 required for 64-detection ai_events"
+    },
+    {
+      "name": "caps_unknown_bit6",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "caps bit6 set, RFC6979 re-signed -> BAD_PACKAGE: unknown capability bits 0x00000040"
+    },
+    {
+      "name": "caps_unknown_bit6_signature_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "rejection is policy, not signature"
+    },
+    {
+      "name": "reserved_176_nonzero",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "manifest reserved[176]=0x01, re-signed -> BAD_PACKAGE: manifest reserved[176..191] not zero"
+    },
+    {
+      "name": "reserved_58_59_nonzero",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "manifest reserved[58]=0x01, re-signed -> BAD_PACKAGE: manifest reserved[58..59] not zero"
+    },
+    {
+      "name": "unknown_run_profile",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "run_profile=2, re-signed -> BAD_PACKAGE: unknown run_profile 2"
+    },
+    {
+      "name": "profile1_without_bit5",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "caps=0x1f (no session_lifecycle), re-signed -> BAD_PACKAGE: profile 1 must declare session_lifecycle (bit5)"
+    },
+    {
+      "name": "ai_events_zero_event_max",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "caps bit2 kept, event_max=0, re-signed -> BAD_PACKAGE: ai_events requires nonzero event_max"
+    },
+    {
+      "name": "v2_container_v1_abi",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "required_host_abi=0x00010000 inside NMF2 manifest, re-signed -> BAD_PACKAGE: v2 manifest required_host_abi=0x00010000 != 0x00020000"
+    },
+    {
+      "name": "caps_subset_negative_signature_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "golden signature pinned valid; the rejection below is host policy, not signature"
+    },
+    {
+      "name": "caps_subset_host_missing_report_submit",
+      "expected": "reject ABI_INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "caps=0x3f all known bits; Host lacks report_submit -> ABI_INCOMPATIBLE: host does not provide capability bits 0x00000008 (known but unsupported)"
+    },
+    {
+      "name": "unknown_publisher_id",
+      "expected": "reject PUBLISHER_UNTRUSTED",
+      "status": "PASS",
+      "detail": "format-valid publisher_id absent from Host trust store, re-signed -> PUBLISHER_UNTRUSTED: publisher_id 'untrusted-pub' not in Host trusted mapping"
+    },
+    {
+      "name": "publisher_negative_signature_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "re-signed with the Host-store key: rejection below is trust mapping, not signature"
+    },
+    {
+      "name": "publisher_key_fingerprint_mismatch",
+      "expected": "reject PUBLISHER_UNTRUSTED",
+      "status": "PASS",
+      "detail": "manifest fingerprint altered, Host store entry unchanged, re-signed -> PUBLISHER_UNTRUSTED: publisher_key_sha256 mismatch for 'test-publisher' vs Host trust store"
+    },
+    {
+      "name": "target_outside_host_loader_range",
+      "expected": "reject RESOURCE_LIMIT",
+      "status": "PASS",
+      "detail": "self-consistent target 0x94E00000 outside Host loader range, re-signed -> RESOURCE_LIMIT: native target_addr 0x94e00000+36B outside host loader range 0x93e00000..0x94000000"
+    },
+    {
+      "name": "exec_region_exceeds_host_actual",
+      "expected": "reject RESOURCE_LIMIT",
+      "status": "PASS",
+      "detail": "required_exec_region_bytes=3MiB > host actual 2MiB, re-signed -> RESOURCE_LIMIT: exec_region 3145728 exceeds host actual execution region 2097152"
+    },
+    {
+      "name": "native_header_abi_mismatch_vs_manifest",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "native header abi=0x00010000 vs manifest 0x00020000, digest-consistent, re-signed -> BAD_PACKAGE: native abi 0x00010000 != manifest required_host_abi"
+    },
+    {
+      "name": "native_reserved0_nonzero",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "native reserved0=1 with matching digest, re-signed -> BAD_PACKAGE: native header reserved0 != 0"
+    },
+    {
+      "name": "manifest_native_len_mismatch",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "manifest native_file_len=+1, re-signed -> BAD_PACKAGE: manifest native_file_len != actual native length"
+    },
+    {
+      "name": "der_trailing_byte",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "valid 70B DER + 1 trailing byte (must fully consume tail) -> BAD_PACKAGE: DER does not consume its tail exactly"
+    },
+    {
+      "name": "der_truncated",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "signature truncated by 1 byte -> BAD_PACKAGE: DER does not consume its tail exactly"
+    },
+    {
+      "name": "manifest_len_160_in_v2",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "manifest_len field=160 (v1 value) in v2 header -> BAD_PACKAGE: manifest_len 160 wrong for container"
+    },
+    {
+      "name": "v1_magic_on_v2_container",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "container magic downgraded to v1, body unchanged -> BAD_PACKAGE: container magic 4e45415050010000 != 4e45415050020000"
+    },
+    {
+      "name": "v2_package_on_v1_host",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "v2 golden fed to frozen v1 structural rules -> BAD_PACKAGE: v1: unknown container magic 4e45415050020000"
+    },
+    {
+      "name": "nmf1_magic_in_v2",
+      "expected": "reject BAD_PACKAGE",
+      "status": "PASS",
+      "detail": "manifest magic NMF1 in v2 container, re-signed -> BAD_PACKAGE: manifest magic b'NMF1' != NMF2"
+    },
+    {
+      "name": "payload_tamper_detected",
+      "expected": "SIGNATURE_INVALID",
+      "status": "PASS",
+      "detail": "true payload byte at TBS[240] flipped (DER untouched) -> SIGNATURE_INVALID"
+    },
+    {
+      "name": "payload_tamper_openssl_rejects",
+      "expected": "non-zero exit",
+      "status": "PASS",
+      "detail": "openssl: Verification failure (exit 1)"
+    },
+    {
+      "name": "manifest_tamper_detected",
+      "expected": "SIGNATURE_INVALID",
+      "status": "PASS",
+      "detail": "manifest byte 40 (app_id area) flipped -> SIGNATURE_INVALID"
+    },
+    {
+      "name": "der_region_tamper_detected",
+      "expected": "SIGNATURE_INVALID",
+      "status": "PASS",
+      "detail": "DER byte 250 flipped (TBS untouched) -> SIGNATURE_INVALID"
+    },
+    {
+      "name": "v1_golden_digest",
+      "expected": "9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679",
+      "status": "PASS",
+      "detail": "frozen v1 §2.5 golden rebuilt from spec HEX"
+    },
+    {
+      "name": "v1_golden_structural",
+      "expected": "v1 gate PASS",
+      "status": "PASS",
+      "detail": "v1 container ok, abi=0x00010000, caps=0x3 (log|tick_ms only)"
+    },
+    {
+      "name": "v1_golden_signature_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "v1 golden DER verifies against the same d=1 SPKI"
+    },
+    {
+      "name": "v1_on_v2_host_caps_limited",
+      "expected": "only v1 16B table semantics (M3)",
+      "status": "PASS",
+      "detail": "v2 Host grants log|tick_ms only; no v2 capability may be inferred"
+    },
+    {
+      "name": "v1_golden_openssl",
+      "expected": "Verified OK, exit 0",
+      "status": "PASS",
+      "detail": "openssl: Verified OK (exit 0)"
+    },
+    {
+      "name": "frame64_length_1576",
+      "expected": "1576B",
+      "status": "PASS",
+      "detail": "len=1576"
+    },
+    {
+      "name": "frame64_roundtrip",
+      "expected": "kind=1 count=64",
+      "status": "PASS",
+      "detail": "encode/validate round trip"
+    },
+    {
+      "name": "frame0_is_40b",
+      "expected": "40B FRAME(count=0)",
+      "status": "PASS",
+      "detail": "distinct from NO_EVENT/MODEL_CHANGED/STOPPING"
+    },
+    {
+      "name": "kind_model_changed_encodes",
+      "expected": "40B valid",
+      "status": "PASS",
+      "detail": "kind=2"
+    },
+    {
+      "name": "kind_gap_encodes",
+      "expected": "40B valid",
+      "status": "PASS",
+      "detail": "kind=3"
+    },
+    {
+      "name": "kind_stopping_encodes",
+      "expected": "40B valid",
+      "status": "PASS",
+      "detail": "kind=4"
+    },
+    {
+      "name": "event_unknown_kind",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "kind=5 -> BAD_EVENT: unknown kind 5"
+    },
+    {
+      "name": "event_unknown_flag_bit",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "flags bit2 set -> BAD_EVENT: undefined flag bits 0x00000004"
+    },
+    {
+      "name": "event_flag1_without_sentinel",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "flags.bit1=1 but lost_frame_count=7 (must be 0xFFFFFFFF) -> BAD_EVENT: flags.bit1=1 requires lost_frame_count=0xFFFFFFFF"
+    },
+    {
+      "name": "event_sentinel_without_flag1",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "lost_frame_count=0xFFFFFFFF without flags.bit1 -> BAD_EVENT: lost_frame_count sentinel without flags.bit1"
+    },
+    {
+      "name": "event_65_detections_encode",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "65 detections > 64 -> BAD_EVENT: 65 detections > 64"
+    },
+    {
+      "name": "event_65_detections_wire",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "hand-built 65-detection event rejected, not truncated -> BAD_EVENT: detection_count 65 > 64"
+    },
+    {
+      "name": "event_total_len_mismatch",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "total_len=100 != 40+24*2 -> BAD_EVENT: total_len != 40 + 24*detection_count"
+    },
+    {
+      "name": "event_nonfinite_confidence",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "confidence bits = quiet NaN -> BAD_EVENT: record 0 confidence not finite"
+    },
+    {
+      "name": "event_class_index_oob",
+      "expected": "reject BAD_EVENT",
+      "status": "PASS",
+      "detail": "class_index=8 >= class_count=8 -> BAD_EVENT: record 0 class_index 8 >= class_count 8"
+    },
+    {
+      "name": "model_meta_layout",
+      "expected": "128B, PP_TYPE_OD, fields ok",
+      "status": "PASS",
+      "detail": "loaded=1 name='line-crossing-model' ver='2.1.0'"
+    },
+    {
+      "name": "model_meta_wrong_type_incompatible",
+      "expected": "INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "result_type=2 -> INCOMPATIBLE"
+    },
+    {
+      "name": "report_oversize_rejected",
+      "expected": "QUOTA_EXCEEDED",
+      "status": "PASS",
+      "detail": "6145B report vs report_max=6144 -> QUOTA_EXCEEDED (no truncation)"
+    },
+    {
+      "name": "report_capacity_aligns_lc_dq",
+      "expected": "6144B",
+      "status": "PASS",
+      "detail": "declared report_max == LC_DQ_SLOT_CAPACITY evidence anchor"
+    },
+    {
+      "name": "model_name_no_nul",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "model_name fills all 64B without NUL -> INCOMPATIBLE: model_name missing NUL terminator"
+    },
+    {
+      "name": "model_name_junk_after_nul",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "model_name carries junk after its NUL -> INCOMPATIBLE: model_name has non-zero bytes after its NUL"
+    },
+    {
+      "name": "model_version_no_nul",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "model_version fills all 32B without NUL -> INCOMPATIBLE: model_version missing NUL terminator"
+    },
+    {
+      "name": "model_meta_trailing_reserved_nonzero",
+      "expected": "reject INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "trailing 8B reserved nonzero -> INCOMPATIBLE: model_meta trailing reserved not zero"
+    },
+    {
+      "name": "tick_positive_small_delta",
+      "expected": "delta 50",
+      "status": "PASS",
+      "detail": "ordinary small forward step, well below the wrap point"
+    },
+    {
+      "name": "tick_wrap_7fffffff_to_80000000",
+      "expected": "delta 1 (legal progress, not an error)",
+      "status": "PASS",
+      "detail": "mod-2^32 wrap past 2^31; the naive signed-int32 reading of 0x80000000 is -2147483648 and must NOT be treated as a §6.4 negative error code"
+    },
+    {
+      "name": "tick_int32_trap_guard_80000000",
+      "expected": "trap documented and guarded",
+      "status": "PASS",
+      "detail": "negative int32 value exists but the delta channel is uint32 mod-2^32 only"
+    },
+    {
+      "name": "tick_wrap_ffffffff_to_00000000",
+      "expected": "delta 1 (legal progress, not an error)",
+      "status": "PASS",
+      "detail": "0xffffffff -> 0x00000000 is +1 mod 2^32; the int32 reading -1 is not a §6.4 error"
+    },
+    {
+      "name": "tick_bits_out_of_range",
+      "expected": "reject INVALID_ARGUMENT",
+      "status": "PASS",
+      "detail": "non-u32 bit pattern rejected -> INVALID_ARGUMENT: tick bits 0x100000000 outside u32"
+    }
+  ],
+  "digests": {
+    "sha256_golden_tbs": "e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278",
+    "sha256_golden_package": "3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e",
+    "sha256_archive_package": "f05ca613d7ea2e74f61cdd5cc2bbc9f44a4406eca216366fee81894b6b664e24",
+    "sha256_spki_der": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+    "sha256_v1_golden": "9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679"
+  },
+  "openssl_cross_proof": {
+    "command": "openssl dgst -sha256 -verify",
+    "exit": 0,
+    "output": "Verified OK"
+  }
+}
