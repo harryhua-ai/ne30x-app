@@ -1,0 +1,22 @@
+B01 window IN + counters + commit
+B02 window OUT
+B03 cumulative totals across windows, window reset
+B04 target class + confidence filtering
+B05 counter name edit does NOT reset counters
+B06 target switch resets counters and rebinds
+B07 manual reset zeroes and persists
+B08 restart recovery: totals/config/report_seq/window carried
+B09 verified absence is NOT data loss
+B10 storage unknown at boot -> degraded, then recovery
+B11 single revision conflict is recovered
+B12 persistent conflict -> CONFLICT state, counting continues
+B13 corrupt stored blob -> visible CORRUPT, then replaced
+B14 model unsupported -> unusable frames, then recovery
+B15 wrong result_type is unsupported; class removal invalidates target
+B16 GAP/lost-frame accounting is visible in the report
+B17 malformed events rejected (wire negative family)
+B18 NO_EVENT vs empty FRAME are distinct
+B19 report quota drop is visible, identity still advances
+B20 accepted vs delivered are distinct; per-channel states
+B21 MODEL_CHANGED rebinds, clears transient, keeps totals
+[test_business] pass=134 fail=0 -> PASS

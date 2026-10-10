@@ -1,0 +1,15 @@
+C01 entry validation (api/table/abi/fnptr)
+C02 clean session: runs, commits state, cooperative stop, exit 0
+C03 unauthorized session refused (UNAUTHORIZED contract)
+C04 event_next INVALID_ARGUMENT x3 -> HOST_FAULT exit
+C05 should_stop negative x3 -> HOST_FAULT exit (never misread as stop)
+C06 STOPPING event -> clean cooperative exit
+C07 tick_ms mod-2^32 window close across the wrap boundary
+C08 E2E: crossing counted, window report schema+identity
+C09 malformed model_meta -> unsupported model, session still safe
+C10 event_next UNAUTHORIZED mid-session -> exit -5
+C11 report_submit UNAUTHORIZED at window close -> exit -5
+C12 GAP/backpressure is visible in the submitted report
+C13 STORAGE_UNKNOWN at boot: session survives, degraded is visible
+C14 JSON report_seq always matches the app_report_seq argument
+[test_contract] pass=50 fail=0 -> PASS
