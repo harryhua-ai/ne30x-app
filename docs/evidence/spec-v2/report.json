@@ -3,8 +3,14 @@
   "issue": 12,
   "suite": "tests/spec-v2/run_all_tests.py",
   "note": "Host-side spec evidence only. No v2 device parser, no STM32 target build, no device PKA, no sustained-run or power-loss PASS (spec §12). Test key d=1 is public and non-production.",
-  "vectors_total": 56,
-  "vectors_passed": 56,
+  "rev2_corrections": {
+    "reviewed_candidate": "7564c22b740430a94ca7133697ebce3f85554f68",
+    "ac2_caps_subset": "policy_check_v2_host now fail-closed rejects KNOWN capability bits the current Host does not provide (ABI_INCOMPATIBLE); new negatives caps_subset_host_missing_report_submit (+ signature-valid proof).",
+    "ac4_verify_order": "full_accept now follows spec §2.3 order: bounded structure/manifest unique-encoding -> ECDSA over raw TBS -> native cross-checks -> policy; payload tamper flips a dynamically computed TRUE payload byte (TBS[240:244], DER byte-identical) and asserts exactly SIGNATURE_INVALID; DER-region corruption is a separately labeled vector.",
+    "ac4_abi_attribution": "native_header_abi_mismatch_vs_manifest keeps manifest abi=0x00020000, flips ONLY the native header abi to 0x00010000 (manifest native SHA updated), re-signs, and asserts the rejection detail names the native<->manifest cross mismatch; the v2-container-declares-v1-ABI case remains a separate independent test."
+  },
+  "vectors_total": 59,
+  "vectors_passed": 59,
   "vectors": [
     {
       "name": "golden_tbs_length",
@@ -127,10 +133,22 @@
       "detail": "required_host_abi=0x00010000 inside NMF2 manifest, re-signed -> BAD_PACKAGE: v2 manifest required_host_abi=0x00010000 != 0x00020000"
     },
     {
-      "name": "native_header_abi_v1_mismatch",
+      "name": "caps_subset_negative_signature_valid",
+      "expected": "signature valid",
+      "status": "PASS",
+      "detail": "golden signature pinned valid; the rejection below is host policy, not signature"
+    },
+    {
+      "name": "caps_subset_host_missing_report_submit",
+      "expected": "reject ABI_INCOMPATIBLE",
+      "status": "PASS",
+      "detail": "caps=0x3f all known bits; Host lacks report_submit -> ABI_INCOMPATIBLE: host does not provide capability bits 0x00000008 (known but unsupported)"
+    },
+    {
+      "name": "native_header_abi_mismatch_vs_manifest",
       "expected": "reject BAD_PACKAGE",
       "status": "PASS",
-      "detail": "native header abi_version=0x00010000 with consistent manifest digest, re-signed -> BAD_PACKAGE: v2 manifest required_host_abi=0x00010000 != 0x00020000"
+      "detail": "native header abi=0x00010000 vs manifest 0x00020000, digest-consistent, re-signed -> BAD_PACKAGE: native abi 0x00010000 != manifest required_host_abi"
     },
     {
       "name": "native_reserved0_nonzero",
@@ -184,19 +202,25 @@
       "name": "payload_tamper_detected",
       "expected": "SIGNATURE_INVALID",
       "status": "PASS",
-      "detail": "byte 250 flipped -> SIGNATURE_INVALID"
+      "detail": "true payload byte at TBS[240] flipped (DER untouched) -> SIGNATURE_INVALID"
     },
     {
       "name": "payload_tamper_openssl_rejects",
       "expected": "non-zero exit",
       "status": "PASS",
-      "detail": "openssl: Verification failure\nC020DF0B02000000:error:030000EA:digital envelope routines:EVP_DigestVerifyFinal:provider signature failure:crypto/evp/m_sigver.c:705:ECDSA digest_verify_final: (exit 1)"
+      "detail": "openssl: Verification failure (exit 1)"
     },
     {
       "name": "manifest_tamper_detected",
       "expected": "SIGNATURE_INVALID",
       "status": "PASS",
       "detail": "manifest byte 40 (app_id area) flipped -> SIGNATURE_INVALID"
+    },
+    {
+      "name": "der_region_tamper_detected",
+      "expected": "SIGNATURE_INVALID",
+      "status": "PASS",
+      "detail": "DER byte 250 flipped (TBS untouched) -> SIGNATURE_INVALID"
     },
     {
       "name": "v1_golden_digest",

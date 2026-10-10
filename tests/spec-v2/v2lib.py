@@ -484,6 +484,14 @@ def policy_check_v2_host(manifest, native, host=HOST_POLICY_V2,
     caps = manifest["caps"]
     if caps & ~CAP_KNOWN_MASK:
         raise SpecViolation("BAD_PACKAGE", f"unknown capability bits 0x{caps & ~CAP_KNOWN_MASK:08x}")
+    unsupported = caps & ~host["caps_supported"]
+    if unsupported:
+        # AC2 / spec §4.2: a signature is only a request. A KNOWN capability the
+        # current Host does not actually provide must be fail-closed rejected at
+        # install/start (runtime calls would be UNAUTHORIZED/INCOMPATIBLE, §6.4).
+        raise SpecViolation("ABI_INCOMPATIBLE",
+                            f"host does not provide capability bits 0x{unsupported:08x} "
+                            "(known but unsupported)")
     if manifest["run_profile"] != PROFILE_SINGLE_TRUSTED_SESSION:
         raise SpecViolation("BAD_PACKAGE", f"unknown run_profile {manifest['run_profile']}")
     if manifest["run_profile"] == PROFILE_SINGLE_TRUSTED_SESSION and \

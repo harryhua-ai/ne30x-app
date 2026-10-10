@@ -123,6 +123,7 @@ manifest `[0..159]` 的位置、宽度、编码与签名交叉检查**严格复�
 **manifest 能力位只表示签名请求的上界与需求，实际安装/启动还必须由 Host 按当前板型、ABI、信任、存储、可用容量逐项验证**：
 
 - 没有声明的能力/函数不能被调用；Host 不得因"表更长"或 v1 函数表长度猜测而升级可用面。
+- **反向同样 fail-closed**：包声明了**已知**能力位、但当前 Host **实际不提供**该能力时，安装/启动必须整体拒绝（映射 `ABI_INCOMPATIBLE`，见 §9；运行期对该能力的调用按 §6.4 返回 `UNAUTHORIZED`/`INCOMPATIBLE`）。"全部位都在已知集合内"不等于"当前 Host 都支持"。
 - 声明了的能力也只在受信身份、允许版本与对应会话授权均成立时可用（§7）。
 - 当前 Line Crossing 兼容 profile 的能力全集示例 `caps=0x0000003f`、`event_max=2048`、`state_quota=4096`、`report_max=6144` 只是**签名请求的上界**，并不凭空创造实际 Host 资源；Host 逐项验证不满足时按 §9 拒绝。
 
@@ -283,6 +284,7 @@ int32_t should_stop(void);
 | M7 | 历史归档 244B 样本（`event_max=1024`、`report_max=4096`） | 64 框业务 v2 Host | 签名数学上有效，但**资源不足负例**：`event_max=1024 < 1576`（声明 `ai_events` 而不满足 64 框需求）且 `report_max=4096 < 6144` → `RESOURCE_LIMIT` 拒绝。**该样本不得当作满足 64 检测框和历史最大合法报文的互操作黄金包** |
 | M8 | 原生头 `abi_version` ≠ manifest `required_host_abi` | v2 Host | **拒绝**（交叉检查失败，`BAD_PACKAGE`） |
 | M9 | `event_max`/`report_max`/`state_quota` 与能力位不匹配 | v2 Host | **拒绝**（§4.1 约束违例） |
+| M10 | 签名合法、caps 全为已知 bit，但 Host 实际不提供其中某能力（如 `report_submit`） | v2 Host | **拒绝**（`ABI_INCOMPATIBLE`，§4.2 反向 fail-closed；运行期该能力调用返回 `UNAUTHORIZED`/`INCOMPATIBLE`） |
 
 升级/卸载/换钥的安装事务语义（`DOWNGRADE_FORBIDDEN`、`VERSION_CONTENT_CONFLICT`、`APP_IDENTITY_CONFLICT`、`STORAGE_STATE_UNKNOWN`、`BUSY` 等）全部继承 v1 §3/§4.1/§5.1，本文不重复、不放宽。
 
@@ -295,6 +297,7 @@ v1 §7 错误主分类**原样复用**（`AUTH_REQUIRED`、`FORBIDDEN`、`BAD_PA
 | 容器 magic/长度/manifest_len≠192/manifest magic/保留字段非零/未知 profile/未知能力位/能力-配额不匹配/manifest 唯一编码破坏/DER 非法或尾随 | `BAD_PACKAGE` |
 | manifest `required_host_abi` ≠ `0x00020000`（v2 容器内） | `BAD_PACKAGE`（v2 格式不变量违例） |
 | 包声明 ABI ≠ 当前 Host 支持 ABI（未来版本容器等） | `ABI_INCOMPATIBLE` |
+| 包声明**已知**能力位但当前 Host 实际不提供（§4.2） | `ABI_INCOMPATIBLE`（运行期 `UNAUTHORIZED`/`INCOMPATIBLE`） |
 | manifest ABI ≠ 原生头 ABI / 原生头任一交叉检查失败 | `BAD_PACKAGE` |
 | `event_max`/`report_max`/`state_quota` 超过 Host 实际可提供容量 | `RESOURCE_LIMIT`（运行期对应 `QUOTA_EXCEEDED`） |
 | 原生 `native_file_len` > 真实装载区 | `RESOURCE_LIMIT` |
@@ -311,6 +314,8 @@ v1 §7 错误主分类**原样复用**（`AUTH_REQUIRED`、`FORBIDDEN`、`BAD_PA
 ```bash
 python3 tests/spec-v2/run_all_tests.py
 ```
+
+辅助验证器 `full_accept` 严格按 §2.3 判定序执行：**有界结构/manifest 唯一编码先行 → 可信发行者对原样 TBS 的 ECDSA 验签 → 之后才做需要信任数据的原生头/CRC/SHA 交叉检查与 Host 策略**；因此"签名段被改"与"已签 payload 被改"都能得到确切的 `SIGNATURE_INVALID`，而不会先被 `BAD_PACKAGE` 掩盖。
 
 证据（黄金包字节、TBS、DER、SPKI、逐向量结果、OpenSSL 输出、全部 SHA-256）输出至 `docs/evidence/spec-v2/`。
 
@@ -339,9 +344,9 @@ python3 tests/spec-v2/run_all_tests.py
 
 ### 10.3 必须覆盖的负例族（tests/spec-v2 实现清单）
 
-1. **payload 篡改**：黄金包镜像字节翻转 → 验签失败（`SIGNATURE_INVALID`），OpenSSL 非零退出。
-2. **DER 尾随**：合法 DER 后追加字节 → `BAD_PACKAGE`（DER 必须完整消费尾部）；DER 截断 → `BAD_PACKAGE`。
-3. **重签后的策略拒绝**（证明"签名正确 ≠ 放行"）：未知能力位（bit6）、[176..191] reserved 非零、manifest [58..59] 非零、未知 `run_profile`、能力-配额不匹配、`required_host_abi=0x00010000`、原生头 ABI 不匹配、原生头 `reserved0≠0`——均以 d=1 重签为合法签名后仍拒绝。
+1. **已签内容篡改（按黄金包真实布局动态定位）**：TBS 布局为 `[0,16)` 容器头、`[16,208)` manifest、`[208,240)` 原生 32B 头、`[240,244)` 真 payload、`[244,314)` DER 签名段。翻转**真 payload** 字节（DER 保持逐字节不变）→ `SIGNATURE_INVALID`，OpenSSL 非零退出；篡改 manifest 字节 → `SIGNATURE_INVALID`；**篡改 DER 签名字节本身**（TBS 不变）→ `SIGNATURE_INVALID`（该项只证明签名字节损坏会被验签拒绝，不作为已签 payload 覆盖的证明）。
+2. **DER 结构**：合法 DER 后追加字节 → `BAD_PACKAGE`（DER 必须完整消费尾部）；DER 截断 → `BAD_PACKAGE`。
+3. **重签后的策略拒绝**（证明"签名正确 ≠ 放行"）：未知能力位（bit6）、Host 不提供的已知能力（能力子集反向 fail-closed，M10）、[176..191] reserved 非零、manifest [58..59] 非零、未知 `run_profile`、profile 1 缺 bit5、能力-配额不匹配、`required_host_abi=0x00010000`（manifest 格式不变量，独立用例）、**仅原生头 ABI 改为 `0x00010000` 而 manifest 保持 `0x00020000`**（同步更新 manifest native SHA 后合法重签 → 真正验证原生头↔manifest 交叉不匹配）、原生头 `reserved0≠0`——均以 d=1 重签为合法签名后仍拒绝，并断言拒绝原因可归因到对应规则。
 4. **新旧交叉拒绝**：v2 包过 v1 Host 结构规则拒绝；v1 容器声明 v2/`NMF2` 混搭拒绝；v1 黄金包过 v2 Host 仅获 v1 16B 表语义（M3）。
 5. **容量判别**：1024/4096 归档样本在 64 框业务判 `RESOURCE_LIMIT`（M7）；黄金包 2048/6144 判通过（M1）。
 6. **事件 wire 负例**：未知 kind、未知 flags 位、`flags.bit1=1` 但 `lost_frame_count≠0xFFFFFFFF`、65 检测（>64/>1576B）、`total_len` 与 `detection_count` 不一致、非有限 float 位型、`class_index` 越界——全部拒绝，不截断、不静默丢弃。

@@ -95,12 +95,18 @@ def vector(name, expected, actual_ok, detail, evidence=None):
     return actual_ok
 
 
-def expect_rejection(name, fn, expected_reason, detail):
-    """Run fn(); PASS only if it raises SpecViolation with expected_reason."""
+def expect_rejection(name, fn, expected_reason, detail, detail_contains=None):
+    """Run fn(); PASS only if it raises SpecViolation with expected_reason
+    (and, when detail_contains is given, only if the detail matches too —
+    proving the rejection is attributable to the named rule, not a checkpoint
+    that happens to run earlier)."""
     try:
         fn()
     except V.SpecViolation as e:
-        return vector(name, f"reject {expected_reason}", e.reason == expected_reason,
+        ok = e.reason == expected_reason
+        if ok and detail_contains is not None:
+            ok = detail_contains in e.detail
+        return vector(name, f"reject {expected_reason}", ok,
                       f"{detail} -> {e.reason}: {e.detail}")
     except Exception as e:  # noqa: BLE001
         return vector(name, f"reject {expected_reason}", False, f"{detail} -> wrong error {e!r}")
@@ -155,12 +161,15 @@ def resigned_package(manifest192, native, private_scalar=D_TEST):
 
 
 def full_accept(pkg, host=V.HOST_POLICY_V2):
-    """Full v2 Host acceptance: structural + signature + manifest + native + policy."""
+    """Full v2 Host acceptance in spec §2.3 order: bounded structure/manifest
+    unique-encoding first, then trusted-issuer ECDSA verification of the raw
+    TBS, and only after a valid signature the trust-data cross-checks (native
+    header/CRC/SHA) and the host policy (caps subset/quotas/resources)."""
     c = V.parse_container(pkg)
     man = V.decode_manifest_v2(c["manifest"])
-    V.check_native_cross(c["native"], man)
     if not V.p256_verify(SPKI, V.sha256(c["tbs"]), c["sig"]):
         raise V.SpecViolation("SIGNATURE_INVALID", "ECDSA verify failed")
+    V.check_native_cross(c["native"], man)
     V.policy_check_v2_host(man, c["native"], host=host)
     return c, man
 
@@ -226,11 +235,12 @@ def group_archive_negative():
     expect_rejection("archive_quota_1024_4096_resource_limit",
                      lambda: full_accept(arch_pkg),
                      "RESOURCE_LIMIT",
-                     "event_max=1024 < 1576 (64-frame ai_events), report_max=4096 < 6144")
+                     "event_max=1024 < 1576 (64-frame ai_events), report_max=4096 < 6144",
+                     detail_contains="event_max 1024")
 
 
 def group_resigned_policy_negatives(golden_pkg):
-    print("== [3] Re-signed policy rejections: valid signature must NOT bypass policy (spec §10.3.3, §8 M4/M5/M6/M9) ==")
+    print("== [3] Re-signed policy rejections + host caps subset: valid signature must NOT bypass policy (spec §10.3.3, §8 M4/M5/M6/M9/M10) ==")
     c = V.parse_container(golden_pkg)
     man_bytes = bytearray(c["manifest"])
     native = c["native"]
@@ -280,20 +290,34 @@ def group_resigned_policy_negatives(golden_pkg):
     expect_rejection("v2_container_v1_abi", lambda: full_accept(pkg), "BAD_PACKAGE",
                      "required_host_abi=0x00010000 inside NMF2 manifest, re-signed")
 
-    # native header abi mismatch vs manifest (digest-consistent, re-signed)
-    def native_abi_mutation(m):
-        struct.pack_into("<I", m, 68, V.ABI_V1)
-        m[96:128] = bytes(32)  # placeholder, replaced below
-    # build explicitly: change native header abi to v1, recompute manifest sha
+    # AC2: a KNOWN capability the current Host does not provide must be
+    # fail-closed rejected (spec §4.2 declaration-vs-host-verify boundary).
+    # The golden package is signature-valid with caps=0x3f (all bits known);
+    # a Host that lacks report_submit (bit3) must reject it as ABI_INCOMPATIBLE.
+    host_no_report = dict(V.HOST_POLICY_V2,
+                          caps_supported=V.HOST_POLICY_V2["caps_supported"] & ~V.CAP_REPORT_SUBMIT)
+    vector("caps_subset_negative_signature_valid", "signature valid",
+           V.p256_verify(SPKI, V.sha256(c["tbs"]), c["sig"]),
+           "golden signature pinned valid; the rejection below is host policy, not signature")
+    expect_rejection("caps_subset_host_missing_report_submit",
+                     lambda: full_accept(golden_pkg, host=host_no_report),
+                     "ABI_INCOMPATIBLE", "caps=0x3f all known bits; Host lacks report_submit",
+                     detail_contains="host does not provide capability bits")
+
+    # native header ABI-only mismatch: manifest keeps required_host_abi=0x00020000;
+    # ONLY the native header abi_version is flipped to 0x00010000 (native SHA
+    # updated in manifest, CRC untouched — it covers the payload only), then the
+    # package is legally re-signed. The rejection must come from the native
+    # header <-> manifest cross-check, not from a manifest format violation.
     bad_native = bytearray(native)
-    struct.pack_into("<I", bad_native, 8, V.ABI_V1)
+    struct.pack_into("<I", bad_native, 8, V.ABI_V1)      # native header abi_version only
     m = bytearray(man_bytes)
-    struct.pack_into("<I", m, 68, V.ABI_V1)              # keep manifest consistent
-    struct.pack_into("<I", m, 84, len(bad_native) - 32)
-    m[96:128] = V.sha256(bytes(bad_native))
+    # manifest abi at [68..71] deliberately stays 0x00020000
+    m[96:128] = V.sha256(bytes(bad_native))              # keep manifest native SHA consistent
     pkg, _, _ = resigned_package(bytes(m), bytes(bad_native))
-    expect_rejection("native_header_abi_v1_mismatch", lambda: full_accept(pkg), "BAD_PACKAGE",
-                     "native header abi_version=0x00010000 with consistent manifest digest, re-signed")
+    expect_rejection("native_header_abi_mismatch_vs_manifest", lambda: full_accept(pkg), "BAD_PACKAGE",
+                     "native header abi=0x00010000 vs manifest 0x00020000, digest-consistent, re-signed",
+                     detail_contains="native abi 0x00010000 != manifest")
 
     # native reserved0 nonzero (digest-consistent, re-signed) — v1-inherited rule
     bad_native = bytearray(native)
@@ -349,22 +373,39 @@ def group_container_structure(golden_pkg):
 
 def group_tamper(golden_pkg):
     print("== [5] Signed-content tamper (spec §10.3.1) ==")
+    # Dynamic layout from the parsed container (no hardcoded offsets):
+    # TBS = [0,16) container header | [16, 16+192) manifest | native file.
+    # Native file = 32B image header [native_off, native_off+32) then the true
+    # payload [native_off+32, len(TBS)). Everything at/after len(TBS) is the
+    # DER signature region and stays byte-for-byte untouched below.
+    c = V.parse_container(golden_pkg)
+    tbs_len = len(c["tbs"])
+    native_off = 16 + c["manifest_len"]
+    payload_off = native_off + V.NATIVE_HEADER_SIZE
+    assert 16 < native_off < payload_off < tbs_len, "golden layout assumption"
+    print(f"     layout: manifest [16,{native_off}), native hdr [{native_off},{payload_off}), "
+          f"true payload [{payload_off},{tbs_len}), DER [{tbs_len},{len(golden_pkg)})")
+
+    # 1) TRUE payload byte flipped (inside [240,244) for the golden TBS), DER untouched.
     pkg = bytearray(golden_pkg)
-    pkg[250] ^= 0x01  # inside the native payload (208..243), signature untouched
+    pkg[payload_off] ^= 0x01
+    diffs = [i for i in range(len(golden_pkg)) if pkg[i] != golden_pkg[i]]
+    assert diffs == [payload_off], f"exactly the payload byte must differ, got {diffs}"
+    assert pkg[tbs_len:] == golden_pkg[tbs_len:], "DER must remain byte-identical"
     try:
         full_accept(bytes(pkg))
         vector("payload_tamper_detected", "SIGNATURE_INVALID", False,
-               "tampered payload accepted (WRONG)")
+               "tampered true payload accepted (WRONG)")
     except V.SpecViolation as e:
         vector("payload_tamper_detected", "SIGNATURE_INVALID", e.reason == "SIGNATURE_INVALID",
-               f"byte 250 flipped -> {e.reason}")
+               f"true payload byte at TBS[{payload_off}] flipped (DER untouched) -> {e.reason}")
     if openssl_available():
-        c = V.parse_container(bytes(pkg))
-        code, out = openssl_verify(SPKI, c["tbs"], c["sig"])
+        c2 = V.parse_container(bytes(pkg))
+        code, out = openssl_verify(SPKI, c2["tbs"], c2["sig"])
         vector("payload_tamper_openssl_rejects", "non-zero exit", code != 0,
-               f"openssl: {out.strip()} (exit {code})")
+               f"openssl: {out.strip().splitlines()[0]} (exit {code})")
 
-    # manifest byte tamper (not payload)
+    # 2) Manifest byte flip (signed metadata, not payload).
     pkg = bytearray(golden_pkg)
     pkg[40] ^= 0x01
     try:
@@ -374,6 +415,19 @@ def group_tamper(golden_pkg):
     except V.SpecViolation as e:
         vector("manifest_tamper_detected", "SIGNATURE_INVALID", e.reason == "SIGNATURE_INVALID",
                f"manifest byte 40 (app_id area) flipped -> {e.reason}")
+
+    # 3) DER signature bytes corrupted (region [244,314)); TBS untouched.
+    #    Correctly labeled: this proves corrupted signature bytes fail verification;
+    #    it is NOT a signed-payload coverage proof (vector 1 above is).
+    pkg = bytearray(golden_pkg)
+    pkg[tbs_len + 6] ^= 0x01
+    try:
+        full_accept(bytes(pkg))
+        vector("der_region_tamper_detected", "SIGNATURE_INVALID", False,
+               "corrupted DER accepted (WRONG)")
+    except V.SpecViolation as e:
+        vector("der_region_tamper_detected", "SIGNATURE_INVALID", e.reason == "SIGNATURE_INVALID",
+               f"DER byte {tbs_len + 6} flipped (TBS untouched) -> {e.reason}")
 
 
 def group_interop_v1(golden_pkg):
@@ -502,6 +556,22 @@ def write_evidence(golden_tbs, golden_der, golden_pkg, arch_pkg, v1_pkg):
         "note": ("Host-side spec evidence only. No v2 device parser, no STM32 target build, "
                  "no device PKA, no sustained-run or power-loss PASS (spec §12). "
                  "Test key d=1 is public and non-production."),
+        "rev2_corrections": {
+            "reviewed_candidate": "7564c22b740430a94ca7133697ebce3f85554f68",
+            "ac2_caps_subset": ("policy_check_v2_host now fail-closed rejects KNOWN capability bits the "
+                                "current Host does not provide (ABI_INCOMPATIBLE); new negatives "
+                                "caps_subset_host_missing_report_submit (+ signature-valid proof)."),
+            "ac4_verify_order": ("full_accept now follows spec §2.3 order: bounded structure/manifest "
+                                 "unique-encoding -> ECDSA over raw TBS -> native cross-checks -> policy; "
+                                 "payload tamper flips a dynamically computed TRUE payload byte "
+                                 "(TBS[240:244], DER byte-identical) and asserts exactly SIGNATURE_INVALID; "
+                                 "DER-region corruption is a separately labeled vector."),
+            "ac4_abi_attribution": ("native_header_abi_mismatch_vs_manifest keeps manifest abi=0x00020000, "
+                                    "flips ONLY the native header abi to 0x00010000 (manifest native SHA "
+                                    "updated), re-signs, and asserts the rejection detail names the "
+                                    "native<->manifest cross mismatch; the v2-container-declares-v1-ABI "
+                                    "case remains a separate independent test."),
+        },
         "vectors_total": len(VECTORS),
         "vectors_passed": sum(1 for v in VECTORS if v["status"] == "PASS"),
         "vectors": VECTORS,
@@ -535,6 +605,22 @@ def write_evidence(golden_tbs, golden_der, golden_pkg, arch_pkg, v1_pkg):
         lines.append(f"- exit **{code}**, output: `{out}`\n")
     else:
         lines.append("- openssl CLI not available; cross-proof MISSING (suite would have failed)\n")
+    lines.append("## Rev 2 corrections (A review of 7564c22, AC2/AC4 blockers)")
+    lines.append("1. **AC2 caps subset**: `policy_check_v2_host` now fail-closed rejects KNOWN capability "
+                 "bits the current Host does not provide (`ABI_INCOMPATIBLE`); negatives "
+                 "`caps_subset_host_missing_report_submit` + `caps_subset_negative_signature_valid` added.")
+    lines.append("2. **AC4 verify order + true payload tamper**: `full_accept` follows spec §2.3 order "
+                 "(bounded structure/manifest encoding -> ECDSA over raw TBS -> native cross-checks -> "
+                 "policy). `payload_tamper_detected` flips a dynamically computed TRUE payload byte "
+                 "(golden TBS true payload = [240,244); DER byte-identical) and asserts exactly "
+                 "`SIGNATURE_INVALID`; DER-region corruption moved to its own correctly labeled vector "
+                 "`der_region_tamper_detected`.")
+    lines.append("3. **AC4 ABI negative attribution**: `native_header_abi_mismatch_vs_manifest` keeps "
+                 "manifest `required_host_abi=0x00020000`, flips ONLY the native header ABI to "
+                 "`0x00010000` (manifest native SHA updated), re-signs, and requires the rejection "
+                 "detail to name the native<->manifest cross mismatch. The v2-container-declares-v1-ABI "
+                 "case (`v2_container_v1_abi`) remains a separate independent test. Rejection-attribution "
+                 "detail matching (`detail_contains`) also added to the archive negative.\n")
     lines.append("## Negative reference artifacts")
     lines.append(f"- `negative-archive-1024-4096.neapp.v2` — {len(arch_pkg)}B, SHA-256 `{report['digests']['sha256_archive_package']}` "
                  f"(spec §8 M7 resource-insufficient negative; never a business-positive sample)")
