@@ -1,0 +1,28 @@
+--- /Users/harryhua/Documents/GitHub/ne301/Custom/Tasks/Inc/lc_types.h	2026-09-22 01:56:52
++++ /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/8/apps/line-crossing/include/lc_types.h	2026-10-09 21:21:13
+@@ -48,14 +48,20 @@
+                              + (r->nb_points > 0u ? (r->nb_points - 1u) * sizeof(lc_point_t) : 0u));
+ }
+ 
+-#ifdef __LC_TEST__
++/*
++ * Ported (ne301 counting@de25a6f1): the only platform seam in the
++ * original code was heap allocation ("mem.h" / hal_mem_alloc_any /
++ * hal_mem_free on NE301).  This port defaults to the C standard
++ * library; an embedder may substitute a platform allocator without
++ * touching algorithm code by defining LC_MALLOC / LC_FREE before
++ * including any lc_*.h header.
++ */
++#ifndef LC_MALLOC
+     #include <stdlib.h>
+     #define LC_MALLOC(sz)     malloc(sz)
++#endif
++#ifndef LC_FREE
+     #define LC_FREE(p)        free(p)
+-#else
+-    #include "mem.h"
+-    #define LC_MALLOC(sz)     hal_mem_alloc_any(sz)
+-    #define LC_FREE(p)        hal_mem_free(p)
+ #endif
+ 
+ static inline uint8_t lc_serial_newer(uint32_t candidate, uint32_t current)

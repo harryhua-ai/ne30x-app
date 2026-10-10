@@ -1,0 +1,9 @@
+upstream baseline: pristine ne301 counting@de25a6f1 test_lc_engine built against pinned upstream sources
+all lc engine tests passed
+sha256 pinned sources:
+cfee6d6d8ce70d497a50ae55037db95ee49dd277472dbdd6cc6fcc98e0cd1918  /Users/harryhua/Documents/GitHub/ne301/Custom/Tasks/Src/lc_tracker.c
+6ed794972ae465fc7da513f4b842478098c261c8c8eaa5822894beabe3ed28fb  /Users/harryhua/Documents/GitHub/ne301/Custom/Tasks/Src/lc_line_cross.c
+776018c46f864c77ffbf76159f0657715ba5e3713d3bedc4676946f765e7f8be  /Users/harryhua/Documents/GitHub/ne301/Custom/Tasks/Inc/lc_types.h
+78ce91ebabb24a642026e52c8f066aa378ff1ed1b8ad6baee1c0877eb1c533e1  /Users/harryhua/Documents/GitHub/ne301/Custom/Tasks/Inc/lc_tracker.h
+ec1b94173a3cca305f055caa74dc74fe3066b487b9e49675a1991dc36fa607e0  /Users/harryhua/Documents/GitHub/ne301/Custom/Tasks/Inc/lc_line_cross.h
+4e4cbebec1dab597b00dc052631ed2eb50831d1d588fa2b8945eb384d92fa9a3  /Users/harryhua/Documents/GitHub/ne301/tests/host/test_lc_engine.c
