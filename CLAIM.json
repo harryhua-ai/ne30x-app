@@ -12,7 +12,35 @@
  "heartbeat_at": "2026-10-10T06:47:25Z",
  "supersedes": null,
  "contract_digest": "1e41a6d34f998f3dba0c225b951faf8f63f0c893c707480122295405e85c6226",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/13/ace0b2db",
+  "sha": "54729c1a10835f310261e32dc6d015ff742652dd",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "README.md": "ALLOWED",
+    "docs/evidence/p6-package-artifacts.json": "ALLOWED",
+    "docs/evidence/p6-package-checks.log": "ALLOWED",
+    "docs/evidence/p6-v1-regression-artifacts.json": "ALLOWED",
+    "docs/p6-packaging.md": "ALLOWED",
+    "package/neapp_pack_v2.py": "ALLOWED",
+    "package/neapp_v2_format.py": "ALLOWED",
+    "package/neapp_verify_v2.py": "ALLOWED",
+    "tests/package-v2/.gitignore": "ALLOWED",
+    "tests/package-v2/run_checks.sh": "ALLOWED",
+    "tests/package-v2/v2_cases.py": "ALLOWED",
+    "tools/make_v2_test_image.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 12,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-10T06:48:04Z"
+ },
  "runtime": {
   "digest": "0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f",
   "release": "v1.1.3",
