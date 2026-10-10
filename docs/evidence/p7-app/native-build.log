@@ -1,0 +1,63 @@
+make: Entering directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app'
+rm -rf build
+mkdir -p build
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c ../src/lc_tracker.c -o build/core_lc_tracker.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c ../src/lc_line_cross.c -o build/core_lc_line_cross.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_app_entry.c -o build/lc_app_entry.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_bus.c -o build/lc_bus.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_bus_config.c -o build/lc_bus_config.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_stateblob.c -o build/lc_stateblob.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_json.c -o build/lc_json.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_arena.c -o build/lc_arena.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -c lc_libc_mini.c -o build/lc_libc_mini.o
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -DLC_APP_TARGET=1 -DLC_APP_ID='"line-crossing"' -DLC_APP_SW_VERSION='"1.0.0"' -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)' -include /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app/lc_arena.h -I../include -I. -o build/lc-line-crossing.elf build/core_lc_tracker.o build/core_lc_line_cross.o build/lc_app_entry.o build/lc_bus.o build/lc_bus_config.o build/lc_stateblob.o build/lc_json.o build/lc_arena.o build/lc_libc_mini.o -nostdlib -T lc_app.ld -Wl,--gc-sections -Wl,-Map,build/lc-line-crossing.map -lgcc
+/Applications/ArmGNUToolchain/15.2.rel1/arm-none-eabi/bin/../lib/gcc/arm-none-eabi/15.2.1/../../../../arm-none-eabi/bin/ld: warning: build/lc-line-crossing.elf has a LOAD segment with RWX permissions
+arm-none-eabi-objcopy -O binary build/lc-line-crossing.elf build/lc-line-crossing.payload.bin
+python3 pack_v2_image.py --elf build/lc-line-crossing.elf --payload build/lc-line-crossing.payload.bin --out build/lc-line-crossing.bin \
+	--exec-base 0x93E00000 --nm arm-none-eabi-nm
+packed build/lc-line-crossing.bin: 32B NEA1 v2 header + 13156B payload = 13188B, entry_offset 0x9cc, crc32 0x562e6994, abi 0x00020000, target 0x93e00000
+   text	   data	    bss	    dec	    hex	filename
+  13156	      0	 108120	 121276	  1d9bc	build/lc-line-crossing.elf
+line-crossing-app: v2 image ready -> build/lc-line-crossing.bin
+mkdir -p ../../../tests/line-crossing-app/work/pkg
+python3 ../../../package/neapp_pack_v2.py \
+	--image build/lc-line-crossing.bin --out ../../../tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2 \
+	--key ../../../tests/line-crossing-app/work/keys/dev-signer.pem \
+	--publisher-id dev-publisher --app-id line-crossing --version 1.0.0 \
+	--host-caps 0x3f --event-max 2048 \
+	--state-quota 4096 --report-max 6144
+packed ../../../tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2: tbs 13396 B + der 70 B = 13466 B, package_sha256 7e1bb1c231832f81bf9777aea8de536fff28656bdeda922f5df58e0c84ee5759, content_identity(SHA-256(TBS)) 0c42aa4f2e8f83a513fd6c12e35c22fac3e1ed8acdb9d559de810bb93a24e17d
+provenance -> ../../../tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2.provenance.json
+python3 ../../../package/neapp_verify_v2.py \
+	--package ../../../tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2 \
+	--trust ../../../tests/line-crossing-app/work/trust-dev.json --expect PASS
+EXPECTED RESULT MATCH: PASS — ../../../tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2
+{
+  "app_id": "line-crossing",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
+  "content_identity_sha256": "0c42aa4f2e8f83a513fd6c12e35c22fac3e1ed8acdb9d559de810bb93a24e17d",
+  "event_max": 2048,
+  "format": "neapp-v2",
+  "native_crc32": "0x562e6994",
+  "native_entry_offset": "0x9cc",
+  "native_file_len": 13188,
+  "native_file_sha256": "9fc4ad6101ea21c1dfaa4baf8ee6cde86e3eeca888dc27d5e4a0a5296718a929",
+  "native_image_size": 13156,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "7e1bb1c231832f81bf9777aea8de536fff28656bdeda922f5df58e0c84ee5759",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "da0683b8b5fc05db9ec897ad4bb692ffe6abb3a4b53757b6b915b7c89246fe94",
+  "report_max": 6144,
+  "required_exec_region_bytes": 13156,
+  "required_host_abi": "0x00020000",
+  "required_host_caps": "0x3f",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "run_profile": 1,
+  "signature_len": 70,
+  "state_quota": 4096,
+  "target_board_id": "0x00003010",
+  "tbs_len": 13396
+}
+make: Leaving directory '/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/11/apps/line-crossing/app'

@@ -1,0 +1,5 @@
+test_arena
+test_json
+test_stateblob
+test_config
+[test_unit] pass=50 fail=0 -> PASS

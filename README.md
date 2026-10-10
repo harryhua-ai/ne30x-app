@@ -49,6 +49,17 @@ NE30x 系列应用仓库，用于开发、测试、打包和发布面向 NE301�
   bash tests/package-v2/run_checks.sh
   ```
 
+- [Issue #11：独立 Line Crossing App 统计业务与 Host 组合](https://github.com/harryhua-ai/ne30x-app/issues/11)：
+  已验收的过线算法核心组合为消费 Host ABI v2 的独立原生 App（事件消费、
+  窗口/累计统计、受控状态持久化、schema_version=1 报告），可目标编译并
+  生成受签 v2 包——见 [docs/p7-app.md](docs/p7-app.md)
+  （宿主契约测试与离线验真不等于设备安装/持续推理/远端送达验收）。一条
+  命令验证：
+
+  ```bash
+  bash tests/line-crossing-app/run_tests.sh
+  ```
+
 实现变更使用可审查的分支／PR，`main` 作为集成来源；任何真机风险、内存冲突或二进制兼容阻塞必须用证据报告，不允许以削弱平台/应用边界掩盖。
 
 平台源码：[harryhua-ai/ne301](https://github.com/harryhua-ai/ne301)。
