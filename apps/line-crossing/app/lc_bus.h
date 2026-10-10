@@ -132,6 +132,8 @@ typedef struct lcbus {
     lcbus_pending_t pending[LCBUS_PENDING_MAX];
 
     uint8_t  state_dirty;
+    uint8_t  business_mutated;
+    uint8_t  corrupt_reset_armed;
     uint32_t revision;
     uint32_t last_flush_ms;
     uint8_t  last_flush_valid;

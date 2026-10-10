@@ -10,6 +10,6 @@ C09 malformed model_meta -> unsupported model, session still safe
 C10 event_next UNAUTHORIZED mid-session -> exit -5
 C11 report_submit UNAUTHORIZED at window close -> exit -5
 C12 GAP/backpressure is visible in the submitted report
-C13 STORAGE_UNKNOWN at boot: session survives, degraded is visible
+C13 STORAGE_UNKNOWN at boot: session survives; no state writes while storage undeterminable
 C14 JSON report_seq always matches the app_report_seq argument
-[test_contract] pass=50 fail=0 -> PASS
+[test_contract] pass=52 fail=0 -> PASS

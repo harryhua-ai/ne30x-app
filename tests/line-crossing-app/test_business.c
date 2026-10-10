@@ -39,6 +39,29 @@ static lc_bus_config_t cfg1(void)
     return c;
 }
 
+static void seed_stored(const char *counter, uint32_t ti, uint32_t to,
+                        uint32_t revision)
+{
+    lc_bus_config_t c;
+    lc_bus_config_defaults(&c);
+    snprintf(c.counter_name, sizeof(c.counter_name), "%s", counter);
+    c.window_minutes = 1;
+    uint8_t blob[LC_ST_BLOB_MAX];
+    uint32_t len = lc_st_encode(blob, sizeof(blob), &c, ti, to, 0, 0, 0);
+    if (len) lcstub_set_state(s, blob, len, revision);
+}
+
+static int stored_totals(uint32_t *ti, uint32_t *rev)
+{
+    lc_bus_config_t c;
+    uint32_t to, wi, wo, seq;
+    if (!s->state_present) return 0;
+    if (lc_st_decode(s->state_blob, s->state_len, &c, ti, &to, &wi, &wo, &seq) != LC_ST_OK)
+        return 0;
+    *rev = s->state_revision;
+    return 1;
+}
+
 static void run_crossing(int down, uint32_t x_center_permille, uint32_t mono0)
 {
     static const float ys_down[4] = { 0.30f, 0.44f, 0.58f, 0.72f };
@@ -334,8 +357,9 @@ static void t09(void)
 
 static void t10(void)
 {
-    printf("B10 storage unknown at boot -> degraded, then recovery\n");
+    printf("B10 storage unknown at boot -> degraded; write only after verified absence\n");
     setup();
+    uint32_t reads_before = lcstub_calls(s, LCSTUB_FN_STATE_READ);
     lcstub_state_read_fault(s, LC_RET_STORAGE_UNKNOWN, 1);
     lcbus_restore(&bus);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_DEGRADED);
@@ -343,6 +367,7 @@ static void t10(void)
     lcbus_apply_config(&bus, &c);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
     CHECK_EQ_I(bus.st.state_commits_ok >= 1, 1);
+    CHECK(lcstub_calls(s, LCSTUB_FN_STATE_READ) >= reads_before + 2);
     teardown();
 }
 
@@ -362,11 +387,11 @@ static void t11(void)
 
 static void t12(void)
 {
-    printf("B12 persistent conflict -> CONFLICT state, counting continues\n");
+    printf("B12 conflict against diverged stored state -> CONFLICT persists, stored bytes win\n");
     setup();
     lc_bus_config_t c = cfg1();
     lcbus_apply_config(&bus, &c);
-    lcstub_state_commit_fault(s, LC_RET_REVISION_CONFLICT, 2);
+    lcstub_state_commit_fault(s, LC_RET_REVISION_CONFLICT, 1);
     run_crossing(1, 500, 100);
     lcstub_set_tick(s, 20000);
     lcbus_flush(&bus, 0);
@@ -377,19 +402,25 @@ static void t12(void)
     CHECK_EQ_I(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT), frozen);
 
     lcbus_flush(&bus, 1);
-    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
-    CHECK_EQ_I(bus.st.state_commits_ok, 2);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CONFLICT);
+    CHECK_EQ_I(bus.st.state_commits_ok, 1);
 
     CHECK_EQ_I(bus.total_in, 1);
+    uint32_t ti = 0, rev = 0;
+    CHECK(stored_totals(&ti, &rev));
+    CHECK_EQ_I(ti, 0);
+    CHECK_EQ_I(rev, 1);
     teardown();
 }
 
 static void t13(void)
 {
-    printf("B13 corrupt stored blob -> visible CORRUPT, then replaced\n");
+    printf("B13 corrupt stored blob -> CORRUPT visible; config change never overwrites; explicit reset recovers\n");
     s = lcstub_new();
     lcstub_make_table(s, &tbl);
     lcstub_set_model(s, 1, 7, 3, 2, "od-demo", "1.2");
+    lcstub_set_class(s, 0, "person");
+    lcstub_set_class(s, 1, "car");
     uint8_t junk[152];
     memset(junk, 0xAB, sizeof(junk));
     lcstub_set_state(s, junk, sizeof(junk), 4);
@@ -397,11 +428,41 @@ static void t13(void)
     ops.user = &tbl;
     lcbus_init(&bus, &ops);
     lcbus_restore(&bus);
+    lcbus_rebind(&bus, 1);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CORRUPT);
     CHECK_EQ_I(bus.total_in, 0);
+    CHECK_EQ_I(bus.state_dirty, 0);
+
     lc_bus_config_t c = cfg1();
-    lcbus_apply_config(&bus, &c);
+    CHECK_EQ_I(lcbus_apply_config(&bus, &c), 0);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CORRUPT);
+    CHECK_EQ_I(bus.st.state_commits_ok, 0);
+    CHECK_EQ_I(s->state_revision, 4);
+    CHECK(memcmp(junk, s->state_blob, sizeof(junk)) == 0);
+
+    lcstub_set_tick(s, 30000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_commits_ok, 0);
+    CHECK_EQ_I(s->state_revision, 4);
+    CHECK(memcmp(junk, s->state_blob, sizeof(junk)) == 0);
+
+    lcbus_reset(&bus);
     CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
+    CHECK_EQ_I(bus.st.state_commits_ok, 1);
+    CHECK_EQ_I(s->state_revision, 5);
+    lc_bus_config_t scfg;
+    uint32_t ti, to, wi, wo, seq;
+    CHECK_EQ_I(lc_st_decode(s->state_blob, s->state_len, &scfg, &ti, &to, &wi, &wo, &seq),
+               LC_ST_OK);
+    CHECK_EQ_I(ti, 0);
+    CHECK(strcmp(scfg.counter_name, c.counter_name) == 0);
+
+    run_crossing(1, 500, 100);
+    CHECK_EQ_I(bus.total_in, 1);
+    lcstub_set_tick(s, 40000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_commits_ok, 2);
+    CHECK_EQ_I(s->state_revision, 6);
     lcstub_destroy(s);
 }
 
@@ -646,10 +707,172 @@ static void t21(void)
     teardown();
 }
 
+static void t22(void)
+{
+    printf("B22 boot STORAGE_UNKNOWN with existing blob -> config change never overwrites stored bytes\n");
+    s = lcstub_new();
+    lcstub_make_table(s, &tbl);
+    lcstub_set_model(s, 1, 7, 3, 2, "od-demo", "1.2");
+    lcstub_set_class(s, 0, "person");
+    lcstub_set_class(s, 1, "car");
+    seed_stored("stored-A", 7, 0, 9);
+    uint8_t saved[LCSTUB_STATE_CAP];
+    uint32_t saved_len = s->state_len;
+    memcpy(saved, s->state_blob, saved_len);
+    lcstub_state_read_fault(s, LC_RET_STORAGE_UNKNOWN, 1);
+    lcbus_host_ops_t ops = *lcbus_abi_ops();
+    ops.user = &tbl;
+    lcbus_init(&bus, &ops);
+    lcbus_restore(&bus);
+    lcbus_rebind(&bus, 1);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_DEGRADED);
+    CHECK_EQ_I(bus.total_in, 0);
+
+    lc_bus_config_t c = cfg1();
+    CHECK_EQ_I(lcbus_apply_config(&bus, &c), 0);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CONFLICT);
+    CHECK_EQ_I(bus.st.state_commits_ok, 0);
+    CHECK_EQ_I(s->state_present, 1);
+    CHECK_EQ_I(s->state_revision, 9);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    uint32_t ti = 0, rev = 0;
+    CHECK(stored_totals(&ti, &rev));
+    CHECK_EQ_I(ti, 7);
+    CHECK_EQ_I(rev, 9);
+
+    lcstub_set_tick(s, 30000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT), 0);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CONFLICT);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+
+    run_crossing(1, 500, 100);
+    CHECK_EQ_I(bus.total_in, 1);
+    const lcstub_report_t *r = close_window(91000);
+    CHECK(r != NULL);
+    if (r) {
+        CHECK(strstr((const char *)r->bytes, "\"persist_ok\":false") != NULL);
+    }
+    CHECK_EQ_I(s->state_revision, 9);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    lcstub_destroy(s);
+}
+
+static void t23(void)
+{
+    printf("B23 revision conflict with different trusted content -> stored bytes win, memory never wins silently\n");
+    setup();
+    lc_bus_config_t c = cfg1();
+    lcbus_apply_config(&bus, &c);
+    run_crossing(1, 500, 100);
+    CHECK_EQ_I(bus.total_in, 1);
+    CHECK_EQ_I(bus.revision, 1);
+
+    seed_stored("stored-B", 5, 0, 42);
+    uint8_t saved[LCSTUB_STATE_CAP];
+    uint32_t saved_len = s->state_len;
+    memcpy(saved, s->state_blob, saved_len);
+
+    lcstub_set_tick(s, 20000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_conflicts, 1);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CONFLICT);
+    CHECK_EQ_I(bus.st.state_commits_ok, 1);
+    CHECK_EQ_I(s->state_revision, 42);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    CHECK_EQ_I(bus.total_in, 1);
+
+    lcbus_flush(&bus, 1);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_CONFLICT);
+    CHECK_EQ_I(bus.st.state_commits_ok, 1);
+    CHECK_EQ_I(s->state_revision, 42);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    CHECK_EQ_I(bus.total_in, 1);
+
+    const lcstub_report_t *r = close_window(81000);
+    CHECK(r != NULL);
+    if (r) {
+        CHECK(strstr((const char *)r->bytes, "\"persist_ok\":false") != NULL);
+    }
+    CHECK_EQ_I(s->state_revision, 42);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    teardown();
+}
+
+static void t24(void)
+{
+    printf("B24 identical-content conflict adopts stored revision without destructive rewrite\n");
+    setup();
+    lc_bus_config_t c = cfg1();
+    lcbus_apply_config(&bus, &c);
+    run_crossing(1, 500, 100);
+    CHECK_EQ_I(bus.total_in, 1);
+
+    uint8_t mine[LC_ST_BLOB_MAX];
+    uint32_t mlen = lc_st_encode(mine, sizeof(mine), &bus.cfg, bus.total_in, bus.total_out,
+                                 bus.window_in, bus.window_out, bus.report_seq);
+    CHECK_EQ_I(mlen, 152);
+    lcstub_set_state(s, mine, mlen, 7);
+
+    lcstub_set_tick(s, 20000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_conflicts, 1);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
+    CHECK_EQ_I(bus.revision, 7);
+    CHECK_EQ_I(bus.state_dirty, 0);
+    CHECK_EQ_I(bus.st.state_commits_ok, 1);
+    CHECK_EQ_I(s->state_revision, 7);
+
+    run_crossing(1, 200, 500);
+    lcstub_set_tick(s, 40000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_commits_ok, 2);
+    CHECK_EQ_I(s->state_revision, 8);
+    teardown();
+}
+
+static void t25(void)
+{
+    printf("B25 boot STORAGE_UNKNOWN then verified stored state is adopted, never rewritten\n");
+    s = lcstub_new();
+    lcstub_make_table(s, &tbl);
+    lcstub_set_model(s, 1, 7, 3, 2, "od-demo", "1.2");
+    lcstub_set_class(s, 0, "person");
+    lcstub_set_class(s, 1, "car");
+    seed_stored("stored-A", 7, 2, 9);
+    lcstub_state_read_fault(s, LC_RET_STORAGE_UNKNOWN, 1);
+    lcbus_host_ops_t ops = *lcbus_abi_ops();
+    ops.user = &tbl;
+    lcbus_init(&bus, &ops);
+    lcbus_restore(&bus);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_DEGRADED);
+
+    lcstub_set_tick(s, 10000);
+    lcbus_on_idle(&bus);
+    CHECK_EQ_I(bus.persist_state, LCBUS_PERSIST_OK);
+    CHECK_EQ_I(bus.total_in, 7);
+    CHECK_EQ_I(bus.total_out, 2);
+    CHECK_EQ_I(bus.report_seq, 0);
+    CHECK(strcmp(bus.cfg.counter_name, "stored-A") == 0);
+    CHECK_EQ_I(bus.revision, 9);
+    CHECK_EQ_I(bus.st.state_commits_ok, 0);
+    CHECK_EQ_I(bus.state_dirty, 0);
+    CHECK_EQ_I(s->state_revision, 9);
+
+    run_crossing(1, 500, 100);
+    CHECK_EQ_I(bus.total_in, 8);
+    lcstub_set_tick(s, 30000);
+    lcbus_flush(&bus, 0);
+    CHECK_EQ_I(bus.st.state_commits_ok, 1);
+    CHECK_EQ_I(s->state_revision, 10);
+    lcstub_destroy(s);
+}
+
 int main(void)
 {
     t01(); t02(); t03(); t04(); t05(); t06(); t07(); t08();
     t09(); t10(); t11(); t12(); t13(); t14(); t15(); t16();
     t17(); t18(); t19(); t20(); t21();
+    t22(); t23(); t24(); t25();
     TEST_REPORT("test_business");
 }

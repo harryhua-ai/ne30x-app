@@ -122,18 +122,20 @@ make -C apps/line-crossing/app image    # -> apps/line-crossing/app/build/lc-lin
 make -C apps/line-crossing/app package
 ```
 
-实测（本 worktree，2026-10-10）：
+实测（本 worktree，2026-10-10；含 AC3 四态持久化修正后的复跑）：
 
-- native 镜像 12328B（32B NEA1 v2 头 + 12296B payload），`text=12296
+- native 镜像 13184B（32B NEA1 v2 头 + 13152B payload），`text=13152
   data=0`（.data==0 链接断言通过）、`bss=108120`（arena 96KiB 等），
   entry_offset `0x9cc`，abi `0x00020000`，target `0x93E00000`；
   **重复构建逐字节一致**（sha256
-  `20ff04084037998ce7e61e0f4c81a5d6b150e10477a9d31494e8e6115fa1f0c2`）。
+  `9fc4ad6101ea21c1dfaa4baf8ee6cde86e3eeca888dc27d5e4a0a5296718a929`；
+  上一轮 Candidate 为 12328B/`20ff0408…`，本轮 lc_bus.c 持久化语义变更
+  后镜像哈希如实换新）。
 - 签名包 `caps=0x3f、event_max=2048、state_quota=4096、report_max=6144、
   run_profile=1`；`neapp_verify_v2.py --expect PASS` 结果 PASS（完整 JSON
   见 `docs/evidence/p7-app/native-build.log`；包 sha256 为每轮 dev 钥签名
   的运行身份，非固定产物；镜像哈希固定可复现）。
-- 宿主测试：unit 50 + business 134 + contract 50 = **234 项断言全过**；
+- 宿主测试：unit 50 + business 214 + contract 52 = **316 项断言全过**；
   #8 核心回归（上游 15 场景 + 17 场景 golden trace）仍逐字节一致。
 
 ## 8. 明确边界（本 Issue 无 PASS 的部分）
@@ -168,7 +170,8 @@ Issue 证明范围内，属 NE301 设备侧任务：
   NO_EVENT/should_stop==0 不是"Host 已恢复"的证据，不清零。连续 3 次
   should_stop 负值或 event_next 非法返回 → `-6`。
 - 每轮循环上限 10⁶ 次迭代（runaway guard，同时约束宿主测试时长）。
-- 退出前执行一次 force flush（尽力而为的最终 commit），退出不是静默状态丢失。
+- 退出前执行一次 force flush（尽力而为；锁定态下仍只验证不覆盖，见 9.2），
+  退出不是静默状态丢失。
 
 ### 9.2 业务层状态机（lc_bus.c）
 
@@ -191,15 +194,33 @@ Issue 证明范围内，属 NE301 设备侧任务：
 - report_seq 在提交结果无关的情况下递增（身份连续性）；提交 OK 才登记
   pending（环容量 8，满时逐出最旧并计 status_unresolved）。状态轮询对每条
   pending 上限 240 次，超限未决同样计入 unresolved。
-- 持久化状态机：OK / NONE（验证过的无旧状态，不是数据丢失宣称）/
-  DEGRADED（STORAGE_UNKNOWN 等，不可判定即不得宣称完整）/ CORRUPT
-  （blob CRC 或内容校验失败，大声记录；下一次成功 commit 用有效数据替换
-  并回到 OK）/ CONFLICT（重读+重提交一次仍冲突：停自动 flush，计数继续、
-  完全可见，force flush 可重试）。单写者会话（v2 §7 profile 1）使
-  "采纳存储 revision 后重提交当前状态"成为诚实的冲突恢复。
-- 恢复语义：NOT_FOUND → NONE + revision 0；读失败 → DEGRADED + dirty
-  （可判定前不归零也不宣称）；成功恢复的窗口计数以 `window_carried/
-  carried_in/carried_out` 显式标注到下一次窗口报告。
+- 持久化四态机：OK（存储内容已验证并采纳）/ NONE（Host 验证过的确实
+  不存在，不是数据丢失宣称）/ DEGRADED（读不可判定：STORAGE_UNKNOWN/
+  IO 等或提交通道失败）/ CORRUPT（blob 存在但 App 内部 CRC/schema/内容
+  校验失败）/ CONFLICT（存储内容可信且与内存分叉）。只有 OK/NONE 允许
+  直接 CAS 提交；三种锁定态默认保留旧字节，普通改配置、过线计数、窗口
+  关闭、定期 flush 与退出 force flush 都不得自动清零覆盖。
+- 锁定态恢复 = 每次 flush 机会先做一次验证读（v2 §6.7：NOT_FOUND 与
+  STORAGE_UNKNOWN 明确分离）：返回 NOT_FOUND → 验证过的缺席（NONE），
+  此时待写内容方可提交；读到有效内容且与内存编码逐字节相同 → 只采纳
+  存储 revision 不重写（对账"提交已落盘但响应丢失"）；读到有效内容且
+  内存从未基于它发生业务变更（如 boot 降级后无事件/无配置）→ 整体采纳
+  恢复（配置/计数/report_seq/revision 全部来自存储，零写入）；读到有效
+  内容但内存已分叉 → CONFLICT：存储字节为权威，内存业务继续，报告
+  `data_quality.persist_ok=false`，验证读失败 → 保持 DEGRADED。
+- REVISION_CONFLICT 处理不再"采纳存储 revision 重提交内存"：CAS 相符只
+  证明版本一致，不证明内存内容应当胜出。冲突后必经验证读，按上一条
+  分派（相同→对账 / 分叉→旧字节胜出 / 缺席→NONE 后重提交 / 不可读→
+  DEGRADED）；一次 flush 内最多三次提交尝试（有界）。
+- CORRUPT 的唯一受控恢复前提是显式手动重置（既有 AC2 业务动作，非新增
+  产品面）：重置时置 armed 前提，flush 复读仍损坏才以存储 revision 为
+  CAS 预期替换为有效全零状态并计 commits_ok；任何自动路径（含退出
+  flush）永不替换损坏字节。冲突分叉（两边内容都可信）没有任何自动或
+  自服务丢弃路径——丢弃可信旧计数属 User-owned 产品决策，本实现不做、
+  也不默认重置；状态保持 CONFLICT 并完全可见。
+- 恢复语义：NOT_FOUND → NONE + revision 0；读失败 → DEGRADED（可判定前
+  不写也不宣称）；成功恢复/采纳的窗口计数以 `window_carried/carried_in/
+  carried_out` 显式标注到下一次窗口报告。
 - 重绑/flush 均按 tick 域限频（1000ms/5000ms）；force 绕过节流（配置变更、
   窗口关闭、退出路径）。
 - 分配耗尽：tracker/line 创建失败 → 帧记 unusable（可见）+ 连击计数，
@@ -252,33 +273,42 @@ ERR_CONTENT 而非 ERR_CRC。
   实际运行输出（native-package-hashes.txt 记录镜像固定哈希与包的每轮
   签名身份）。
 
-## 10. 测试清单（234 项断言的构成）
+## 10. 测试清单（316 项断言的构成）
 
 unit（50）：arena 分配/合并/耗尽/churn；JSON u32/i32/bool/null/转义/
 permille/coord/溢出锁存（含 NUL 保留字节）；状态 blob 往返 + SIZE/MAGIC/
 SCHEMA/CRC/CONTENT/容量负例；counting 对齐默认值/校验/UTF-8（含多字节）。
 
-business（B01–B21，134）：B01 窗口 IN+计数+提交；B02 OUT；B03 跨窗口
+business（B01–B25，214）：B01 窗口 IN+计数+提交；B02 OUT；B03 跨窗口
 累计与窗口复位；B04 类别+置信度过滤；B05 counter name 编辑不重置（报告
 携带新名）；B06 目标切换清零+重绑；B07 手动重置（report_seq 延续）；
 B08 重启恢复（totals/config/report_seq/窗口 carried）；B09 验证过的无旧
-状态≠数据丢失；B10 开机 STORAGE_UNKNOWN→降级→恢复；B11 单次
-REVISION_CONFLICT 恢复；B12 双次冲突→CONFLICT 停自动 flush、业务继续、
-force 恢复；B13 腐坏 blob→CORRUPT 可见→有效 commit 替换；B14 模型未加载
-→帧 unusable→恢复计数；B15 result_type 错→UNSUPPORTED；class 表变更需
-class_generation 递增才可观察（无 bump 保持绑定）；B16 GAP/flag/未知丢失
-全账目+报告 data_quality；B17 wire 负例 9 连（未知 kind、未知 flags、
-bit1 携带有限 lost、非 FRAME 带检测、total_len 不一致、reserved0≠0、
-Inf 位型、class_index 越界、截断头）全拒且计入 gap；B18 NO_EVENT≠空帧；
-B19 QUOTA 丢弃可见、report_seq 仍递增、窗口照常关闭；B20 接受≠送达/
-失败/未配置分通道计数；B21 MODEL_CHANGED 清 transient 保计数。
+状态≠数据丢失；B10 开机 STORAGE_UNKNOWN→降级，仅在验证缺席后才允许
+提交（验证读可见）；B11 单次 REVISION_CONFLICT 经验证缺席恢复；B12 与
+分叉存储态冲突→CONFLICT 持续、停自动 commit、存储旧字节胜出（原字节
+与 revision 复核）；B13 腐坏 blob→CORRUPT 可见、配置变更与定期 flush
+均不覆盖、显式手动重置为唯一受控替换前提、之后正常 CAS 续写；B14 模型
+未加载→帧 unusable→恢复计数；B15 result_type 错→UNSUPPORTED；class 表
+变更需 class_generation 递增才可观察（无 bump 保持绑定）；B16 GAP/flag/
+未知丢失全账目+报告 data_quality；B17 wire 负例 9 连（未知 kind、未知
+flags、bit1 携带有限 lost、非 FRAME 带检测、total_len 不一致、
+reserved0≠0、Inf 位型、class_index 越界、截断头）全拒且计入 gap；
+B18 NO_EVENT≠空帧；B19 QUOTA 丢弃可见、report_seq 仍递增、窗口照常
+关闭；B20 接受≠送达/失败/未配置分通道计数；B21 MODEL_CHANGED 清
+transient 保计数；B22 开机 STORAGE_UNKNOWN 而旧 blob 实际存在→配置
+变更零覆盖（字节/revision 逐字节复核）、计数内存继续、报告
+persist_ok=false；B23 不同可信内容 REVISION_CONFLICT→旧内容胜出、内存
+永不静默胜出（force flush 亦不覆盖、报告 persist_ok=false）；B24 相同
+内容冲突→仅采纳存储 revision 对账、零重写、后续正常续写；B25 开机
+STORAGE_UNKNOWN 后验证读到有效旧态→内存未分叉即整体采纳（零写入、
+revision 延续）。
 
-contract（C01–C14，50）：C01 入口四类校验（含 v1 ABI 0x00010000 拒绝）；
+contract（C01–C14，52）：C01 入口四类校验（含 v1 ABI 0x00010000 拒绝）；
 C02 干净会话（绑定/轮询/最终 commit/退出 0）；C03 未授权会话 -5 且零
 存储零报告；C04 event_next INVALID_ARGUMENT×3→-6；C05 should_stop
 负值×3→-6（绝不误读为停止）；C06 STOPPING 事件协作退出；C07 tick 跨
 2³² 回绕的窗口关闭（duration_sec=60）；C08 E2E 过线计数+报告 schema/
 身份/字段；C09 腐坏 meta 会话安全降级；C10 event_next UNAUTHORIZED→-5；
 C11 report_submit UNAUTHORIZED→-5；C12 GAP/backpressure 在提交报告可见；
-C13 STORAGE_UNKNOWN 开机会话存活+commit 尝试可见；C14 JSON report_seq
-与提交参数一致性（stub 反向验证）。
+C13 STORAGE_UNKNOWN 开机会话存活且全程零状态写入（存储不可判定即拒写，
+fail-closed）；C14 JSON report_seq 与提交参数一致性（stub 反向验证）。

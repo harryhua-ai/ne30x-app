@@ -273,7 +273,7 @@ static void c12_gap_visible_in_report(void)
 
 static void c13_storage_unknown_boot(void)
 {
-    printf("C13 STORAGE_UNKNOWN at boot: session survives, degraded is visible\n");
+    printf("C13 STORAGE_UNKNOWN at boot: session survives; no state writes while storage undeterminable\n");
     setup();
     lcstub_state_read_fault(s, LC_RET_STORAGE_UNKNOWN, 1000);
     push_crossing_frames(s, 500, 100);
@@ -281,7 +281,9 @@ static void c13_storage_unknown_boot(void)
     s->auto_stop_after_no_events = 3;
     int32_t rc = app_entry(&tbl, LC_APP_ABI_V2);
     CHECK_EQ_I(rc, LC_APP_EXIT_OK);
-    CHECK(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT) > 0);
+    CHECK_EQ_I(lcstub_calls(s, LCSTUB_FN_STATE_COMMIT), 0);
+    CHECK_EQ_I(s->state_present, 0);
+    CHECK(lcstub_calls(s, LCSTUB_FN_STATE_READ) >= 2);
     teardown();
 }
 

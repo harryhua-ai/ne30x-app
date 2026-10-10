@@ -334,7 +334,10 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
                                     &n_evts);
     b->window_in += win_in;
     b->window_out += win_out;
-    if (win_in + win_out > 0u) b->state_dirty = 1;
+    if (win_in + win_out > 0u) {
+        b->state_dirty = 1;
+        b->business_mutated = 1;
+    }
 
     if (b->cfg.heat_grid_enable) {
         lc_tracker_for_each_stable(b->tracker, heat_cb, b->heat);
@@ -580,6 +583,7 @@ static void submit_window_report(lcbus_t *b, uint32_t end_ms,
                                      len, seq, &boot);
     b->report_seq = seq;
     b->state_dirty = 1;
+    b->business_mutated = 1;
     switch (r) {
     case LC_RET_OK:
         b->st.reports_submitted++;
@@ -680,6 +684,7 @@ static void close_window(lcbus_t *b, uint32_t now)
     b->carried_out = 0;
     b->window_start_ms = now;
     b->state_dirty = 1;
+    b->business_mutated = 1;
 }
 
 static void maybe_close_window(lcbus_t *b, uint32_t now)
@@ -696,19 +701,126 @@ static void encode_state(lcbus_t *b, uint8_t *buf, uint32_t cap, uint32_t *len)
                         b->window_in, b->window_out, b->report_seq);
 }
 
-void lcbus_flush(lcbus_t *b, int force)
+static void lc_persist_log(lcbus_t *b, lcbus_persist_state_t st, const char *msg)
 {
-    if (b->session_fatal) return;
-    if (b->persist_state == LCBUS_PERSIST_CONFLICT && !force) return;
-    if (!b->state_dirty && !force) return;
-    uint32_t now = now_tick(b);
-    if (!force && b->last_flush_valid &&
-        lc_tick_diff(now, b->last_flush_ms) < LCBUS_FLUSH_INTERVAL_MS) {
-        return;
-    }
-    b->last_flush_ms = now;
-    b->last_flush_valid = 1;
+    if (b->persist_state == st) return;
+    b->persist_state = st;
+    if (msg) lc_log(b, msg);
+}
 
+static int stored_matches_memory(lcbus_t *b, const uint8_t *sb, uint32_t slen)
+{
+    uint8_t mine[LC_ST_BLOB_MAX];
+    uint32_t mlen = 0;
+    encode_state(b, mine, (uint32_t)sizeof(mine), &mlen);
+    return mlen == slen && lc_memcmp(mine, sb, mlen) == 0;
+}
+
+static void adopt_stored(lcbus_t *b, const lc_bus_config_t *cfg,
+                         uint32_t ti, uint32_t to, uint32_t wi, uint32_t wo,
+                         uint32_t seq, uint32_t rev)
+{
+    b->cfg = *cfg;
+    b->total_in = ti;
+    b->total_out = to;
+    b->window_in = wi;
+    b->window_out = wo;
+    b->carried_in = wi;
+    b->carried_out = wo;
+    b->window_carried = (wi || wo) ? 1u : 0u;
+    b->report_seq = seq;
+    b->revision = rev;
+    b->state_dirty = 0;
+    b->business_mutated = 0;
+    b->corrupt_reset_armed = 0;
+    b->persist_state = LCBUS_PERSIST_OK;
+}
+
+static int replace_corrupt_after_reset(lcbus_t *b, uint32_t expected_rev)
+{
+    uint8_t blob[LC_ST_BLOB_MAX];
+    uint32_t len = 0, newrev = 0;
+    encode_state(b, blob, (uint32_t)sizeof(blob), &len);
+    if (len == 0u) {
+        b->st.state_commit_failures++;
+        return 0;
+    }
+    int32_t r = b->ops.state_commit(b->ops.user, blob, len, expected_rev, &newrev);
+    if (r == LC_RET_UNAUTHORIZED) {
+        b->session_fatal = 1;
+        return 0;
+    }
+    if (r != LC_RET_OK) {
+        b->st.state_commit_failures++;
+        b->state_dirty = 1;
+        if (r == LC_RET_REVISION_CONFLICT) b->st.state_conflicts++;
+        return 0;
+    }
+    b->corrupt_reset_armed = 0;
+    b->revision = newrev;
+    b->state_dirty = 0;
+    b->st.state_commits_ok++;
+    b->persist_state = LCBUS_PERSIST_OK;
+    lc_log(b, "LC_APP: corrupt state replaced after explicit reset");
+    return 1;
+}
+
+static int verify_stored(lcbus_t *b)
+{
+    uint8_t sb[LC_ST_BLOB_MAX];
+    uint32_t slen = 0, srev = 0;
+    int32_t rr = b->ops.state_read(b->ops.user, sb, (uint32_t)sizeof(sb), &slen, &srev);
+    if (rr == LC_RET_UNAUTHORIZED) {
+        b->session_fatal = 1;
+        return 2;
+    }
+    if (rr == LC_RET_NOT_FOUND) {
+        b->revision = 0;
+        b->corrupt_reset_armed = 0;
+        b->persist_state = LCBUS_PERSIST_NONE;
+        lc_log(b, "LC_APP: stored state verified absent");
+        return 1;
+    }
+    if (rr != LC_RET_OK) {
+        lc_persist_log(b, LCBUS_PERSIST_DEGRADED,
+                       "LC_APP: stored state unreadable -> degraded; writes withheld");
+        return 2;
+    }
+
+    lc_bus_config_t scfg;
+    uint32_t sti, sto, swi, swo, sseq;
+    lc_st_status_t d = lc_st_decode(sb, slen, &scfg, &sti, &sto, &swi, &swo, &sseq);
+    if (d != LC_ST_OK) {
+        b->revision = srev;
+        if (b->persist_state == LCBUS_PERSIST_CORRUPT && b->corrupt_reset_armed &&
+            replace_corrupt_after_reset(b, srev)) {
+            return 0;
+        }
+        lc_persist_log(b, LCBUS_PERSIST_CORRUPT,
+                       "LC_APP: stored state blob failed integrity/content check; bytes preserved");
+        return 2;
+    }
+    if (stored_matches_memory(b, sb, slen)) {
+        b->revision = srev;
+        b->state_dirty = 0;
+        b->corrupt_reset_armed = 0;
+        b->persist_state = LCBUS_PERSIST_OK;
+        lc_log(b, "LC_APP: stored state matches memory; revision adopted");
+        return 0;
+    }
+    if (!b->business_mutated) {
+        adopt_stored(b, &scfg, sti, sto, swi, swo, sseq, srev);
+        lc_log(b, "LC_APP: stored state adopted after recovery");
+        return 0;
+    }
+    b->revision = srev;
+    lc_persist_log(b, LCBUS_PERSIST_CONFLICT,
+                   "LC_APP: stored state differs and stays authoritative -> conflict; no overwrite");
+    return 2;
+}
+
+static void try_commit(lcbus_t *b, int depth)
+{
     uint8_t blob[LC_ST_BLOB_MAX];
     uint32_t len = 0;
     encode_state(b, blob, (uint32_t)sizeof(blob), &len);
@@ -722,13 +834,6 @@ void lcbus_flush(lcbus_t *b, int force)
         b->revision = newrev;
         b->state_dirty = 0;
         b->st.state_commits_ok++;
-        if (b->persist_state == LCBUS_PERSIST_DEGRADED) {
-            lc_log(b, "LC_APP: state storage recovered");
-        } else if (b->persist_state == LCBUS_PERSIST_CORRUPT) {
-
-            lc_log(b, "LC_APP: corrupt state replaced with valid state");
-        }
-
         b->persist_state = LCBUS_PERSIST_OK;
         return;
     }
@@ -740,41 +845,40 @@ void lcbus_flush(lcbus_t *b, int force)
     b->state_dirty = 1;
     if (r == LC_RET_REVISION_CONFLICT) {
         b->st.state_conflicts++;
-
-        uint8_t rb[LC_ST_BLOB_MAX];
-        uint32_t rlen = 0, rrev = 0;
-        int32_t rr = b->ops.state_read(b->ops.user, rb, (uint32_t)sizeof(rb), &rlen, &rrev);
-        if (rr == LC_RET_OK) {
-            b->revision = rrev;
-            encode_state(b, blob, (uint32_t)sizeof(blob), &len);
-            int32_t r2 = b->ops.state_commit(b->ops.user, blob, len, b->revision, &newrev);
-            if (r2 == LC_RET_OK) {
-                b->revision = newrev;
-                b->state_dirty = 0;
-                b->st.state_commits_ok++;
-                b->persist_state = LCBUS_PERSIST_OK;
-                return;
-            }
-        } else if (rr == LC_RET_NOT_FOUND) {
-            b->revision = 0;
-            encode_state(b, blob, (uint32_t)sizeof(blob), &len);
-            int32_t r2 = b->ops.state_commit(b->ops.user, blob, len, 0u, &newrev);
-            if (r2 == LC_RET_OK) {
-                b->revision = newrev;
-                b->state_dirty = 0;
-                b->st.state_commits_ok++;
-                b->persist_state = LCBUS_PERSIST_OK;
-                return;
-            }
+        if (depth < 2) {
+            int v = verify_stored(b);
+            if (v == 1) try_commit(b, depth + 1);
+        } else {
+            lc_persist_log(b, LCBUS_PERSIST_CONFLICT,
+                           "LC_APP: state commit conflict unresolved -> conflict; no overwrite");
         }
-        lc_log(b, "LC_APP: state commit conflict unresolved -> CONFLICT state");
-        b->persist_state = LCBUS_PERSIST_CONFLICT;
         return;
     }
-
     if (b->persist_state != LCBUS_PERSIST_CONFLICT) {
-        b->persist_state = LCBUS_PERSIST_DEGRADED;
+        lc_persist_log(b, LCBUS_PERSIST_DEGRADED,
+                       "LC_APP: state commit failed -> degraded; old bytes preserved");
     }
+}
+
+void lcbus_flush(lcbus_t *b, int force)
+{
+    if (b->session_fatal) return;
+    int locked = b->persist_state != LCBUS_PERSIST_OK &&
+                 b->persist_state != LCBUS_PERSIST_NONE;
+    if (!locked && !b->state_dirty && !force) return;
+    uint32_t now = now_tick(b);
+    if (!force && b->last_flush_valid &&
+        lc_tick_diff(now, b->last_flush_ms) < LCBUS_FLUSH_INTERVAL_MS) {
+        return;
+    }
+    b->last_flush_ms = now;
+    b->last_flush_valid = 1;
+    if (locked) {
+        int v = verify_stored(b);
+        if (v == 1 && b->state_dirty) try_commit(b, 1);
+        return;
+    }
+    try_commit(b, 0);
 }
 
 void lcbus_restore(lcbus_t *b)
@@ -787,30 +891,17 @@ void lcbus_restore(lcbus_t *b)
         uint32_t ti, to, wi, wo, seq;
         lc_st_status_t d = lc_st_decode(buf, len, &cfg, &ti, &to, &wi, &wo, &seq);
         if (d == LC_ST_OK) {
-            b->cfg = cfg;
-            b->total_in = ti;
-            b->total_out = to;
-            b->window_in = wi;
-            b->window_out = wo;
-            b->carried_in = wi;
-            b->carried_out = wo;
-            b->window_carried = (wi || wo) ? 1u : 0u;
-            b->report_seq = seq;
-            b->revision = rev;
-            b->state_dirty = 0;
-            b->persist_state = LCBUS_PERSIST_OK;
+            adopt_stored(b, &cfg, ti, to, wi, wo, seq, rev);
             lc_log(b, "LC_APP: persisted state restored");
             return;
         }
-
         b->persist_state = LCBUS_PERSIST_CORRUPT;
         b->revision = rev;
-        b->state_dirty = 1;
-        lc_log(b, "LC_APP: stored state blob failed integrity/content check");
+        b->state_dirty = 0;
+        lc_log(b, "LC_APP: stored state blob failed integrity/content check; bytes preserved");
         return;
     }
     if (r == LC_RET_NOT_FOUND) {
-
         b->persist_state = LCBUS_PERSIST_NONE;
         b->revision = 0;
         b->state_dirty = 0;
@@ -821,11 +912,10 @@ void lcbus_restore(lcbus_t *b)
         b->session_fatal = 1;
         return;
     }
-
     b->persist_state = LCBUS_PERSIST_DEGRADED;
     b->revision = 0;
     b->state_dirty = 1;
-    lc_log(b, "LC_APP: persisted state unreadable -> degraded persistence");
+    lc_log(b, "LC_APP: persisted state undeterminable -> degraded; no write until verified");
 }
 
 void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
@@ -935,6 +1025,7 @@ int lcbus_apply_config(lcbus_t *b, const lc_bus_config_t *candidate)
         lcbus_rebind(b, 1);
     }
     b->state_dirty = 1;
+    b->business_mutated = 1;
     lcbus_flush(b, 1);
     return 0;
 }
@@ -956,6 +1047,10 @@ void lcbus_reset(lcbus_t *b)
     b->window_start_ms = now;
     clear_transient(b);
     b->state_dirty = 1;
+    b->business_mutated = 1;
+    if (b->persist_state == LCBUS_PERSIST_CORRUPT) {
+        b->corrupt_reset_armed = 1;
+    }
     lcbus_flush(b, 1);
 }
 
