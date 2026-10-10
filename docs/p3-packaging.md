@@ -172,15 +172,16 @@ P2 §5/§7 与 P4 任务收敛；本工具只覆盖 §7 离线子集。
 | `native_entry_offset_oob`（`9b4d74a6…`） | BAD_PACKAGE | 同名 | BAD_PACKAGE |
 | `mismatched_manifest_native_len`（`f8cccc3c…`） | BAD_PACKAGE | 同名 | BAD_PACKAGE |
 | "同一合法镜像/manifest 受信签名"正例要求 | 打包端正例 | `dev_v1_accept` / `dev_v2_accept`（dev 钥打包 + PASS） | PASS |
-| "已签名内容被篡改 `d415350f…`"（规范只发表哈希，字节不可重建） | SIGNATURE_INVALID | 本地等价 `tamper_payload` / `tamper_manifest_version` | SIGNATURE_INVALID |
+| "已签名内容被篡改 `d415350f…`"（规范只发表哈希，字节不可重建） | SIGNATURE_INVALID | 本地等价 `tamper_payload`（native payload 区内翻转一字节、不重签；signed_len/篡改偏移在用例输出与结果 JSON 中记录）/ `tamper_manifest_version`（已签名 manifest 元数据） | SIGNATURE_INVALID |
 | "同 TBS 不同合法 DER `5af8dff5…`"（同上，字节不可重建） | 通过且同内容身份 | 等价性质由 `golden_accept`+`golden_low_s_accept` 覆盖（两个合法 DER、同一 `SHA-256(TBS)`、不同包哈希） | PASS |
 
 规范 §2.3/§7.1 要求、由 `tests/package/generated_cases.py` 补充的本地
-负例（全部 30 项见 `docs/evidence/p3-package-artifacts.json`）：
+负例（全部 33 项见 `docs/evidence/p3-package-artifacts.json`）：
 
 | 类别 | 用例（期望类） |
 | --- | --- |
-| 签名覆盖 | `tamper_payload`、`tamper_manifest_version`、`wrong_signer_key`（SIGNATURE_INVALID） |
+| 签名覆盖 | `tamper_payload`（native payload 区翻转一字节、不重签）、`tamper_manifest_version`、`wrong_signer_key`（SIGNATURE_INVALID）；`tamper_signature_last_byte`（签名段末字节篡改——独立 signature-tamper 用例，只证明签名被改被拒，**不**作为 payload 篡改证据）（SIGNATURE_INVALID） |
+| 重签内容交叉检查不一致（正确 dev 钥重签、签名有效仍拒，覆盖 signed native integrity guard） | `resigned_payload_crc_mismatch`（原生头 CRC 未同步）、`resigned_payload_digest_mismatch`（manifest native_file_sha256 未同步）（均 BAD_PACKAGE） |
 | 容器结构 | `truncate_signature`、`truncate_whole_package`、`append_tail_byte`、`manifest_len_159`、`manifest_len_zero`、`image_len_below_header`、`image_len_overflow`、`magic_corrupted`（BAD_PACKAGE） |
 | DER 编码 | `der_second_object`、`der_r_zero`、`der_nonminimal_length`（BAD_PACKAGE） |
 | manifest 唯一编码（重签仍拒） | `app_id_nonzero_padding`、`app_id_embedded_nul`、`caps_unknown_bit_signed`、`abi_manifest_header_mismatch_signed`（BAD_PACKAGE） |

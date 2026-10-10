@@ -119,11 +119,12 @@ def main() -> int:
     results: list[dict] = []
 
     def check(name: str, spec_ref: str, expect: str, package: bytes,
-              policy: Path | None = None, trust_file: Path = trust) -> None:
+              policy: Path | None = None, trust_file: Path = trust,
+              extra: dict | None = None) -> None:
         path = case_dir / f"{name}.neapp"
         path.write_bytes(package)
         report = run_verifier(path, trust_file, expect, policy)
-        results.append({
+        entry = {
             "case": name,
             "category": "generated",
             "expected": expect,
@@ -132,7 +133,10 @@ def main() -> int:
             "content_identity_sha256": report.get("content_identity_sha256"),
             "detail": report.get("detail"),
             "note": spec_ref,
-        })
+        }
+        if extra:
+            entry.update(extra)
+        results.append(entry)
         print(f"  ok {name}: {expect}")
 
     # ---------------- positives ----------------
@@ -216,10 +220,50 @@ def main() -> int:
 
     # ---------------- negatives: signature coverage ----------------
     print("[generated] signature coverage negatives")
+
+    # Bounded signed region, derived from the container framing (neapp_format
+    # §2.2): signed_len = 16B header + manifest_len(160) + image_len, and the
+    # trailing DER signature is exactly data[signed_len:].  The native PAYLOAD
+    # (the CRC/digest-covered bytes behind the 32B native header) therefore
+    # spans container offsets [payload_off, payload_off + payload_len) — all
+    # strictly inside the signed region and never inside the signature.
+    manifest_len, image_len = struct.unpack_from("<II", v1, 8)
+    signed_len = fmt.HEADER_LEN + manifest_len + image_len
+    payload_off = fmt.HEADER_LEN + fmt.MANIFEST_LEN + fmt.NATIVE_HEADER_SIZE
+    payload_len = image_len - fmt.NATIVE_HEADER_SIZE
+
+    # tamper_payload — TRUE payload tamper: flip one byte strictly inside the
+    # native payload region of the TBS and keep every DER signature byte
+    # untouched, so SIGNATURE_INVALID is attributable to the payload edit
+    # alone.  (A review of 5c7506e: this case previously flipped tampered[-1]
+    # — the trailing DER signature byte — which only proves tampered
+    # signatures are rejected, not payload tampering.)
+    tamper_off = payload_off + payload_len // 2
+    assert payload_off <= tamper_off < signed_len
     tampered = bytearray(v1)
-    tampered[-1] ^= 0x01  # flip one payload byte inside the signed region
-    check("tamper_payload", "spec §2.5 表：已签名内容被篡改（等价本地生成）",
-          "SIGNATURE_INVALID", bytes(tampered))
+    tampered[tamper_off] ^= 0x01
+    print(f"  tamper_payload: signed_len={signed_len} "
+          f"payload_region=[{payload_off},{payload_off + payload_len}) "
+          f"tamper_offset={tamper_off} expected=SIGNATURE_INVALID")
+    check("tamper_payload", "spec §2.5 表：已签名内容被篡改（等价本地生成："
+          "native payload 区内翻一字节、不重签）",
+          "SIGNATURE_INVALID", bytes(tampered),
+          extra={
+              "signed_len": signed_len,
+              "payload_region": f"[{payload_off}, {payload_off + payload_len})",
+              "tamper_offset": tamper_off,
+              "predicate": ("one native payload byte flipped inside the signed "
+                            "region; DER signature bytes untouched"),
+          })
+
+    # tamper_signature_last_byte — the previously mislabelled flip retained as
+    # its own signature-tamper case under an honest name: it proves tampered
+    # SIGNATURE bytes are rejected; it is not payload-tamper evidence.
+    tampered_sig = bytearray(v1)
+    tampered_sig[-1] ^= 0x01
+    check("tamper_signature_last_byte",
+          "签名段末字节篡改（独立 signature-tamper 用例，非 payload 篡改证据）",
+          "SIGNATURE_INVALID", bytes(tampered_sig))
 
     tampered_manifest = bytearray(v1)
     tampered_manifest[68] = 0x02  # manifest version_major 1 -> 2 (signed metadata)
@@ -354,6 +398,48 @@ def main() -> int:
 
     check("unknown_publisher", "未知发行者（包内指纹无权自授信）", "PUBLISHER_UNTRUSTED",
           resign(v1, signer, mutate_manifest=lambda m: replace_field(m, "publisher_id", "other-pub")))
+
+    # ---------------- negatives: re-signed, cross-checks inconsistent --------
+    print("[generated] re-signed content with inconsistent CRC/manifest cross-checks")
+
+    # Trusted re-sign of MODIFIED native payload content: the ECDSA signature
+    # over the new TBS is valid (correct dev key), so rejection can only come
+    # from the stage-6 signed-native integrity guard in neapp_format (CRC-32
+    # and manifest native_file_sha256 cross-checks).  Expected class for both
+    # arms, per neapp_verify.py actual semantics: BAD_PACKAGE.
+
+    def flip_first_payload_byte(image: bytearray) -> bytearray:
+        image[fmt.NATIVE_HEADER_SIZE] ^= 0x01  # first CRC-covered payload byte
+        return image
+
+    # (a) manifest digest recomputed for the modified image, native-header
+    #     CRC left stale -> "native payload CRC-32 mismatch"
+    check("resigned_payload_crc_mismatch",
+          "payload 已改 + 正确 dev 钥重签（签名有效），原生头 CRC 未同步 → 仍拒",
+          "BAD_PACKAGE",
+          resign(v1, signer, mutate_image=flip_first_payload_byte),
+          extra={
+              "predicate": ("valid dev-key signature over modified content; "
+                            "stage-6 native CRC-32 cross-check rejects"),
+          })
+
+    # (b) native-header CRC recomputed for the modified image, manifest
+    #     native_file_sha256 left pointing at the ORIGINAL image ->
+    #     "manifest native_file_sha256 does not match the native image bytes"
+    prefix_b, _sig_b = unpack(v1)
+    manifest_b = fmt.parse_manifest(prefix_b[fmt.HEADER_LEN:fmt.HEADER_LEN + fmt.MANIFEST_LEN])
+    image_b = flip_first_payload_byte(
+        bytearray(prefix_b[fmt.HEADER_LEN + fmt.MANIFEST_LEN:]))
+    struct.pack_into("<I", image_b, 28,  # native header crc32 field (NEA1 layout)
+                     fmt.native_payload_crc32(bytes(image_b), manifest_b.native_image_size))
+    tbs_b = fmt.build_container_prefix(fmt.build_manifest(manifest_b), bytes(image_b))
+    check("resigned_payload_digest_mismatch",
+          "payload 已改 + CRC 已同步 + 正确 dev 钥重签（签名有效），manifest 摘要未同步 → 仍拒",
+          "BAD_PACKAGE", tbs_b + signer.sign(tbs_b),
+          extra={
+              "predicate": ("valid dev-key signature over modified content; "
+                            "stage-6 manifest native_file_sha256 cross-check rejects"),
+          })
 
     # Load-transient vs residency: spec §2.3 requires native_file_len <= 可信
     # 执行区 in ADDITION to required_exec_region_bytes >= native_image_size.
