@@ -26,7 +26,7 @@ GOLDEN_NATIVE_CRC = 0xDE8E3439
 GOLDEN_CMD_APPLY_SHA_HEX = "e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca"
 GOLDEN_CMD_RESET_SHA_HEX = "5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb"
 GOLDEN_REPLY_APPLIED_SHA_HEX = "054b7356b81fb555d6bdbc05f6d666cedb0d84a98555476a06cb32df09d87eed"
-GOLDEN_SNAPSHOT_SHA_HEX = "bf489b98ed512f066756d1cb25c8d3a536367d73ccf79718b84e34b3e96b4065"
+GOLDEN_SNAPSHOT_SHA_HEX = "9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5"
 
 V1_GOLDEN_TBS_SHA_HEX = "5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91"
 V2_GOLDEN_TBS_SHA_HEX = "e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278"
@@ -35,6 +35,21 @@ V2_GOLDEN_DER_HEX = ("3044022011e9d2635e2036fb0bcbd1107a5e6d272c150473a8c1e02988
 V2_GOLDEN_PKG_SHA_HEX = "3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e"
 
 SNAPSHOT_JSON_GOLDEN = json.dumps({
+    "active_config": {
+        "conf_threshold_permille": 250,
+        "counter_name": "客流统计",
+        "heat_grid_enable": False,
+        "k_confirm": 5,
+        "line": {"x1_permille": 200, "x2_permille": 800,
+                 "y1_permille": 500, "y2_permille": 500},
+        "max_dist_permille": 250,
+        "max_miss": 5,
+        "outside": {"x_permille": 500, "y_permille": 200},
+        "target_class_name": "car",
+        "track_history_k": 8,
+        "tracks_report_enable": True,
+        "window_minutes": 5,
+    },
     "app_state": "running",
     "config_generation": 7,
     "counters": {"in": 12, "out": 9},
@@ -47,7 +62,7 @@ SNAPSHOT_JSON_GOLDEN = json.dumps({
     "schema": "line-crossing/1",
     "state_revision": 5,
     "storage": {"fault": False},
-}, separators=(",", ":"), sort_keys=True)
+}, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
 
 RESULTS = []
 
@@ -265,9 +280,9 @@ def group_resigned_policy_negatives():
         ("resign.report_max_below_6144",
          lambda m: struct.pack_into("<I", m, 172, 4096), None, None,
          "RESOURCE_LIMIT", "report_max"),
-        ("resign.control_max_below_184",
-         lambda m: struct.pack_into("<I", m, 176, 128), None, None,
-         "RESOURCE_LIMIT", "control_max"),
+        ("resign.control_max_below_generic_wire_min",
+         lambda m: struct.pack_into("<I", m, 176, 16), None, None,
+         "RESOURCE_LIMIT", "control wire header"),
         ("resign.control_max_above_host",
          lambda m: struct.pack_into("<I", m, 176, 512), None, None,
          "RESOURCE_LIMIT", "control capacity"),
@@ -417,13 +432,14 @@ def group_interop_matrix():
 
 
 def group_command_wire():
-    blob152 = bytes((i * 7 + 3) & 0xFF for i in range(152))
-    cmd = V.build_command(V.MSG_CONFIG_APPLY, 7, 42, 6, 0, blob152)
-    vector("command.golden_config_apply_184B", GOLDEN_CMD_APPLY_SHA_HEX,
-           V.sha256_hex(cmd) == GOLDEN_CMD_APPLY_SHA_HEX, f"{len(cmd)}B")
+    opaque152 = bytes((i * 7 + 3) & 0xFF for i in range(152))
+    cmd = V.build_command(V.MSG_CONFIG_APPLY, 7, 42, 6, 0, opaque152)
+    vector("command.golden_config_apply_opaque_payload_184B", GOLDEN_CMD_APPLY_SHA_HEX,
+           V.sha256_hex(cmd) == GOLDEN_CMD_APPLY_SHA_HEX,
+           f"{len(cmd)}B opaque transport vector, not a real business config candidate")
     parsed = V.validate_command(cmd)
     vector("command.validate_config_apply", "ok",
-           parsed["msg_type"] == V.MSG_CONFIG_APPLY and parsed["payload"] == blob152
+           parsed["msg_type"] == V.MSG_CONFIG_APPLY and parsed["payload"] == opaque152
            and parsed["session_generation"] == 7 and parsed["request_id"] == 42
            and parsed["config_generation"] == 6)
     rst = V.build_command(V.MSG_COUNTERS_RESET, 7, 43, 7, V.FLAG_DESTRUCTIVE_CONFIRMED, b"")
@@ -509,7 +525,7 @@ def group_reply_wire():
 
 def group_snapshot_wire():
     snap = V.build_snapshot(7, 5, SNAPSHOT_JSON_GOLDEN)
-    vector("snapshot.golden_397B", GOLDEN_SNAPSHOT_SHA_HEX,
+    vector("snapshot.golden_771B", GOLDEN_SNAPSHOT_SHA_HEX,
            V.sha256_hex(snap) == GOLDEN_SNAPSHOT_SHA_HEX, f"{len(snap)}B")
     parsed = V.validate_snapshot(snap, snapshot_max=1024)
     vector("snapshot.validate_golden", "ok",
@@ -594,8 +610,8 @@ def group_host_state_machine():
     code, buf, actual = host.control_next(256)
     vector("session.control_next_no_event", "NO_EVENT=1", code == 1 and buf is None)
 
-    blob152 = bytes((i * 7 + 3) & 0xFF for i in range(152))
-    outcome, _pending = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, blob152)
+    opaque152 = bytes((i * 7 + 3) & 0xFF for i in range(152))
+    outcome, _pending = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, opaque152)
     vector("session.register_config_apply", "PENDING", outcome == "PENDING")
     code, buf, actual = host.control_next(64)
     vector("session.control_next_buffer_too_small_keeps_pending",
@@ -608,7 +624,7 @@ def group_host_state_machine():
     vector("session.control_next_delivers_184B", "OK 184B",
            code == 0 and len(buf) == 184 and actual == 184 and host.pending is None)
     expected_cmd = V.build_command(V.MSG_CONFIG_APPLY, host.session_generation,
-                                   1, 1, 0, blob152)
+                                   1, 1, 0, opaque152)
     vector("session.delivered_bytes_exact", "match", buf == expected_cmd)
     vector("session.control_next_after_delivery_no_event", "NO_EVENT=1",
            host.control_next(256)[0] == 1)
@@ -620,7 +636,7 @@ def group_host_state_machine():
                                             V.RESULT_APPLIED, 2, 1)) == 0)
     vector("session.known_generation_advanced_by_applied", "2",
            host.known_config_generation == 2)
-    outcome3, cached = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, blob152, request_id=1)
+    outcome3, cached = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, opaque152, request_id=1)
     vector("session.dedup_same_id_same_semantics_cached", "CACHED",
            outcome3 == "CACHED" and cached["result_status"] == V.RESULT_APPLIED)
     outcome4, _c4 = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, b"\x00" * 152, request_id=1)
@@ -688,8 +704,8 @@ def group_transaction():
     host.snapshot_publish(app.snapshot_bytes())
     vector("txn.host_learns_baseline_from_snapshot", "1",
            host.known_config_generation == 1)
-    blob152 = b"\x11" * 152
-    outcome, _ = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, blob152)
+    opaque152 = b"\x11" * 152
+    outcome, _ = host.register_command(V.MSG_CONFIG_APPLY, 1, 0, opaque152)
     vector("txn.register_accepted_pending_only", "PENDING", outcome == "PENDING")
     code, cmd, _n = host.control_next(256)
     vector("txn.delivered_to_app", "OK", code == 0)
@@ -704,14 +720,31 @@ def group_transaction():
     vector("txn.snapshot_after_apply_matches", "gen2",
            host.snapshot["config_generation"] == 2)
     counters_after = app.blob["counters"]
-    vector("txn.config_apply_preserves_counters", "kept", counters_after == {"in": 0, "out": 0})
+    vector("txn.config_apply_preserves_counters", "kept",
+           counters_after == {"in": 0, "out": 0} and app.blob["report_seq"] == 0)
+
+    backfill_payload = bytes((i * 7 + 3) & 0xFF for i in range(132))
+    backfill_payload += struct.pack("<5I", 999999, 888888, 777777, 666666, 4242)
+    outcome_bf, _p = host.register_command(V.MSG_CONFIG_APPLY,
+                                           host.known_config_generation, 0,
+                                           backfill_payload)
+    code, cmd_bf, _n = host.control_next(256)
+    reply_bf = app.handle_command(cmd_bf)
+    parsed_bf = V.validate_reply(reply_bf)
+    vector("txn.candidate_cannot_backfill_persistent_state", "counters/report_seq unchanged",
+           outcome_bf == "PENDING" and code == 0
+           and parsed_bf["result_status"] == V.RESULT_APPLIED
+           and app.blob["counters"] == {"in": 0, "out": 0}
+           and app.blob["report_seq"] == 0)
+    vector("txn.backfill_candidate_reply_cached", "OK",
+           host.control_reply(reply_bf) == 0)
 
     code, cmd2, _n = host.control_next(256)
     vector("txn.no_event_when_no_pending", "NO_EVENT=1", code == 1)
 
     app_stale = V.AppV3(active_config_generation=2, state_revision=1)
     app_stale.bind_session(host.session_generation)
-    stale_cmd = V.build_command(V.MSG_CONFIG_APPLY, host.session_generation, 9, 1, 0, blob152)
+    stale_cmd = V.build_command(V.MSG_CONFIG_APPLY, host.session_generation, 9, 1, 0, opaque152)
     reply_stale = app_stale.handle_command(stale_cmd)
     vector("txn.stale_expected_generation_rejected_at_app", "REJECTED_STALE_CONFIG",
            V.validate_reply(reply_stale)["result_status"] == V.RESULT_REJECTED_STALE_CONFIG)
@@ -723,7 +756,7 @@ def group_transaction():
     app_conflict.persisted_revision = 4
     app_conflict.commit_mode = "conflict"
     app_conflict.bind_session(host.session_generation)
-    cmd_ok = V.build_command(V.MSG_CONFIG_APPLY, host.session_generation, 10, 2, 0, blob152)
+    cmd_ok = V.build_command(V.MSG_CONFIG_APPLY, host.session_generation, 10, 2, 0, opaque152)
     reply_conflict = app_conflict.handle_command(cmd_ok)
     vector("txn.cas_conflict_fails_not_applied", "FAILED_STATE_CONFLICT",
            V.validate_reply(reply_conflict)["result_status"] == V.RESULT_FAILED_STATE_CONFLICT)
@@ -846,8 +879,8 @@ def write_evidence():
     pkg = golden_package()
     tbs = build_golden_tbs()
     der = bytes.fromhex(GOLDEN_DER_HEX)
-    blob152 = bytes((i * 7 + 3) & 0xFF for i in range(152))
-    cmd = V.build_command(V.MSG_CONFIG_APPLY, 7, 42, 6, 0, blob152)
+    opaque152 = bytes((i * 7 + 3) & 0xFF for i in range(152))
+    cmd = V.build_command(V.MSG_CONFIG_APPLY, 7, 42, 6, 0, opaque152)
     rst = V.build_command(V.MSG_COUNTERS_RESET, 7, 43, 7, V.FLAG_DESTRUCTIVE_CONFIRMED, b"")
     rep = V.build_reply(7, 42, V.RESULT_APPLIED, 7, 5)
     snap = V.build_snapshot(7, 5, SNAPSHOT_JSON_GOLDEN)
@@ -869,7 +902,9 @@ def write_evidence():
         "spec": "docs/app-package-protocol-v3.md",
         "scope": "host-side offline spec evidence only",
         "not_proven": ["real Host compilation", "target resource or device writes",
-                       "Line Crossing Web", "device PKA", "sustained AI session"],
+                       "Line Crossing Web", "device PKA", "sustained AI session",
+                       "real business config candidate schema/availability "
+                       "(App #21; NE301 #57 consumes its reviewed public schema)"],
         "vectors": RESULTS,
         "hashes": {
             "golden_tbs_sha256": V.sha256_hex(tbs),
@@ -891,7 +926,13 @@ def write_evidence():
         json.dump(report, f, indent=2, ensure_ascii=False)
     lines = ["# .neapp v3 spec — offline vector evidence", "",
              "Host-side spec evidence only: no real Host compilation, no resource or",
-             "device writes, no Line Crossing Web, no device PKA (spec §14).", "",
+             "device writes, no Line Crossing Web, no device PKA (spec §14).",
+             "The CONFIG_APPLY golden is an opaque-payload transport vector: it proves",
+             "control-wire framing/quota/session forwarding only, NOT real business",
+             "config availability (candidate schema/validation and the full readable",
+             "active-config projection belong to App #21; NE301 #57 consumes its",
+             "reviewed public schema). App-owned persistent state (lc_stateblob.c 152B,",
+             "counters/window/report_seq) is not a writable config candidate.", "",
              "| vector | expected | result | detail |", "| --- | --- | --- | --- |"]
     for r in RESULTS:
         lines.append(f"| {r['name']} | {r['expected']} | "

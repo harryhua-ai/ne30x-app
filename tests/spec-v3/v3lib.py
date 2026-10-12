@@ -66,8 +66,7 @@ RESULT_FAILED_STATE_CONFLICT = 5
 RESULT_FAILED_STORAGE_IO = 6
 RESULT_FAILED_STORAGE_UNKNOWN = 7
 
-LINE_CROSSING_CONFIG_BLOB_BYTES = 152
-LINE_CROSSING_CONTROL_MIN = CONTROL_HEADER_SIZE + LINE_CROSSING_CONFIG_BLOB_BYTES
+CONTROL_WIRE_MIN = CONTROL_HEADER_SIZE
 
 ABI_TABLE_SIZE_V3 = 60
 ABI_TABLE_SIZE_V2 = 48
@@ -513,6 +512,10 @@ def policy_check_v3_host(manifest, host, business="line-crossing-64"):
         raise SpecViolation("BAD_PACKAGE", "control_max set without control_receive")
     if not (caps & CAP_BUSINESS_SNAPSHOT) and manifest["snapshot_max"] != 0:
         raise SpecViolation("BAD_PACKAGE", "snapshot_max set without business_snapshot")
+    if (caps & CAP_CONTROL_RECEIVE) and manifest["control_max"] < CONTROL_WIRE_MIN:
+        raise SpecViolation("RESOURCE_LIMIT",
+                            f"control_max {manifest['control_max']} < "
+                            f"{CONTROL_WIRE_MIN} (generic 32B control wire header)")
     if business == "line-crossing-64":
         required = (CAP_AI_EVENTS | CAP_REPORT_SUBMIT | CAP_APP_STATE |
                     CAP_SESSION_LIFECYCLE | CAP_CONTROL_RECEIVE | CAP_BUSINESS_SNAPSHOT)
@@ -526,10 +529,6 @@ def policy_check_v3_host(manifest, host, business="line-crossing-64"):
         if (caps & CAP_REPORT_SUBMIT) and manifest["report_max"] < REPORT_BUSINESS_MAX:
             raise SpecViolation("RESOURCE_LIMIT",
                                 f"report_max {manifest['report_max']} < {REPORT_BUSINESS_MAX}")
-        if manifest["control_max"] < LINE_CROSSING_CONTROL_MIN:
-            raise SpecViolation("RESOURCE_LIMIT",
-                                f"control_max {manifest['control_max']} < "
-                                f"{LINE_CROSSING_CONTROL_MIN} (32B header + 152B config blob)")
     if (caps & CAP_AI_EVENTS) and manifest["event_max"] > host["event_buffer_bytes"]:
         raise SpecViolation("RESOURCE_LIMIT", "event_max exceeds host event buffer")
     if (caps & CAP_REPORT_SUBMIT) and manifest["report_max"] > host["report_capacity_bytes"]:
@@ -999,13 +998,28 @@ class AppV3:
             "app_state": "restricted" if self.restricted else "running",
             "config_generation": self.active_config_generation,
             "state_revision": self.state_revision,
+            "active_config": {
+                "conf_threshold_permille": 250,
+                "counter_name": "客流统计",
+                "heat_grid_enable": False,
+                "k_confirm": 5,
+                "line": {"x1_permille": 200, "x2_permille": 800,
+                         "y1_permille": 500, "y2_permille": 500},
+                "max_dist_permille": 250,
+                "max_miss": 5,
+                "outside": {"x_permille": 500, "y_permille": 200},
+                "target_class_name": "car",
+                "track_history_k": 8,
+                "tracks_report_enable": True,
+                "window_minutes": 5,
+            },
             "counters": self.blob["counters"],
             "report_seq": self.blob["report_seq"],
             "model": {"loaded": True, "target_class": "car", "valid": True},
             "gap": {"active": False},
             "quality": {"dropped_frames": 0},
             "storage": {"fault": self.restricted},
-        }, separators=(",", ":"), sort_keys=True)
+        }, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
 
     def snapshot_bytes(self):
         return build_snapshot(self.active_config_generation, self.state_revision,

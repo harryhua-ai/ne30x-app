@@ -4,7 +4,7 @@
 >
 > **v1/v2 不变基准**：已集成的 [app-package-protocol-v1.md](app-package-protocol-v1.md) 与 [app-package-protocol-v2-draft.md](app-package-protocol-v2-draft.md) 分别是 v1/v2 的唯一已集成规范。v3 是**独立容器 major 3 + 独立 Host ABI major 0x00030000**，不是 v2 的向后兼容延伸：旧包的 magic、函数表、签名与拒绝规则逐字节不变；v3 不借 v2 保留字节、未知能力位或未声明特性扩权。#54 明确：旧 Host 直接拒绝 v3；v3 Host 按原规则接收合规 v1/v2（各自旧语义、旧函数表），禁止前缀偷兼容，禁止旧包自动获得新能力。
 >
-> **固定证据锚点**（与 v2 规范文件头同源，容量与 ABI 数字与之对齐）：`LC_FRAME_MAX_DETECTIONS = 64`、单事件上限 1576B、`LC_DQ_SLOT_CAPACITY = 6144`、`LC_TARGET_CLASS_NAME_LEN = 32`（ne301 `de25a6f1`）；实验 Host 2 MiB 执行区（v1 §2.3/§2.5 基线）；Line Crossing 业务私有配置 blob 参考长度 **152B**（#54 §2 冻结事实：Host 不解析或改写该 blob）。
+> **固定证据锚点**（与 v2 规范文件头同源，容量与 ABI 数字与之对齐）：`LC_FRAME_MAX_DETECTIONS = 64`、单事件上限 1576B、`LC_DQ_SLOT_CAPACITY = 6144`、`LC_TARGET_CLASS_NAME_LEN = 32`（ne301 `de25a6f1`）；实验 Host 2 MiB 执行区（v1 §2.3/§2.5 基线）；已合并 App 源码 `apps/line-crossing/app/lc_stateblob.c`（只读事实参照）证明其 152B blob 是 **App-owned 持久状态编码**（magic/schema/CRC，offset 132..151 为累计/窗口 IN/OUT 与 `report_seq`；#54 §2 冻结：Host 不解析或改写）——它**不是**用户可写配置候选；本规范不指定任何业务配置候选尺寸（配置候选 codec 事实归 App #21，§6.2/§8.3），控制配额只按通用 wire 头推导（§4.1）。
 >
 > **测试与黄金向量**：本文 §12 的全部正负向量由 [tests/spec-v3/](../tests/spec-v3/README.md) 一键独立生成与核对（纯 Python 标准库 + OpenSSL 独立交叉验签），证据输出到 `docs/evidence/spec-v3/`。该套件**独立实现** v3 验证逻辑，不 import `package/` 的 v2 验证器，也不复制 `tests/spec-v2` 的 parser 自证；对 v1/v2 的判定仅是互操作模拟门，v1/v2 权威仍是各自已集成规范。本文不实现打包器、Host 服务或业务 App（non_goals）。
 
@@ -125,7 +125,8 @@
 - **bits 0..5 原语义不变**（#54）；bit6/bit7 仅可由**合法受信 v3 包**声明；v1/v2 容器内出现位 6/7 仍按各自规范拒绝。
 - **`run_profile = 2` 必须包含 bit5（会话生命周期）与 bit6（热命令）**；缺任一为格式违例（`BAD_PACKAGE`）。
 - **配额-能力位匹配**：bit2 ⇒ `event_max > 0`；bit3 ⇒ `report_max > 0`；bit4 ⇒ `state_quota > 0`；bit6 ⇒ `control_max > 0`；bit7 ⇒ `snapshot_max > 0`。未声明对应能力位而配额非零同样拒绝（不允许"悄悄预留"）。
-- **热配置 Line Crossing 业务约束**（#54 §1：同时要求 bits2/3/4/5/6/7）：凡业务判定为 line-crossing-64，缺 bits2/3/4/5/6/7 任一即 `BAD_PACKAGE`；且 `event_max >= 1576`、`report_max >= 6144`（继承 v2 §4.1）与 **`control_max >= 184`**（= 32B 消息头 + 152B Line Crossing 配置 blob，§6.4），否则 `RESOURCE_LIMIT`。
+- **控制面通用 wire 下界**（只由 §6.3 通用 32B 消息头推导，不含任何业务尺寸）：凡声明 bit6，`control_max >= 32`（最小的完整命令 `COUNTERS_RESET` 恰为 32B；`CONFIG_APPLY` 载荷非空，其完整命令恒 >32B），否则 `RESOURCE_LIMIT`。**业务配置候选的尺寸下界不由本规范指定**：不存在已受审的独立配置编码/拒绝向量事实，禁止从 App 私有持久状态 blob 长度（如 lc_stateblob 152B）推导业务配额；真实 Line Crossing 候选尺寸/schema 归 App #21，设备可承载容量归 #55/#56。
+- **热配置 Line Crossing 业务约束**（#54 §1：同时要求 bits2/3/4/5/6/7）：凡业务判定为 line-crossing-64，缺 bits2/3/4/5/6/7 任一即 `BAD_PACKAGE`；且 `event_max >= 1576`、`report_max >= 6144`（继承 v2 §4.1 事件/报告 codec 事实），否则 `RESOURCE_LIMIT`。
 - Host 实际可提供的有界容量（事件缓冲、报告槽、状态配额、**控制消息容量与快照 RAM**）由设备实现另行验证（#55/#56）；声明超过实际即 `RESOURCE_LIMIT`，不得部分成功。
 
 ### 4.2 包声明 ≠ Host 授权（继承 v2 §4.2）
@@ -185,10 +186,10 @@ Host 在服务端完成现有管理员逐请求鉴权、CSRF/请求来源等既�
 
 | `msg_type` | 名称 | 语义 |
 | --- | --- | --- |
-| 1 | `CONFIG_APPLY` | 完整配置候选（非默默 merge 的 patch）；载荷为 App 业务私有配置 blob（Line Crossing 参考 152B），**Host 仅限额/转发，不解析或改写** |
+| 1 | `CONFIG_APPLY` | 完整配置候选（非默默 merge 的 patch）；载荷为 **App 自有、自版本化的 config-only 候选编码**（有界 opaque bytes；其 schema/版本空间属 App 业务，#19 不实现）。**Host 仅按已签名能力（bit6）、`control_max`/Host 实际容量与当前会话转发，不解析或改写**。**禁止**把 App 私有持久状态 blob 当作配置候选提交或接受：已合并 App 源码 `apps/line-crossing/app/lc_stateblob.c` 的 152B 编码在 offset 132..151 含累计/窗口 IN/OUT 与 `report_seq`，按 #54 所有权边界属 App-owned 持久状态——把可写配置与它混同即能伪造/回填计数与报告序号；拒绝"状态 blob 形状候选"的业务校验由 App #21 交付 |
 | 2 | `COUNTERS_RESET` | 明确独立的破坏性计数重置动作；载荷必须为空 |
 
-读取当前配置/计数**不发送**有副作用的控制命令；读取使用 `snapshot_publish` 的 App 自有只读投影（§8）。Web 画线、选类、调阈值、窗口与跟踪参数由 App 作为业务 schema/合法性/资源预备/计数影响的唯一解释者消费；Host 不解析业务私有 blob、不重解释 AI 事件。
+读取当前配置/计数**不发送**有副作用的控制命令；读取使用 `snapshot_publish` 的 App 自有只读投影（§8）。Web 画线、选类、调阈值、窗口与跟踪参数由 App 作为业务 schema/合法性/资源预备/计数影响的唯一解释者消费；Host 不解析配置候选与私有持久状态 blob、不重解释 AI 事件。**规范交接**：真实 Line Crossing 配置候选 schema/校验（含拒绝私有持久状态形状候选）与完整可读的活动配置投影由 **App #21** 交付；**NE301 #57** 只消费其受审公开业务 schema。本规范只钉定"config-only 候选 vs 私有持久状态分离 + 有界 opaque 转发"边界，不实现、不指定具体业务 schema 或候选尺寸。
 
 ### 6.3 统一 32B 消息头（命令/回执/快照共用；B 最小编码，见 §13.1）
 
@@ -205,7 +206,7 @@ Host 在服务端完成现有管理员逐请求鉴权、CSRF/请求来源等既�
 | `20..23` / u32-le | `config_generation` | `expected_config_generation`：**非零**，管理员草稿所基于的配置世代 | `new_config_generation`：APPLIED 时为切换后的新世代，其余结果为 App 当前活跃世代；**非零** | App 当前活跃配置世代；**非零** |
 | `24..27` / u32-le | `state_revision` | **必须为 0** | 回执对应的 #46 CAS 物理版本（APPLIED/提交类结果为新版本；拒绝类为当前版本） | App 最新已持久 `state_revision` |
 | `28..31` / u32-le | `flags`/`status` | `flags`：bit0 = `destructive_confirmed`；bit1..31 必须为 0 | `result_status` 枚举（§7.2） | **必须为 0** |
-| `32..` | payload | `CONFIG_APPLY`：App 业务私有配置 blob（非空）；`COUNTERS_RESET`：空 | 无 | 严格 UTF-8 JSON 对象（§8.3） |
+| `32..` | payload | `CONFIG_APPLY`：App 自有 config-only 候选编码（非空有界 opaque bytes；非私有持久状态 blob）；`COUNTERS_RESET`：空 | 无 | 严格 UTF-8 JSON 对象（§8.3） |
 
 ### 6.4 命令规范编码负例（fail-closed）
 
@@ -236,7 +237,7 @@ Host 在服务端完成现有管理员逐请求鉴权、CSRF/请求来源等既�
 
 ### 8.1 快照契约（#54 §2 冻结）
 
-快照由 App 发出，承载：活动配置及世代（头字段 `config_generation`）、已持久版本（头字段 `state_revision`）与应用状态、当前窗口/累计 IN/OUT、模型/目标有效性、GAP/数据质量与持久化故障。Host 仅检查来源、格式边界和当前会话并复制到有界 RAM 快照；Host 不解释业务字段，展示层由 Host 附加自身 #44 健康事实。
+快照由 App 发出，承载：活动配置及世代（头字段 `config_generation`）、已持久版本（头字段 `state_revision`）与应用状态、当前窗口/累计 IN/OUT、模型/目标有效性、GAP/数据质量与持久化故障。其中"活动配置"投影必须是**可重建编辑草稿的完整业务配置视图**——Line Crossing 至少涵盖线段（含方向语义）、`counter_name`、目标类、置信/距离阈值、tracker 与窗口参数等活动配置字段——而**不是**私有持久状态 blob 的回读：累计/窗口计数与 `report_seq` 只能作为运行事实字段出现，不得借快照变成可写配置。Line Crossing 投影的具体字段集与校验归 **App #21**（**NE301 #57** 只消费其受审公开业务 schema）。Host 仅检查来源、格式边界和当前会话并复制到有界 RAM 快照；Host 不解释业务字段，展示层由 Host 附加自身 #44 健康事实。
 
 ### 8.2 会话绑定（#54 §2 冻结）
 
@@ -244,7 +245,7 @@ Host 在服务端完成现有管理员逐请求鉴权、CSRF/请求来源等既�
 
 ### 8.3 载荷编码（B 最小编码，见 §13.3）
 
-载荷为**严格 UTF-8 编码的单个 JSON 对象**文本：合法 UTF-8（非法字节拒绝）、顶层必须是对象、任意深度**重复键拒绝**、`NaN`/`Infinity` 常量拒绝、JSON 文本后不得有尾随数据、对象键为 App 自有 schema（Host 不解释业务键）。参考 Line Crossing 投影（`schema=line-crossing/1`）见 §12.4；业务字段内容正确性由 App 负责并由 #57 Web 消费，Host 仅做格式边界校验。
+载荷为**严格 UTF-8 编码的单个 JSON 对象**文本：合法 UTF-8（非法字节拒绝）、顶层必须是对象、任意深度**重复键拒绝**、`NaN`/`Infinity` 常量拒绝、JSON 文本后不得有尾随数据、对象键为 App 自有 schema（Host 不解释业务键）。参考 Line Crossing 投影（`schema=line-crossing/1`，**非权威示例**，含 §8.1 要求的 `active_config` 完整活动配置字段示意；权威字段集/校验归 App #21，#57 只消费）见 §12.3；业务字段内容正确性由 App 负责并由 #57 Web 消费，Host 仅做格式边界校验。
 
 ### 8.4 新鲜度与失效（#54 §2 冻结）
 
@@ -327,7 +328,7 @@ Host 在服务端完成现有管理员逐请求鉴权、CSRF/请求来源等既�
 | M8 | v3 caps bit8..31 任一置位（重签合法） | v3 Host | **拒绝**（未知能力位） |
 | M9 | `run_profile != 2`、[184..191] reserved 非零、能力-配额不匹配、原生头 ABI ≠ manifest ABI（重签合法） | v3 Host | **拒绝**（`BAD_PACKAGE`） |
 | M10 | 签名合法、caps 全为已知位，但 Host 实际不提供其中某能力（如 v3 Host 不提供 bit7，或模拟仅 v2 能力面） | v3 Host | **拒绝**（`ABI_INCOMPATIBLE`；运行期该能力调用 `UNAUTHORIZED`/`INCOMPATIBLE`） |
-| M11 | `control_max`/`snapshot_max` 超过 Host 实际容量，或 line-crossing-64 缺 bits2..7 任一/`event_max<1576`/`report_max<6144`/`control_max<184` | v3 Host | **拒绝**（`RESOURCE_LIMIT`/`BAD_PACKAGE`，§4.1） |
+| M11 | `control_max`/`snapshot_max` 超过 Host 实际容量，或 line-crossing-64 缺 bits2..7 任一/`event_max<1576`/`report_max<6144`，或 bit6 包 `control_max<32`（通用 wire 下界） | v3 Host | **拒绝**（`RESOURCE_LIMIT`/`BAD_PACKAGE`，§4.1） |
 
 升级/卸载/换钥安装事务语义（`DOWNGRADE_FORBIDDEN`、`VERSION_CONTENT_CONFLICT`、`APP_IDENTITY_CONFLICT`、`STORAGE_STATE_UNKNOWN`、`BUSY` 等）全部继承 v1 §3/§4.1/§5.1，不重复、不放宽。
 
@@ -380,22 +381,24 @@ python3 tests/spec-v3/run_all_tests.py      # 或 sh tests/spec-v3/run_tests.sh
 
 | 向量 | 构成 | 长度 | `SHA-256` |
 | --- | --- | --- | --- |
-| `CONFIG_APPLY` 命令 | 会话世代 7、请求 ID 42、`expected_config_generation=6`、flags 0、152B 确定性载荷 `(i*7+3) mod 256` | 184B | `e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca` |
+| `CONFIG_APPLY` 命令（**opaque 传输向量**） | 会话世代 7、请求 ID 42、`expected_config_generation=6`、flags 0、152B 确定性 **opaque** 载荷 `(i*7+3) mod 256`（仅证控制面线格式/限额/会话转发；**不是**真实业务配置候选，不构成"真实配置可用性 PASS"——候选 schema/尺寸归 App #21，§14.6） | 184B | `e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca` |
 | `COUNTERS_RESET` 命令 | 会话世代 7、请求 ID 43、expected gen 7、`destructive_confirmed=1`、空载荷 | 32B | `5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb` |
 | `APPLIED` 回执 | 会话世代 7、请求 ID 42、`result_status=0`、新世代 7、`state_revision=5` | 32B | `054b7356b81fb555d6bdbc05f6d666cedb0d84a98555476a06cb32df09d87eed` |
-| 业务快照 | `config_generation=7`、`state_revision=5`、参考 JSON（12.4） | 397B | `bf489b98ed512f066756d1cb25c8d3a536367d73ccf79718b84e34b3e96b4065` |
+| 业务快照 | `config_generation=7`、`state_revision=5`、参考 JSON（§12.3，含 `active_config` 完整投影示例） | 771B | `9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5` |
 
 ### 12.3 参考快照 JSON（App 自有 schema 示例；Host 不解释业务键）
 
+**非权威示例**：只示意 §8.3 格式边界与 §8.1 "活动配置投影须可重建编辑草稿"的完整性要求。`active_config` 字段名取自已合并 App 配置结构（`apps/line-crossing/app/lc_bus_config.h`，只读事实参照）；权威 Line Crossing 投影 schema/校验归 App #21，#57 只消费其受审公开 schema。累计/窗口计数与 `report_seq` 是运行事实字段，不是可写配置：
+
 ```json
-{"app_state":"running","config_generation":7,"counters":{"in":12,"out":9},"cumulative":{"in":3456,"out":2890},"gap":{"active":false,"last_reason":null},"model":{"class_generation":2,"generation":3,"loaded":true,"target_class":"car","valid":true},"quality":{"dropped_frames":2},"report_seq":88,"schema":"line-crossing/1","state_revision":5,"storage":{"fault":false}}
+{"active_config":{"conf_threshold_permille":250,"counter_name":"客流统计","heat_grid_enable":false,"k_confirm":5,"line":{"x1_permille":200,"x2_permille":800,"y1_permille":500,"y2_permille":500},"max_dist_permille":250,"max_miss":5,"outside":{"x_permille":500,"y_permille":200},"target_class_name":"car","track_history_k":8,"tracks_report_enable":true,"window_minutes":5},"app_state":"running","config_generation":7,"counters":{"in":12,"out":9},"cumulative":{"in":3456,"out":2890},"gap":{"active":false,"last_reason":null},"model":{"class_generation":2,"generation":3,"loaded":true,"target_class":"car","valid":true},"quality":{"dropped_frames":2},"report_seq":88,"schema":"line-crossing/1","state_revision":5,"storage":{"fault":false}}
 ```
 
 ### 12.4 必须覆盖的负例族（tests/spec-v3 实现清单）
 
 1. **已签内容篡改**：翻转真 payload 字节/manifest 配额字节（DER 逐字节不变）→ `SIGNATURE_INVALID`；翻转 DER 字节（TBS 不变）→ `SIGNATURE_INVALID`；OpenSSL 非零退出。
 2. **DER/容器结构**：合法 DER 后追加字节、截断、整包截断 → `BAD_PACKAGE`。
-3. **重签后策略拒绝**（证明"签名正确 ≠ 放行"）：bit8 置位、bit6 无 `control_max`、bit7 缺失而 `snapshot_max` 非零、[184..191] 非零、`run_profile=1`、profile 2 缺 bit5/bit6、line-crossing 缺位、`event_max<1576`、`report_max<6144`、`control_max<184`/超 Host、`snapshot_max` 超 Host、配额-能力不匹配、[58..59] 非零、错板、指纹不一致、未知发行者、NMF3 内 ABI `0x00020000`、原生头 ABI 交叉不匹配、原生头 `reserved0 != 0`、v3 新能力位遇仅 v2 能力面 Host——均以 d=1 重签为合法签名后仍拒绝，且拒绝原因可归因。
+3. **重签后策略拒绝**（证明"签名正确 ≠ 放行"）：bit8 置位、bit6 无 `control_max`、bit7 缺失而 `snapshot_max` 非零、[184..191] 非零、`run_profile=1`、profile 2 缺 bit5/bit6、line-crossing 缺位、`event_max<1576`、`report_max<6144`、`control_max<32`（通用 wire 下界）/超 Host、`snapshot_max` 超 Host、配额-能力不匹配、[58..59] 非零、错板、指纹不一致、未知发行者、NMF3 内 ABI `0x00020000`、原生头 ABI 交叉不匹配、原生头 `reserved0 != 0`、v3 新能力位遇仅 v2 能力面 Host——均以 d=1 重签为合法签名后仍拒绝，且拒绝原因可归因。
 4. **命令 wire 负例**：坏 magic、`header_version=2`、未知 type、`total_len` 不一致、会话世代 0、请求 ID 0、期望世代 0、命令 `state_revision` 非零、未知 flags 位、`CONFIG_APPLY` 空载荷、`COUNTERS_RESET` 带载荷、回执类型冒充命令。
 5. **回执 wire 负例**：未知 `result_status`、APPLIED 带零世代、回执带载荷、世代/请求 ID 为 0。
 6. **快照 wire 负例**：重复 JSON 键、非法 UTF-8、JSON 尾随数据、顶层数组、`NaN` 常量、App 自填会话世代/请求 ID（必须为 0）、世代 0、超 `snapshot_max` → `QUOTA_EXCEEDED`。
@@ -421,7 +424,7 @@ v2 黄金 TBS 244B 逐字节重建并以钉定哈希验证；DER 固定 70B `304
 | 8 | Host 侧在最近结果存储不可知/快照带故障时拒绝新破坏性登记（App 侧义务的纵深防御，非语义放宽） | §9.3 |
 | 9 | Host 登记 `COUNTERS_RESET` 未确认标志即拒绝（`UNCONFIRMED`），不替代 Web 显式确认义务 | §9.2.6 |
 | 10 | `control_max`/`snapshot_max` 声明与 Host 模拟容量参考值（256/1024B；Host 实际值归 #55/#56 设备事实） | §3.2/§4.1 |
-| 11 | line-crossing-64 的 `control_max >= 184` 下界（32B 头 + 152B 冻结 blob 推导） | §4.1 |
+| 11 | 控制面通用 wire 下界 `control_max >= 32`（只按 §6.3 通用 32B 消息头推导；业务候选尺寸不指定——无配置 codec 事实，归 App #21；禁止从 lc_stateblob 152B 私有持久状态长度推导配额） | §4.1 |
 | 12 | 首个有效回执定终态；后续同 ID 回执不改缓存结果 | §7.1 |
 | 13 | 快照 `total_len > min(声明, Host RAM)` 整体 `QUOTA_EXCEEDED`，不截断 | §3.2/§8 |
 
@@ -434,6 +437,7 @@ v2 黄金 TBS 244B 逐字节重建并以钉定哈希验证；DER 固定 70B `304
 3. **Line Crossing Web**：热配置 Web 编辑/草稿/保存闭环（#57）未实现、未验证；#46 CAS blob、#44 报告服务与 #36 鉴权基线的 v3 集成未验证。
 4. **设备 PKA 验签 / 掉电事务 / 持续 AI 会话**：v2 规范 §12 的同款缺口对 v3 全部适用（mbedTLS/PKA 设备验签、原子提交掉电实测、64 框持续会话下 Host 不阻断 AI 主回调地完成命令交付与快照拷贝）。
 5. **本规范的"规范已集成"状态**：须经后续 exact-SHA A Review、merge 与 canonical ght complete 之后方可声明；本文当前仅为受审候选。产物哈希证据以测试输出为准（§12）；不存在"真机 PASS"表述。
+6. **真实业务配置候选可用性**：§12.2 的 `CONFIG_APPLY` 正向量是 **opaque 传输向量**（确定性任意载荷），只证控制面线格式、限额与会话转发；真实 Line Crossing 配置候选编码/校验/拒绝向量与完整可读活动配置投影均未实现、未证明（归 App #21；#57 消费其受审公开 schema）。任何引用本文的文档不得把本套件的"随机载荷传输 PASS"写成"真实配置可用性 PASS"。
 
 ## 附录 A：#54 冻结决定 → 本文覆盖对照
 
@@ -445,11 +449,11 @@ v2 黄金 TBS 244B 逐字节重建并以钉定哈希验证；DER 固定 70B `304
 | manifest 160..175 沿用 v2 字段与配额位置；`run_profile=2` 专用语义；旧 profile 不被误解释 | §3.2 |
 | caps bit0..5 原语义不变；bit6=`control_receive`、bit7=`business_snapshot`；bit8..31 未知拒绝 | §4.1 |
 | [176..179]=`control_max`、[180..183]=`snapshot_max`（含头含载荷、不截断）、[184..191] 全零、quota 随位声明且 ≤ 实际容量 | §3.2、§4.1 |
-| 热配置 Line Crossing 要求 bits2/3/4/5/6/7；旧容量边界继承 v2；声明 ≠ Host 提供 | §4.1、§4.2 |
+| 热配置 Line Crossing 要求 bits2/3/4/5/6/7；旧容量边界继承 v2；声明 ≠ Host 提供；控制配额只有通用 wire 下界（无业务尺寸） | §4.1、§4.2 |
 | 60B 表（`table_size=60`、`abi_version=0x00030000`）、偏移 8..44 沿用 v2 十能力、48/52/56 三新回调 `int32_t`、Thumb/静态断言/无裸指针、表禁前缀互换、缺失已请求能力拒绝、仅当前受信会话+声明能力可调用 | §5 |
 | `control_next` 无命令合法 `NO_EVENT=1`（对 v2 §6.4 的显式限定扩展） | §5.3、§12.4.9 |
 | 传输模型：服务端鉴权、单会话单待决命令、App 自身上下文非阻塞取命令、禁伪装 AI 事件、`control_reply` 仅缓存匹配回执 | §6.1、§6.3、§7.1 |
-| 命令仅 `CONFIG_APPLY`/`COUNTERS_RESET`；读取走快照投影；Host 不解 152B 私有 blob、不重解释 AI 事件 | §6.2 |
+| 命令仅 `CONFIG_APPLY`（App 自有自版本化 **config-only 候选**，有界 opaque）/`COUNTERS_RESET`；读取走快照投影；Host 不解析候选与 lc_stateblob 152B 私有持久状态 blob、不重解释 AI 事件；候选 schema/校验与完整可读投影归 App #21，#57 只消费 | §6.2、§8.1、§8.3 |
 | wire 必备字段（协议标识/版本/类型/长度/保留/会话世代/请求 ID/期望世代/破坏性确认/载荷/结果状态/新世代/`state_revision`）；快照不由 App 自填会话世代；规范有界编码 fail-closed；超 quota 整体拒绝 | §6.3、§6.4、§7、§8 |
 | `config_generation` 与 `state_revision` 分离；统计 flush 不失效 Web 草稿；普通 RESET 不算配置编辑 | §9.1、§9.5 |
 | 会话内幂等/冲突/防重放；会话关闭/失信/升级/重启清除待决与 RAM 快照；未知结果只读对账不自动重放 | §9.2–§9.4、§9.6 |

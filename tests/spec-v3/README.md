@@ -22,29 +22,45 @@ signature, structural/manifest/policy acceptance in spec §2.3 order
 (structure -> Host-local publisher trust mapping -> signature over the
 original TBS -> policy), v3 capability/quota coupling (bits 6/7,
 `control_max`/`snapshot_max`, reserved [184..191], profile 2, line-crossing-64
-minimums), Host capability-subset fail-closed rejection, golden control-plane
-wire vectors (CONFIG_APPLY 184B / COUNTERS_RESET 32B / APPLIED reply 32B /
-snapshot 397B), command/reply/snapshot negative encodings (unknown flags,
-zero session/request ids, duplicate JSON keys, invalid UTF-8, oversize
-quotas), the §9 host-side command state machine (single pending, BUFFER_TOO_
-SMALL non-consumption, dedup CACHED vs DUPLICATE_ID_CONFLICT, CONFLICT on
-stale generation, session-end UNKNOWN with read-only snapshot
-reconciliation, 5s/10s snapshot freshness), the §9.5 app transaction model
-(CAS conflict / IO error / STORAGE_UNKNOWN never masquerade as APPLIED and
-preserve previously confirmed data, restricted state blocks destructive
-commands, counters reset keeps config_generation while state_revision
-advances), v2→v3 same-identity migration vs cross-identity refusal, the
-session-generation no-wrap rule, and the §10 v1/v2/v3 interop rejection
-matrix (v1/v2 goldens rebuilt against their pinned TBS hashes; the v2
-package also against its pinned DER/package hashes from the integrated v2
+event/report minimums and the generic 32B control-wire `control_max` minimum;
+no business config size is specified), Host capability-subset fail-closed
+rejection, golden control-plane wire vectors (CONFIG_APPLY 184B
+opaque-payload transport vector — NOT a real business config candidate — /
+COUNTERS_RESET 32B / APPLIED reply 32B / snapshot 771B carrying the full
+`active_config` projection example), command/reply/snapshot negative
+encodings (unknown flags, zero session/request ids, duplicate JSON keys,
+invalid UTF-8, oversize quotas), the §9 host-side command state machine
+(single pending, BUFFER_TOO_SMALL non-consumption, dedup CACHED vs
+DUPLICATE_ID_CONFLICT, CONFLICT on stale generation, session-end UNKNOWN with
+read-only snapshot reconciliation, 5s/10s snapshot freshness), the §9.5 app
+transaction model (CAS conflict / IO error / STORAGE_UNKNOWN never masquerade
+as APPLIED and preserve previously confirmed data, restricted state blocks
+destructive commands, opaque config candidates cannot backfill
+counters/report_seq, counters reset keeps config_generation while
+state_revision advances), v2→v3 same-identity migration vs cross-identity
+refusal, the session-generation no-wrap rule, and the §10 v1/v2/v3 interop
+rejection matrix (v1/v2 goldens rebuilt against their pinned TBS hashes; the
+v2 package also against its pinned DER/package hashes from the integrated v2
 spec §10.1).
+
+Ownership boundary (spec §6.2/§8.1/§8.3): a `CONFIG_APPLY` payload is an
+App-owned, self-versioned **config-only** candidate transported as bounded
+opaque bytes. The merged App source `apps/line-crossing/app/lc_stateblob.c`
+(read-only fact reference) proves its 152B blob is App-owned **persistent
+state** (counters/window/report_seq at offset 132..151) and is not a writable
+config candidate. The real Line Crossing candidate schema/validation and the
+full readable active-config snapshot projection are deliverables of App #21;
+NE301 #57 only consumes that reviewed public business schema. This suite
+therefore names its CONFIG_APPLY positives as transport vectors and does not
+claim real-config-availability PASS.
 
 Does NOT prove (spec §14): any device-side v3 parser, real Host compilation
 or static asserts, target resource or device writes, device mbedTLS/PKA,
 Line Crossing Web, sustained AI event delivery, cooperative stop/reclaim, or
-storage atomicity/power-loss. The signing key is the public non-production
-scalar `d=1` (same key as the v1/v2 goldens) and must never become a
-production trust anchor.
+storage atomicity/power-loss; nor any real business config candidate
+encoding/validation/rejection vectors (App #21). The signing key is the
+public non-production scalar `d=1` (same key as the v1/v2 goldens) and must
+never become a production trust anchor.
 
 ## Independence
 

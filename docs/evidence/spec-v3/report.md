@@ -2,6 +2,12 @@
 
 Host-side spec evidence only: no real Host compilation, no resource or
 device writes, no Line Crossing Web, no device PKA (spec §14).
+The CONFIG_APPLY golden is an opaque-payload transport vector: it proves
+control-wire framing/quota/session forwarding only, NOT real business
+config availability (candidate schema/validation and the full readable
+active-config projection belong to App #21; NE301 #57 consumes its
+reviewed public schema). App-owned persistent state (lc_stateblob.c 152B,
+counters/window/report_seq) is not a writable config candidate.
 
 | vector | expected | result | detail |
 | --- | --- | --- | --- |
@@ -25,7 +31,7 @@ device writes, no Line Crossing Web, no device PKA (spec §14).
 | resign.line_crossing_missing_bit3 | BAD_PACKAGE | PASS | report_max set without report_submit |
 | resign.event_max_below_1576 | RESOURCE_LIMIT | PASS | event_max 1024 < 1576 |
 | resign.report_max_below_6144 | RESOURCE_LIMIT | PASS | report_max 4096 < 6144 |
-| resign.control_max_below_184 | RESOURCE_LIMIT | PASS | control_max 128 < 184 (32B header + 152B config blob) |
+| resign.control_max_below_generic_wire_min | RESOURCE_LIMIT | PASS | control_max 16 < 32 (generic 32B control wire header) |
 | resign.control_max_above_host | RESOURCE_LIMIT | PASS | control_max exceeds host control capacity |
 | resign.snapshot_max_above_host | RESOURCE_LIMIT | PASS | snapshot_max exceeds host snapshot RAM |
 | resign.quota_without_capability_bit | BAD_PACKAGE | PASS | ai_events requires nonzero event_max |
@@ -56,7 +62,7 @@ device writes, no Line Crossing Web, no device PKA (spec §14).
 | interop.nmf2_manifest_inside_v3_container | BAD_PACKAGE | PASS | manifest magic 4e4d4632 != NMF3 |
 | interop.nmf3_manifest_inside_v2_container | BAD_PACKAGE | PASS | manifest magic != NMF2 |
 | interop.abi_table_sizes_distinct | 16/48/60 | PASS |  |
-| command.golden_config_apply_184B | e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca | PASS | 184B |
+| command.golden_config_apply_opaque_payload_184B | e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca | PASS | 184B opaque transport vector, not a real business config candidate |
 | command.validate_config_apply | ok | PASS |  |
 | command.golden_counters_reset_32B | 5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb | PASS | 32B |
 | command.validate_counters_reset | ACCEPT | PASS |  |
@@ -79,7 +85,7 @@ device writes, no Line Crossing Web, no device PKA (spec §14).
 | reply.negative.applied_zero_generation | BAD_CONTROL_WIRE | PASS | reply active/new_config_generation must be nonzero |
 | reply.negative.payload_not_allowed | BAD_CONTROL_WIRE | PASS | total_len 32 != buffer 33 |
 | reply.negative.zero_generation | BAD_CONTROL_WIRE | PASS | reply active/new_config_generation must be nonzero |
-| snapshot.golden_397B | bf489b98ed512f066756d1cb25c8d3a536367d73ccf79718b84e34b3e96b4065 | PASS | 397B |
+| snapshot.golden_771B | 9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5 | PASS | 771B |
 | snapshot.validate_golden | ok | PASS |  |
 | snapshot.negative.duplicate_json_key | BAD_SNAPSHOT | PASS | duplicate JSON object keys |
 | snapshot.negative.invalid_utf8 | BAD_SNAPSHOT | PASS | snapshot payload not valid UTF-8 |
@@ -127,6 +133,8 @@ device writes, no Line Crossing Web, no device PKA (spec §14).
 | txn.known_generation_after_apply | 2 | PASS |  |
 | txn.snapshot_after_apply_matches | gen2 | PASS |  |
 | txn.config_apply_preserves_counters | kept | PASS |  |
+| txn.candidate_cannot_backfill_persistent_state | counters/report_seq unchanged | PASS |  |
+| txn.backfill_candidate_reply_cached | OK | PASS |  |
 | txn.no_event_when_no_pending | NO_EVENT=1 | PASS |  |
 | txn.stale_expected_generation_rejected_at_app | REJECTED_STALE_CONFIG | PASS |  |
 | txn.stale_rejection_keeps_generation | 2 | PASS |  |
@@ -163,7 +171,7 @@ device writes, no Line Crossing Web, no device PKA (spec §14).
 - command_config_apply_sha256: `e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca`
 - command_counters_reset_sha256: `5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb`
 - reply_applied_sha256: `054b7356b81fb555d6bdbc05f6d666cedb0d84a98555476a06cb32df09d87eed`
-- snapshot_sha256: `bf489b98ed512f066756d1cb25c8d3a536367d73ccf79718b84e34b3e96b4065`
+- snapshot_sha256: `9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5`
 - v1_golden_tbs_sha256: `5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91`
 - v2_golden_tbs_sha256: `e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278`
 - v2_golden_package_sha256: `3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e`
