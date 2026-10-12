@@ -1,0 +1,1080 @@
+{
+  "suite": "tests/spec-v3",
+  "spec": "docs/app-package-protocol-v3.md",
+  "scope": "host-side offline spec evidence only",
+  "not_proven": [
+    "real Host compilation",
+    "target resource or device writes",
+    "Line Crossing Web",
+    "device PKA",
+    "sustained AI session",
+    "real business config candidate schema/availability (App #21; NE301 #57 consumes its reviewed public schema)"
+  ],
+  "vectors": [
+    {
+      "name": "golden.tbs_length",
+      "expected": "244",
+      "ok": true,
+      "detail": "244B",
+      "evidence": {}
+    },
+    {
+      "name": "golden.tbs_sha256",
+      "expected": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+      "ok": true,
+      "detail": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+      "evidence": {}
+    },
+    {
+      "name": "golden.native_crc32",
+      "expected": "0xde8e3439",
+      "ok": true,
+      "detail": "0xde8e3439",
+      "evidence": {}
+    },
+    {
+      "name": "golden.native_sha256",
+      "expected": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+      "ok": true,
+      "detail": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+      "evidence": {}
+    },
+    {
+      "name": "golden.der_deterministic",
+      "expected": "304402204646fc74c70bbbefcabc29afb8228bc121ad8b432104254d0b3f09819e9b6de50220251fd81c3f8976906785871c0016bad865f5e3c7f460b67b76e6fc1cce5bab50",
+      "ok": true,
+      "detail": "70B",
+      "evidence": {}
+    },
+    {
+      "name": "golden.package_length",
+      "expected": "314",
+      "ok": true,
+      "detail": "314B",
+      "evidence": {}
+    },
+    {
+      "name": "golden.package_sha256",
+      "expected": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+      "ok": true,
+      "detail": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+      "evidence": {}
+    },
+    {
+      "name": "golden.full_accept_v3",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "structure->trust->signature->policy order accepts golden v3 package",
+      "evidence": {}
+    },
+    {
+      "name": "golden.full_accept_without_trust_map",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "ok": true,
+      "detail": "publisher_id 'test-publisher' not trusted",
+      "evidence": {}
+    },
+    {
+      "name": "golden.openssl_cross_verify",
+      "expected": "Verified OK",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "resign.unknown_capability_bit8",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "unknown capability bits 0x00000100",
+      "evidence": {}
+    },
+    {
+      "name": "resign.control_max_zero_with_bit6",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "control_receive requires nonzero control_max",
+      "evidence": {}
+    },
+    {
+      "name": "resign.snapshot_max_without_bit7",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "snapshot_max set without business_snapshot",
+      "evidence": {}
+    },
+    {
+      "name": "resign.reserved_184_191_nonzero",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest reserved[184..191] not zero",
+      "evidence": {}
+    },
+    {
+      "name": "resign.run_profile_1_in_v3",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "unknown run_profile 1",
+      "evidence": {}
+    },
+    {
+      "name": "resign.profile2_missing_bit5",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "profile 2 must declare session_lifecycle (bit5)",
+      "evidence": {}
+    },
+    {
+      "name": "resign.profile2_missing_bit6",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "profile 2 must declare control_receive (bit6)",
+      "evidence": {}
+    },
+    {
+      "name": "resign.line_crossing_missing_bit3",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "report_max set without report_submit",
+      "evidence": {}
+    },
+    {
+      "name": "resign.event_max_below_1576",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "event_max 1024 < 1576",
+      "evidence": {}
+    },
+    {
+      "name": "resign.report_max_below_6144",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "report_max 4096 < 6144",
+      "evidence": {}
+    },
+    {
+      "name": "resign.control_max_below_generic_wire_min",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "control_max 16 < 32 (generic 32B control wire header)",
+      "evidence": {}
+    },
+    {
+      "name": "resign.control_max_above_host",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "control_max exceeds host control capacity",
+      "evidence": {}
+    },
+    {
+      "name": "resign.snapshot_max_above_host",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "snapshot_max exceeds host snapshot RAM",
+      "evidence": {}
+    },
+    {
+      "name": "resign.quota_without_capability_bit",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "ai_events requires nonzero event_max",
+      "evidence": {}
+    },
+    {
+      "name": "resign.reserved_58_59_nonzero",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest reserved[58..59] not zero",
+      "evidence": {}
+    },
+    {
+      "name": "resign.wrong_board",
+      "expected": "TARGET_INCOMPATIBLE",
+      "ok": true,
+      "detail": "board 0x00003011",
+      "evidence": {}
+    },
+    {
+      "name": "resign.untrusted_key_fingerprint",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "ok": true,
+      "detail": "publisher_key_sha256 mismatch for 'test-publisher'",
+      "evidence": {}
+    },
+    {
+      "name": "resign.abi_v2_value_in_nmf3",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "required_host_abi 0x00020000 != 0x00030000",
+      "evidence": {}
+    },
+    {
+      "name": "resign.native_abi_v2_mismatch",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "native abi 0x00020000 != manifest required_host_abi",
+      "evidence": {}
+    },
+    {
+      "name": "resign.native_reserved0_nonzero",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "native header reserved0 != 0",
+      "evidence": {}
+    },
+    {
+      "name": "resign.unknown_publisher_id",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "ok": true,
+      "detail": "publisher_id 'other-publisher' not trusted",
+      "evidence": {}
+    },
+    {
+      "name": "resign.v3_new_caps_on_v2_caps_host",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "host does not provide capability bits 0x000000c0",
+      "evidence": {}
+    },
+    {
+      "name": "tamper.signed_payload_payload_byte",
+      "expected": "SIGNATURE_INVALID",
+      "ok": true,
+      "detail": "ECDSA P-256 verification failed",
+      "evidence": {}
+    },
+    {
+      "name": "tamper.signed_manifest_byte",
+      "expected": "SIGNATURE_INVALID",
+      "ok": true,
+      "detail": "ECDSA P-256 verification failed",
+      "evidence": {}
+    },
+    {
+      "name": "tamper.der_byte",
+      "expected": "SIGNATURE_INVALID",
+      "ok": true,
+      "detail": "ECDSA P-256 verification failed",
+      "evidence": {}
+    },
+    {
+      "name": "der.trailing_byte",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "DER SEQUENCE length not minimal/exact",
+      "evidence": {}
+    },
+    {
+      "name": "der.truncated",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "DER SEQUENCE length not minimal/exact",
+      "evidence": {}
+    },
+    {
+      "name": "container.truncated_image",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "package too short",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v1_golden_tbs_rebuilt",
+      "expected": "5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91",
+      "ok": true,
+      "detail": "212B",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v1_pkg_on_v1_semantics_host",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "v1 package accepted under frozen v1 rules only (16B table log/tick)",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v1_pkg_on_v3_host",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic 4e45415050010000 != v3",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v1_pkg_on_v2_host",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic != v2",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v2_golden_tbs_rebuilt",
+      "expected": "e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278",
+      "ok": true,
+      "detail": "244B",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v2_golden_pkg_rebuilt",
+      "expected": "3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e",
+      "ok": true,
+      "detail": "314B",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v2_pkg_on_v2_semantics_host",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "v2 package accepted under frozen v2 rules only (48B table, caps<=bit5)",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v2_pkg_on_v3_host",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic 4e45415050020000 != v3",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v2_pkg_on_v1_host",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic != v1",
+      "evidence": {}
+    },
+    {
+      "name": "interop.v3_pkg_on_v3_host",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "v3 golden accepted under v3 rules (60B table, caps bits0..7)",
+      "evidence": {}
+    },
+    {
+      "name": "interop.nmf2_manifest_inside_v3_container",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest magic 4e4d4632 != NMF3",
+      "evidence": {}
+    },
+    {
+      "name": "interop.nmf3_manifest_inside_v2_container",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest magic != NMF2",
+      "evidence": {}
+    },
+    {
+      "name": "interop.abi_table_sizes_distinct",
+      "expected": "16/48/60",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "command.golden_config_apply_opaque_payload_184B",
+      "expected": "e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca",
+      "ok": true,
+      "detail": "184B opaque transport vector, not a real business config candidate",
+      "evidence": {}
+    },
+    {
+      "name": "command.validate_config_apply",
+      "expected": "ok",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "command.golden_counters_reset_32B",
+      "expected": "5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb",
+      "ok": true,
+      "detail": "32B",
+      "evidence": {}
+    },
+    {
+      "name": "command.validate_counters_reset",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.bad_proto_magic",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "proto magic b'MFC3' != NFC3",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.header_version_2",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "header version 2 != 1",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.unknown_msg_type",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "unknown msg_type 5",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.total_len_mismatch",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "total_len 255 != buffer 184",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.session_generation_zero",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "command session_generation must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.request_id_zero",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "command request_id must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.expected_generation_zero",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "command expected_config_generation must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.state_revision_nonzero",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "command state_revision must be zero",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.unknown_flag_bit1",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "unknown command flags 0x00000002",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.config_apply_empty_payload",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "CONFIG_APPLY requires a payload",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.counters_reset_with_payload",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "COUNTERS_RESET must carry empty payload",
+      "evidence": {}
+    },
+    {
+      "name": "command.negative.reply_type_is_not_command",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "msg_type 3 is not a command",
+      "evidence": {}
+    },
+    {
+      "name": "reply.golden_applied_32B",
+      "expected": "054b7356b81fb555d6bdbc05f6d666cedb0d84a98555476a06cb32df09d87eed",
+      "ok": true,
+      "detail": "32B",
+      "evidence": {}
+    },
+    {
+      "name": "reply.validate_applied",
+      "expected": "ok",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "reply.validate_rejected_stale",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "reply.negative.unknown_result_status",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "unknown result_status 8",
+      "evidence": {}
+    },
+    {
+      "name": "reply.negative.applied_zero_generation",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "reply active/new_config_generation must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "reply.negative.payload_not_allowed",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "total_len 32 != buffer 33",
+      "evidence": {}
+    },
+    {
+      "name": "reply.negative.zero_generation",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "reply active/new_config_generation must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.golden_771B",
+      "expected": "9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5",
+      "ok": true,
+      "detail": "771B",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.validate_golden",
+      "expected": "ok",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.duplicate_json_key",
+      "expected": "BAD_SNAPSHOT",
+      "ok": true,
+      "detail": "duplicate JSON object keys",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.invalid_utf8",
+      "expected": "BAD_SNAPSHOT",
+      "ok": true,
+      "detail": "snapshot payload not valid UTF-8",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.trailing_data",
+      "expected": "BAD_SNAPSHOT",
+      "ok": true,
+      "detail": "snapshot JSON has trailing data",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.top_level_not_object",
+      "expected": "BAD_SNAPSHOT",
+      "ok": true,
+      "detail": "snapshot JSON must be an object",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.nan_constant",
+      "expected": "BAD_SNAPSHOT",
+      "ok": true,
+      "detail": "non-JSON constant NaN",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.app_filled_session_generation",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "snapshot session_generation must be zero",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.app_filled_request_id",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "snapshot request_id must be zero",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.zero_config_generation",
+      "expected": "BAD_CONTROL_WIRE",
+      "ok": true,
+      "detail": "snapshot config_generation must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.negative.oversize_quota",
+      "expected": "QUOTA_EXCEEDED",
+      "ok": true,
+      "detail": "snapshot 2040B exceeds snapshot_max 1024",
+      "evidence": {}
+    },
+    {
+      "name": "session.register_without_session",
+      "expected": "UNAUTHORIZED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.control_next_without_session",
+      "expected": "UNAUTHORIZED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.snapshot_without_session",
+      "expected": "UNAUTHORIZED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.control_next_no_event",
+      "expected": "NO_EVENT=1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.register_config_apply",
+      "expected": "PENDING",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.control_next_buffer_too_small_keeps_pending",
+      "expected": "BUFFER_TOO_SMALL + pending kept",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.second_pending_busy",
+      "expected": "BUSY",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.control_next_delivers_184B",
+      "expected": "OK 184B",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.delivered_bytes_exact",
+      "expected": "match",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.control_next_after_delivery_no_event",
+      "expected": "NO_EVENT=1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.reply_wrong_request_id",
+      "expected": "INVALID_ARGUMENT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.reply_right_request_id",
+      "expected": "OK",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.known_generation_advanced_by_applied",
+      "expected": "2",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.dedup_same_id_same_semantics_cached",
+      "expected": "CACHED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.dedup_same_id_different_payload_rejected",
+      "expected": "DUPLICATE_ID_CONFLICT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.register_next_new_id",
+      "expected": "PENDING",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.stale_expected_generation_conflict",
+      "expected": "CONFLICT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.no_baseline_registration_allowed",
+      "expected": "PENDING",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.counters_reset_unconfirmed_rejected",
+      "expected": "UNCONFIRMED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.oversize_command_quota",
+      "expected": "QUOTA_EXCEEDED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.fresh_at_5000ms",
+      "expected": "current",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.stale_at_10001ms",
+      "expected": "stale",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.refresh_clears_stale",
+      "expected": "current",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "snapshot.version_increments",
+      "expected": "2",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.close_marks_delivered_unknown",
+      "expected": "1 unknown",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.snapshot_unavailable_after_close",
+      "expected": "unavailable",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.reconcile_before_snapshot_unknown",
+      "expected": "UNKNOWN",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.reconcile_after_snapshot_read_only",
+      "expected": "RECONCILED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "session.reconcile_does_not_replay",
+      "expected": "no pending/delivered",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.host_learns_baseline_from_snapshot",
+      "expected": "1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.register_accepted_pending_only",
+      "expected": "PENDING",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.delivered_to_app",
+      "expected": "OK",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.applied_reply_new_generation",
+      "expected": "APPLIED gen2 rev1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.host_accepts_reply",
+      "expected": "OK",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.known_generation_after_apply",
+      "expected": "2",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.snapshot_after_apply_matches",
+      "expected": "gen2",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.config_apply_preserves_counters",
+      "expected": "kept",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.candidate_cannot_backfill_persistent_state",
+      "expected": "counters/report_seq unchanged",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.backfill_candidate_reply_cached",
+      "expected": "OK",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.no_event_when_no_pending",
+      "expected": "NO_EVENT=1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.stale_expected_generation_rejected_at_app",
+      "expected": "REJECTED_STALE_CONFIG",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.stale_rejection_keeps_generation",
+      "expected": "2",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.cas_conflict_fails_not_applied",
+      "expected": "FAILED_STATE_CONFLICT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.cas_conflict_preserves_persisted",
+      "expected": "kept",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.io_error_fails_not_applied",
+      "expected": "FAILED_STORAGE_IO",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.storage_unknown_not_applied",
+      "expected": "FAILED_STORAGE_UNKNOWN",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.storage_unknown_restriction_on",
+      "expected": "restricted",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.restricted_app_blocks_destructive",
+      "expected": "FAILED_STORAGE_UNKNOWN",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.recovery_restores_operation",
+      "expected": "restricted cleared",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.counters_reset_applied",
+      "expected": "APPLIED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.counters_reset_keeps_config_generation",
+      "expected": "gen unchanged 3",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.counters_reset_advances_state_revision",
+      "expected": "rev 9",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "txn.counters_reset_zeroes_counters_keeps_report_seq",
+      "expected": "0/0 seq41",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "migration.v2_same_identity_restores_state",
+      "expected": "counters 55/44 gen1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "migration.cross_identity_refused",
+      "expected": "FORBIDDEN",
+      "ok": true,
+      "detail": "FORBIDDEN",
+      "evidence": {}
+    },
+    {
+      "name": "session.generation_wrap_forbidden",
+      "expected": "refused",
+      "ok": true,
+      "detail": "BAD_CONTROL_WIRE",
+      "evidence": {}
+    },
+    {
+      "name": "abi.table_60B",
+      "expected": "60",
+      "ok": true,
+      "detail": "60B",
+      "evidence": {}
+    },
+    {
+      "name": "abi.validate_v3_table",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "abi.thirteen_callbacks",
+      "expected": "13",
+      "ok": true,
+      "detail": "log,tick_ms,event_next,model_meta,class_name,report_submit,report_status,state_read,state_commit,should_stop,control_next,control_reply,snapshot_publish",
+      "evidence": {}
+    },
+    {
+      "name": "abi.new_callbacks_at_48_52_56",
+      "expected": "control_next/control_reply/snapshot_publish",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "abi.negative.table_size_48",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "table_size 48 != 60",
+      "evidence": {}
+    },
+    {
+      "name": "abi.negative.abi_0x00020000",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "abi_version 0x00020000 != 0x00030000",
+      "evidence": {}
+    },
+    {
+      "name": "abi.negative.length_48_prefix",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "v3 table length 48 != 60",
+      "evidence": {}
+    },
+    {
+      "name": "abi.negative.null_pointer_offset_56",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "null pointer at offset 56",
+      "evidence": {}
+    },
+    {
+      "name": "abi.control_next_no_event_is_1",
+      "expected": "1",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    }
+  ],
+  "hashes": {
+    "golden_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+    "golden_package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+    "golden_der": "304402204646fc74c70bbbefcabc29afb8228bc121ad8b432104254d0b3f09819e9b6de50220251fd81c3f8976906785871c0016bad865f5e3c7f460b67b76e6fc1cce5bab50",
+    "spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+    "command_config_apply_sha256": "e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca",
+    "command_counters_reset_sha256": "5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb",
+    "reply_applied_sha256": "054b7356b81fb555d6bdbc05f6d666cedb0d84a98555476a06cb32df09d87eed",
+    "snapshot_sha256": "9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5",
+    "v1_golden_tbs_sha256": "5035e6512c0c003490b228b9ae0dc6351166a04b0dc96a3ff053bb7fe348fe91",
+    "v2_golden_tbs_sha256": "e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278",
+    "v2_golden_package_sha256": "3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e"
+  },
+  "passed": 150,
+  "failed": 0
+}
