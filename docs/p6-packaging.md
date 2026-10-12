@@ -264,12 +264,14 @@ profile 2 必含 bit5+bit6/配额-能力双向匹配含 bit6/bit7/`control_max �
 
 | 文件 | 作用 |
 | --- | --- |
-| `package/neapp_v3_format.py` | v3 格式权威：容器/192B NMF3 manifest 编解码、§2.3 判定序验真管线、能力位/配额/业务下限/控制 wire 下界、Host 策略替身（分层复用 v1 共享原语，同 v2 惯例） |
-| `package/neapp_pack_v3.py` | v3 打包器：镜像 + 元数据 + 私钥 → `.neapp.v3` + 溯源 sidecar；写入前自验，任一约束违反即拒不出包 |
+| `package/neapp_v3_format.py` | v3 格式权威：容器/192B NMF3 manifest 编解码、§2.3 判定序验真管线（`host_admission` 两层可分）、能力位/配额/业务下限/控制 wire 下界、Host 策略替身（分层复用 v1 共享原语，同 v2 惯例） |
+| `package/neapp_pack_v3.py` | v3 打包器：镜像 + 元数据 + 私钥 → `.neapp.v3` + 溯源 sidecar；写入前**两层自验**（默认层=格式/签名/内在策略一致性；`--host-policy` 显式给定目标 Host 策略时追加完整 §2.3 准入模拟），任一违反即拒不出包 |
 | `package/neapp_verify_v3.py` | v3 离线验真器：`.neapp.v3` + 信任库 JSON（+ 可选 Host 策略 JSON）→ PASS 或 §11 错误类 |
 | `tests/package-v3/make_v3_test_image.py` | 受控 v3-ABI 原生测试镜像生成器（确定性；默认字节 == #19 黄金原生镜像） |
-| `tests/package-v3/v3_cases.py` | 60+ 项正/负/跨版本用例（真实 CLI 驱动，逐项 detail 归因断言） |
-| `tests/package-v3/run_checks.sh` | 一键全流程（冻结 v1/v2 回归 + spec-v2/spec-v3 套件 + v3 全套 → 证据） |
+| `tests/package-v3/v3_cases.py` | 70+ 项正/负/跨版本/打包器准入用例（真实 CLI 驱动，逐项 detail 归因断言） |
+| `tests/package-v3/run_checks.sh` | 一键全流程（证据护栏 fail-closed + 非破坏性回归 + 冻结 v1/v2 回归 + spec-v2/spec-v3 套件 + v3 全套 → 证据） |
+| `tests/package-v3/require_clean_evidence.sh` | 证据护栏：任何受守护 evidence 文件已有未提交修改即拒绝启动（fail-closed，零副作用） |
+| `tests/package-v3/test_evidence_guard.sh` | 非破坏性受控回归：护栏干净接受/脏拒封/调用者字节存活/`run_checks.sh` 快速拒封探针（自恢复） |
 
 打包（v3；能力/配额为签名请求上界，§4.2 声明 ≠ Host 授权）：
 
@@ -282,6 +284,27 @@ python3 package/neapp_pack_v3.py \
   --host-caps 0xff --event-max 2048 --state-quota 4096 --report-max 6144 \
   --control-max 256 --snapshot-max 1024
 ```
+
+**打包器自验两层语义**（v3 §2.3/§4.1 分离，#20 修正轮；`--host-caps` 默认
+`0x63` = log|tick_ms|session_lifecycle|control_receive）：
+
+- **默认层**（不给 `--host-policy`）：只验**包内在正确性**——有界结构、192B
+  NMF3 唯一编码、信任映射 + 对原样 TBS 的 ECDSA 验签、原生交叉检查、以及
+  Host 无关的 manifest 策略规则（未知能力位 bit8..31 拒绝、profile 2 必含
+  bit5+bit6、配额-能力双向匹配、`control_max ≥ 32` 通用 wire 下界）。该层对
+  **任意** v3 Host 成立，PASS **不**对任何具体 Host 的准入下结论。
+- **目标 Host 准入层**（`--host-policy host.json`，schema 与验真器
+  `--policy` 完全相同：board/PSRAM/ABI/`host_caps`/容量上限/loader/装载/
+  执行区/`business`）：在该**显式、可复核**的策略输入上追加完整 §2.3 判定序
+  （含业务下限与 Host 容量上限）；任一拒绝即 exit 2 **拒不出包**（不产出
+  任何包文件）。
+- **依据**：v3 §4.1/§14——黄金包的 `control_max=256`/`snapshot_max=1024`
+  只是 §13.10 **模拟参考值**，Host 真实容量归设备验收；打包器不得把模拟
+  业务/容量无条件强加为所有签名包的内置成包准入。因此默认命令可出合法
+  **泛用** profile 2 包（默认 caps `0x63` + `control_max` 256，无业务位）；
+  `control_max=512`/`snapshot_max=2048` 等**更大签名配额**在显式充足策略下
+  可出包 + 验真；**同一声明**对容量不足的策略必须被拒（正反例见 §13 打包器
+  准入组）。
 
 受控测试原生镜像（NEA1 32B 头、`abi_version=0x00030000` 钉定、`reserved0=0`；
 默认 payload `00207047` = Thumb `movs r0,#0; bx lr`；该工具拒绝其它 ABI 值，
@@ -322,7 +345,7 @@ loader 基址与范围/装载区/执行区/事件缓冲/报告容量/状态配�
 | 配额一致性 | bit2⇒`event_max>0`、bit3⇒`report_max>0`、bit4⇒`state_quota>0`、**bit6⇒`control_max>0`、bit7⇒`snapshot_max>0`**，反向同样拒绝（不悄悄预留） | v3 §4.1 |
 | 控制 wire 下界 | 声明 bit6 时 `control_max ≥ 32`（最小完整命令 `COUNTERS_RESET` 恰为 32B；业务候选尺寸不由本规范指定） | v3 §4.1/§13.11 |
 | 业务下限（64 框 line-crossing） | 同时要求 bits2/3/4/5/6/7；声明 `ai_events` 时 `event_max ≥ 1576`；声明 `report_submit` 时 `report_max ≥ 6144` | v3 §4.1/§10 M11 |
-| Host 实际容量（默认策略替身） | 事件缓冲 2048 / 报告 6144 / 状态配额 4096 / **控制消息 256 / 快照 RAM 1024**（§13.10 模拟参考值；设备实际值归 #55/#56）；超出 → `RESOURCE_LIMIT` | v3 §3.2/§10 M11 |
+| Host 实际容量（默认策略替身） | 事件缓冲 2048 / 报告 6144 / 状态配额 4096 / **控制消息 256 / 快照 RAM 1024**（§13.10 模拟参考值；设备实际值归 #55/#56）；超出 → `RESOURCE_LIMIT`。**只在显式给定的 Host 策略上生效**（验真器 `--policy` / 打包器 `--host-policy`）；打包器默认自验层不施加这些模拟值 | v3 §3.2/§10 M11 |
 | loader 范围 | `native_target_addr` 必须落在 Host **独立已知**的 `[0x93E00000, +2 MiB)`；装载临时量与驻留量分别验证 | v3 §3.3、v1 §2.3 |
 
 ## 12. v3 签名输入、#19 黄金逐字节复现与密钥纪律（AC1/AC3）
@@ -378,6 +401,15 @@ loader 基址与范围/装载区/执行区/事件缓冲/报告容量/状态配�
   超 Host 容量（M11）、业务下限 1576/6144（M11）、事件/状态超 Host 容量、
   板型/PSRAM、Host 缺 bit7 反向 fail-closed（M10）、执行区超限、loader 范围
   越界、装载区不足。
+- **打包器准入语义（#20 修正轮新增，真实 CLI 正反例）**：默认命令出合法
+  **泛用** profile 2 包（caps `0x63`、`control_max` 256、无业务位/配额，
+  manifest 形状断言）并在泛用 Host 策略（`business: null`）下验真 PASS；
+  同一包对 line-crossing-64 Host 策略 → `BAD_PACKAGE`（缺 bits2/3/4/7——
+  业务准入随 Host 策略，不是打包器内置规则）；`control_max=512`/
+  `snapshot_max=2048`（超出 §13.10 模拟参考值 256/1024）在**显式充足**
+  `--host-policy` 下出包 + 验真 PASS；同一包对默认模拟容量策略验真
+  `RESOURCE_LIMIT`；打包器对同一声明 + 不足策略 **exit 2 拒绝且不产出
+  文件**。
 - **跨版本判别（§10 M2–M5，v2 保留位不得提权）**：v3 黄金过**未改动** v2
   验真器 → `BAD_PACKAGE`（M2，v2 绝不解析）；过**未改动** v1 验真器 →
   `BAD_PACKAGE`（M3）；#12 v2 黄金过 v3 验真器 → `BAD_PACKAGE`（M4，且
@@ -397,14 +429,41 @@ loader 基址与范围/装载区/执行区/事件缓冲/报告容量/状态配�
 bash tests/package-v3/run_checks.sh
 ```
 
-步骤：[0/7] 预检 → [1/7] **未改动**冻结 v1/v2 包工具回归
+步骤：**[0a] 证据护栏 fail-closed**（`tests/package-v3/require_clean_evidence.sh`：
+任何受守护 evidence 文件——`p3-package-*`、`p6-package-*` 四件、`p6-package-v3-*`
+两件、`spec-v2/`、`spec-v3/`——已有未提交修改即**拒绝启动**并给出明确指引，
+零副作用；绝不静默抹除调用者工作区）→ **[0b] 非破坏性受控回归**
+（`tests/package-v3/test_evidence_guard.sh`：隔离临时仓护栏干净接受、脏拒封
+且调用者字节存活、staged 修改拒封、真实仓 `run_checks.sh` 对脏守护文件快速
+拒封 + 探针自恢复）→ **[0/7] 预检** → [1/7] **未改动**冻结 v1/v2 包工具回归
 `tests/package-v2/run_checks.sh`（内含 v1 回归 + hello-app 逐字节复现 + 59
-项 v2 用例；本轮快照 captured，#13 拥有的已提交证据文件随后 **restore 原状**
-，不被本轮 churn）→ [2/7] **未改动** `tests/spec-v2/run_all_tests.py`（73
-向量）与 `tests/spec-v3/run_all_tests.py`（150 向量；两者提交证据必须
-逐字节不变）→ [3/7] 非生产身份（每轮 dev 钥 + 公开 d=1）→ [4/7] 受控镜像
-（== #19 黄金原生镜像断言）→ [5/7] d=1 黄金复刻包（TBS **与整包**逐字节
-一致断言）→ [6/7] dev 包 1.0.0/2.0.0/alt → [7/7] v3 用例矩阵 + 证据落盘。
+项 v2 用例；本轮快照 captured；#13 拥有的已提交证据文件在护栏预检证明干净
+后才 restore 原状，restore 后逐文件断言 clean，不被本轮 churn）→ [2/7]
+**未改动** `tests/spec-v2/run_all_tests.py`（73 向量）与
+`tests/spec-v3/run_all_tests.py`（150 向量；两者提交证据必须逐字节不变）→
+[3/7] 非生产身份（每轮 dev 钥 + 公开 d=1）→ [4/7] 受控镜像（== #19 黄金
+原生镜像断言）→ [5/7] d=1 黄金复刻包（TBS **与整包**逐字节一致断言）→
+[6/7] dev 包 1.0.0/2.0.0/alt → [7/7] v3 用例矩阵（含打包器准入语义组）+
+证据落盘。
+
+**本轮修正（A REQUEST_CHANGES 三阻断）实施说明**：
+
+1. **打包器自验两层语义**：如 §10 所述，默认层只验包内在正确性
+   （`neapp_v3_format.verify_package_v3` 新增 `host_admission=False` 参数，
+   验真器默认行为不变），目标 Host 准入改为 `--host-policy` 显式输入；
+   `--host-caps` 帮助文本默认值笔误 `0x67` → `0x63` 一并修正。
+2. **证据护栏 + 非破坏性回归**：如上 [0a]/[0b]；被守护文件集合即本脚本
+   （含其调用的冻结套件）会重写的 `docs/evidence` 全部文件。
+3. **零注释纪律**（User 明确禁令，适用一切新增/修改代码）：本轮全部
+   Python/Shell 代码**零注释**（含 `# noqa`、`# type: ignore` 类指令注释，
+   已全部移除）。实现方式：`neapp_pack_v3.py`/`neapp_verify_v3.py` 的
+   `import neapp_format`/`import neapp_v3_format` 归位到文件顶部 import 块
+   （删除 `sys.path.insert`——直接脚本执行时 Python 自动将脚本目录置于
+   `sys.path[0]`，与 `neapp_v3_format.py` 既有 `import neapp_format` 惯例
+   一致）；`tests/package-v3/v3_cases.py` 在路径设置后用
+   `importlib.import_module` 绑定三个包模块，import 语句全部保留在文件
+   顶部；`parse_version` 重构为显式解包三元组返回，移除
+   `type: ignore[return-value]`。行为与全部测试保持不变。
 
 证据（真实输出）：
 

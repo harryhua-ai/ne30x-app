@@ -26,6 +26,28 @@ written into the manifest and provenance sidecar.
 The output package is OFFLINE evidence: packing (or packing plus
 self-verification) does not mean NE301 admitted, installed, executed, or
 hot-reconfigured anything (spec §14).
+
+Self-verification is two-tier (§2.3/§4.1 separation, Issue #20 fix):
+
+  * default tier (no --host-policy): verifies the emitted package is
+    format-correct, signature-valid against its own publisher key, and
+    intrinsically policy-consistent (unknown capability bits, run_profile
+    2 requiring bit5+bit6, quota/capability matching, generic 32B
+    control-wire minimum).  A PASS makes NO claim that any Host admits
+    the package: capability/quotas are signed requests (§4.2) and Host
+    capacity is device acceptance (§14).
+  * target-Host admission tier (--host-policy PATH): additionally runs
+    the FULL verifier pipeline (neapp_v3_format.verify_package_v3 with
+    host_admission=True) against the policy JSON given on the command
+    line — same schema as neapp_verify_v3.py --policy: board/PSRAM/ABI,
+    Host-provided capability bits, business floors and Host capacity
+    ceilings (the 256/1024B control/snapshot values are golden SIMULATION
+    reference values, §13.10/§14, never implied defaults).  Any rejection
+    refuses to emit.
+
+Without --host-policy the packer therefore happily emits legal GENERIC
+v3 run_profile 2 packages (e.g. default caps 0x63 with control_max only)
+and packages with larger signed quotas than any simulated Host.
 """
 
 from __future__ import annotations
@@ -37,11 +59,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import neapp_format as fmt  # noqa: E402
-import neapp_v3_format as fmt3  # noqa: E402
+import neapp_format as fmt
+import neapp_v3_format as fmt3
 
-PACKER_VERSION = "3.0.0"
+PACKER_VERSION = "3.0.1"
 
 
 def parse_int(value: str) -> int:
@@ -52,10 +73,10 @@ def parse_version(value: str) -> tuple[int, int, int]:
     parts = value.split(".")
     if len(parts) != 3 or not all(p.isdigit() for p in parts):
         raise ValueError(f"version must be MAJOR.MINOR.PATCH of integers, got {value!r}")
-    v = tuple(int(p) for p in parts)
-    if any(p > 0xFFFF for p in v):
+    major, minor, patch = (int(p) for p in parts)
+    if any(v > 0xFFFF for v in (major, minor, patch)):
         raise ValueError("version segments must fit u16")
-    return v  # type: ignore[return-value]
+    return major, minor, patch
 
 
 def load_private_key(path: Path):
@@ -104,7 +125,7 @@ def main() -> int:
                         default=fmt3.CAP_LOG | fmt3.CAP_TICK_MS | fmt3.CAP_SESSION_LIFECYCLE
                         | fmt3.CAP_CONTROL_RECEIVE,
                         help="v3 capability bitmask, bits 0..7 only; run_profile 2 requires bit5+bit6 "
-                             "(default 0x67 = log|tick_ms|session_lifecycle|control_receive)")
+                             "(default 0x63 = log|tick_ms|session_lifecycle|control_receive)")
     parser.add_argument("--event-max", type=parse_int, default=0,
                         help="AI event single-event max bytes declared (requires capability bit2)")
     parser.add_argument("--state-quota", type=parse_int, default=0,
@@ -125,6 +146,14 @@ def main() -> int:
                         help="source commit recorded in the provenance sidecar (default: auto-detect)")
     parser.add_argument("--sidecar", default=None, metavar="PATH|none",
                         help="provenance JSON path (default: <out>.provenance.json)")
+    parser.add_argument("--host-policy", type=Path, default=None, metavar="JSON",
+                        help="optional target-Host policy for ADMISSION SIMULATION "
+                             "(same schema as neapp_verify_v3.py --policy: board/PSRAM/ABI/"
+                             "host_caps/quotas/loader/business); given it, self-verification "
+                             "also runs the full target-Host admission pipeline and refuses "
+                             "to emit on any rejection; without it, self-verification covers "
+                             "format/signature/intrinsic-manifest-policy only and makes NO "
+                             "Host-admission claim (§4.1/§14)")
     args = parser.parse_args()
 
     from cryptography.hazmat.primitives import hashes
@@ -247,11 +276,26 @@ def main() -> int:
         fmt.validate_identifier("publisher_id", args.publisher_id.encode("ascii"), 16):
             (hashlib.sha256(spki).hexdigest(), spki),
     })
-    report, err = fmt3.verify_package_v3(package, self_trust)
-    if err is not None:
-        print(f"ERROR: packer self-verification rejected the package: {err.code}: {err.detail}",
-              file=sys.stderr)
-        return 2
+    host_policy = None
+    if args.host_policy is not None:
+        try:
+            host_policy = fmt3.DevicePolicyV3.from_json(
+                json.loads(args.host_policy.read_text(encoding="utf-8")))
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"ERROR: cannot load target-Host policy {args.host_policy}: {exc}",
+                  file=sys.stderr)
+            return 2
+        report, err = fmt3.verify_package_v3(package, self_trust, host_policy)
+        if err is not None:
+            print(f"ERROR: target-Host admission simulation ({args.host_policy}) rejected "
+                  f"the package: {err.code}: {err.detail}", file=sys.stderr)
+            return 2
+    else:
+        report, err = fmt3.verify_package_v3(package, self_trust, host_admission=False)
+        if err is not None:
+            print(f"ERROR: packer self-verification rejected the package: {err.code}: {err.detail}",
+                  file=sys.stderr)
+            return 2
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_bytes(package)

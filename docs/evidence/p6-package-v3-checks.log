@@ -1,6 +1,7 @@
 
 == [0/7] preflight
 python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2 arm-none-eabi-gcc=15.2.1
+non-destructive evidence-guard regression: PASS (tests/package-v3/test_evidence_guard.sh: clean accept, dirty refuse, caller bytes survive, run_checks.sh fail-closed probe self-restored)
 
 == [1/7] frozen v1/v2 package-tool regression UNCHANGED (tests/package-v2/run_checks.sh)
 
@@ -16,7 +17,7 @@ python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2
 dev signing identity generated (NON-PRODUCTION TEST ROOT)
   private key (gitignored, owner-only): /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/keys/dev-signer.pem
   signer SPKI DER: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/keys/dev-signer.spki.der (91 B)
-  SHA-256(SPKI DER): 6d869d6f0c06fd4124e333474cc8d7525d199eea8ffa91b488b6f54424cae64d
+  SHA-256(SPKI DER): 173b6ddbc0f0f3622ed8edc053ca763f96207100021121847322c8a7926f341c
   trust store: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/trust-dev.json (publisher_id 'dev-publisher')
 
 == [2/9] clean build hello-app V1 + V2 native images (pinned ABI, Arm GNU)
@@ -64,11 +65,11 @@ VALID: file=608 payload=576 target=0x93e00000 entry_offset=0x50 abi=0x00010000 c
 reproducible OK: sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03
 
 == [4/9] pack .neapp v1 packages (packer self-verifies before writing)
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v1.neapp: tbs 784 B + der 70 B = 854 B, package_sha256 cb0f55b0073325ef61f7ac709349291ac02823059dda5c5551291a33d81b68a3, content_identity(SHA-256(TBS)) cced164d67bf1d7eedc51e1ec19a5a6e6f7e07af903f0118f68e56232f2016ec
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v1.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 20a156b4aa2ac57aa1281df7c8fcb28179324fbef847ca61edcdc0dbd5fdc4fc, content_identity(SHA-256(TBS)) 08ba539ce798347d9c8ab1d2fbeda8e67d4b7eb9f5b2b753bb17a8d125ef1d18
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v1.neapp.provenance.json
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v2.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 f7685d79ae09c8ea8ab0c89e774957053efd6b39c3c94a81d81a66af4cf2537c, content_identity(SHA-256(TBS)) a273c762d5dbcbfc56aa2964022951be59e1cd49687f9d3f94039f06cccf8b17
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v2.neapp: tbs 784 B + der 70 B = 854 B, package_sha256 35629b364f11d629156e87436e02f69d3e270f1496268def274589beec89a811, content_identity(SHA-256(TBS)) a6d11e1aa4b7bb50e7a50f100413d9918c68b82dce0ee139aab0450e7fbd059b
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v2.neapp.provenance.json
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/v2-image-as-1.0.0.neapp: tbs 784 B + der 70 B = 854 B, package_sha256 0874bfa8d387c77548a754adaa6ec181cbc2aa40d69d7d738c1ac86a976dc1fc, content_identity(SHA-256(TBS)) 6f9b4e389818a61b8ed800df0c72419421d5441720afa17733b6b7f1351dd49d
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/v2-image-as-1.0.0.neapp: tbs 784 B + der 70 B = 854 B, package_sha256 708ac48780392f2201acceffe07163705977792cd0f2136f9841f4845ff41150, content_identity(SHA-256(TBS)) 11d18db9b4c191ea813faf6b9ebada4fe72038b4874e82ac0222735037ecb68a
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/v2-image-as-1.0.0.neapp.provenance.json
 
 == [5/9] offline verification of the trusted packages (must PASS)
@@ -77,40 +78,16 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "app_id": "hello-app",
   "app_version": "1.0.0",
   "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
-  "content_identity_sha256": "cced164d67bf1d7eedc51e1ec19a5a6e6f7e07af903f0118f68e56232f2016ec",
+  "content_identity_sha256": "08ba539ce798347d9c8ab1d2fbeda8e67d4b7eb9f5b2b753bb17a8d125ef1d18",
   "native_crc32": "0x1eb77cb6",
   "native_entry_offset": "0x50",
   "native_file_len": 608,
   "native_file_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
   "native_image_size": 576,
   "native_target_addr": "0x93e00000",
-  "package_sha256": "cb0f55b0073325ef61f7ac709349291ac02823059dda5c5551291a33d81b68a3",
+  "package_sha256": "20a156b4aa2ac57aa1281df7c8fcb28179324fbef847ca61edcdc0dbd5fdc4fc",
   "publisher_id": "dev-publisher",
-  "publisher_key_sha256": "6d869d6f0c06fd4124e333474cc8d7525d199eea8ffa91b488b6f54424cae64d",
-  "required_exec_region_bytes": 576,
-  "required_host_abi": "0x00010000",
-  "required_host_caps": "0x3",
-  "required_psram_mib": 64,
-  "result": "PASS",
-  "signature_len": 70,
-  "target_board_id": "0x00003010",
-  "tbs_len": 784
-}
-VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v2.neapp
-{
-  "app_id": "hello-app",
-  "app_version": "2.0.0",
-  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
-  "content_identity_sha256": "a273c762d5dbcbfc56aa2964022951be59e1cd49687f9d3f94039f06cccf8b17",
-  "native_crc32": "0x24352317",
-  "native_entry_offset": "0x50",
-  "native_file_len": 608,
-  "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
-  "native_image_size": 576,
-  "native_target_addr": "0x93e00000",
-  "package_sha256": "f7685d79ae09c8ea8ab0c89e774957053efd6b39c3c94a81d81a66af4cf2537c",
-  "publisher_id": "dev-publisher",
-  "publisher_key_sha256": "6d869d6f0c06fd4124e333474cc8d7525d199eea8ffa91b488b6f54424cae64d",
+  "publisher_key_sha256": "173b6ddbc0f0f3622ed8edc053ca763f96207100021121847322c8a7926f341c",
   "required_exec_region_bytes": 576,
   "required_host_abi": "0x00010000",
   "required_host_caps": "0x3",
@@ -120,21 +97,45 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "target_board_id": "0x00003010",
   "tbs_len": 784
 }
-VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/v2-image-as-1.0.0.neapp
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v2.neapp
 {
   "app_id": "hello-app",
-  "app_version": "1.0.0",
+  "app_version": "2.0.0",
   "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
-  "content_identity_sha256": "6f9b4e389818a61b8ed800df0c72419421d5441720afa17733b6b7f1351dd49d",
+  "content_identity_sha256": "a6d11e1aa4b7bb50e7a50f100413d9918c68b82dce0ee139aab0450e7fbd059b",
   "native_crc32": "0x24352317",
   "native_entry_offset": "0x50",
   "native_file_len": 608,
   "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
   "native_image_size": 576,
   "native_target_addr": "0x93e00000",
-  "package_sha256": "0874bfa8d387c77548a754adaa6ec181cbc2aa40d69d7d738c1ac86a976dc1fc",
+  "package_sha256": "35629b364f11d629156e87436e02f69d3e270f1496268def274589beec89a811",
   "publisher_id": "dev-publisher",
-  "publisher_key_sha256": "6d869d6f0c06fd4124e333474cc8d7525d199eea8ffa91b488b6f54424cae64d",
+  "publisher_key_sha256": "173b6ddbc0f0f3622ed8edc053ca763f96207100021121847322c8a7926f341c",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 70,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/v2-image-as-1.0.0.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "11d18db9b4c191ea813faf6b9ebada4fe72038b4874e82ac0222735037ecb68a",
+  "native_crc32": "0x24352317",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "708ac48780392f2201acceffe07163705977792cd0f2136f9841f4845ff41150",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "173b6ddbc0f0f3622ed8edc053ca763f96207100021121847322c8a7926f341c",
   "required_exec_region_bytes": 576,
   "required_host_abi": "0x00010000",
   "required_host_caps": "0x3",
@@ -207,9 +208,9 @@ V1 image  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/apps/hello-app
 V2 image  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/apps/hello-app/build-v2/hello-app-v2.bin
   sha256 e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd
 V1 package /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v1.neapp
-  sha256 cb0f55b0073325ef61f7ac709349291ac02823059dda5c5551291a33d81b68a3
+  sha256 20a156b4aa2ac57aa1281df7c8fcb28179324fbef847ca61edcdc0dbd5fdc4fc
 V2 package /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package/work/pkg/hello-app-v2.neapp
-  sha256 f7685d79ae09c8ea8ab0c89e774957053efd6b39c3c94a81d81a66af4cf2537c
+  sha256 35629b364f11d629156e87436e02f69d3e270f1496268def274589beec89a811
 P3-owned artifact restored; this run snapshotted to docs/evidence/p6-v1-regression-artifacts.json
 
 == [2/8] #12 spec-v2 vector suite UNCHANGED (tests/spec-v2/run_all_tests.py)
@@ -308,7 +309,7 @@ All vectors PASS. Host-side spec evidence only — no device PASS (spec §12).
 dev signing identity generated (NON-PRODUCTION TEST ROOT)
   private key (gitignored, owner-only): /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/keys/dev-signer.pem
   signer SPKI DER: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/keys/dev-signer.spki.der (91 B)
-  SHA-256(SPKI DER): a4eb8dbf265ec0e56c84e073358e706f2ac0e6f1a31894f210c3f2475cbe5826
+  SHA-256(SPKI DER): 00512df3f7f87601389b719fd3adb29434b4cf41072e2e5148d5fce18c1aa16b
   trust store: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/trust-dev.json (publisher_id 'dev-publisher')
 d=1 test identity generated (PUBLIC, NON-PRODUCTION): SPKI sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3
   private key (gitignored): /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/keys/d1-test-signer.pem
@@ -360,14 +361,14 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
 }
 
 == [6/8] dev-key v2 packages (AC1 traceable provenance, upgrade + conflict discriminators)
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2: tbs 244 B + der 70 B = 314 B, package_sha256 57642fc65a2ba3e08de9c9d9a580de1b6b0d2c0bce86ac1d65cd42b18e58516e, content_identity(SHA-256(TBS)) 5b4ee9b48f61e5a979ee98ad3ae3e3ab93a2a50032be877980890cfb1a4edc3a
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2: tbs 244 B + der 70 B = 314 B, package_sha256 45cd840adedeef34c78c6390118417a5c323c1e920946cd18b19312d5dcc6c56, content_identity(SHA-256(TBS)) 325a30521e00e8d1941ac1abfe6480459179d91eb11b69fe32236c60b70c52f0
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2.provenance.json
 VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2
 {
   "app_id": "lc-test-app",
   "app_version": "1.0.0",
   "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
-  "content_identity_sha256": "5b4ee9b48f61e5a979ee98ad3ae3e3ab93a2a50032be877980890cfb1a4edc3a",
+  "content_identity_sha256": "325a30521e00e8d1941ac1abfe6480459179d91eb11b69fe32236c60b70c52f0",
   "event_max": 2048,
   "format": "neapp-v2",
   "native_crc32": "0xde8e3439",
@@ -376,9 +377,9 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "native_file_sha256": "9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095",
   "native_image_size": 4,
   "native_target_addr": "0x93e00000",
-  "package_sha256": "57642fc65a2ba3e08de9c9d9a580de1b6b0d2c0bce86ac1d65cd42b18e58516e",
+  "package_sha256": "45cd840adedeef34c78c6390118417a5c323c1e920946cd18b19312d5dcc6c56",
   "publisher_id": "dev-publisher",
-  "publisher_key_sha256": "a4eb8dbf265ec0e56c84e073358e706f2ac0e6f1a31894f210c3f2475cbe5826",
+  "publisher_key_sha256": "00512df3f7f87601389b719fd3adb29434b4cf41072e2e5148d5fce18c1aa16b",
   "report_max": 6144,
   "required_exec_region_bytes": 4,
   "required_host_abi": "0x00020000",
@@ -391,14 +392,14 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "target_board_id": "0x00003010",
   "tbs_len": 244
 }
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2: tbs 244 B + der 71 B = 315 B, package_sha256 cd647096e4af9f09ba486591b937aae0bd9949df294030e0f3701a6cc9c8ae61, content_identity(SHA-256(TBS)) c97288fe95586c62819a0a36902554369bc943401169ab7153aff388cda9a169
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2: tbs 244 B + der 72 B = 316 B, package_sha256 1e712059b00386733aacd57940264648f0ad87e81c6ea3f07802db3c77fd8f51, content_identity(SHA-256(TBS)) 7818c3c24ea994225bc863b77880bddf4170b2db67b654dee5ce5b1d1296d018
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2.provenance.json
 VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2
 {
   "app_id": "lc-test-app",
   "app_version": "2.0.0",
   "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
-  "content_identity_sha256": "c97288fe95586c62819a0a36902554369bc943401169ab7153aff388cda9a169",
+  "content_identity_sha256": "7818c3c24ea994225bc863b77880bddf4170b2db67b654dee5ce5b1d1296d018",
   "event_max": 2048,
   "format": "neapp-v2",
   "native_crc32": "0xde8e3439",
@@ -407,9 +408,9 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "native_file_sha256": "9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095",
   "native_image_size": 4,
   "native_target_addr": "0x93e00000",
-  "package_sha256": "cd647096e4af9f09ba486591b937aae0bd9949df294030e0f3701a6cc9c8ae61",
+  "package_sha256": "1e712059b00386733aacd57940264648f0ad87e81c6ea3f07802db3c77fd8f51",
   "publisher_id": "dev-publisher",
-  "publisher_key_sha256": "a4eb8dbf265ec0e56c84e073358e706f2ac0e6f1a31894f210c3f2475cbe5826",
+  "publisher_key_sha256": "00512df3f7f87601389b719fd3adb29434b4cf41072e2e5148d5fce18c1aa16b",
   "report_max": 6144,
   "required_exec_region_bytes": 4,
   "required_host_abi": "0x00020000",
@@ -417,19 +418,19 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "required_psram_mib": 64,
   "result": "PASS",
   "run_profile": 1,
-  "signature_len": 71,
+  "signature_len": 72,
   "state_quota": 4096,
   "target_board_id": "0x00003010",
   "tbs_len": 244
 }
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2: tbs 244 B + der 71 B = 315 B, package_sha256 e10037a4a1e09a7164d3999fbb8581e27b9566ab17cee27257a4393364d4b80b, content_identity(SHA-256(TBS)) 5e5f4a48f7112086fa730344cf47f24258f75fb0ba20fbe92dd5e00ee60bfd7c
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2: tbs 244 B + der 71 B = 315 B, package_sha256 05ffe4add5d749d83321ff77d7140f7c34f83499268b7bf210a253a366e1787b, content_identity(SHA-256(TBS)) ea94af7e8ebb98648137f7e1c8ab24142ac31ae073ca434ee424007d422ad997
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2.provenance.json
 VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2
 {
   "app_id": "lc-test-app",
   "app_version": "1.0.0",
   "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
-  "content_identity_sha256": "5e5f4a48f7112086fa730344cf47f24258f75fb0ba20fbe92dd5e00ee60bfd7c",
+  "content_identity_sha256": "ea94af7e8ebb98648137f7e1c8ab24142ac31ae073ca434ee424007d422ad997",
   "event_max": 2048,
   "format": "neapp-v2",
   "native_crc32": "0x4e3129a8",
@@ -438,9 +439,9 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
   "native_file_sha256": "16cd5a93088375060043fdd728f7fec56d4edec17c684225f327a813e30fb39a",
   "native_image_size": 4,
   "native_target_addr": "0x93e00000",
-  "package_sha256": "e10037a4a1e09a7164d3999fbb8581e27b9566ab17cee27257a4393364d4b80b",
+  "package_sha256": "05ffe4add5d749d83321ff77d7140f7c34f83499268b7bf210a253a366e1787b",
   "publisher_id": "dev-publisher",
-  "publisher_key_sha256": "a4eb8dbf265ec0e56c84e073358e706f2ac0e6f1a31894f210c3f2475cbe5826",
+  "publisher_key_sha256": "00512df3f7f87601389b719fd3adb29434b4cf41072e2e5148d5fce18c1aa16b",
   "report_max": 6144,
   "required_exec_region_bytes": 4,
   "required_host_abi": "0x00020000",
@@ -533,13 +534,13 @@ controlled image /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/p
 golden replica  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/golden-replica.neapp.v2
   sha256 aad02bca22a1e10cd70f73d592ad89440e11a12a9c361abb5c99271087af3112
 dev package     /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2
-  sha256 57642fc65a2ba3e08de9c9d9a580de1b6b0d2c0bce86ac1d65cd42b18e58516e
+  sha256 45cd840adedeef34c78c6390118417a5c323c1e920946cd18b19312d5dcc6c56
 evidence log    /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/docs/evidence/p6-package-checks.log
 frozen v1/v2 regression snapshot captured:
   v1 spec vectors: 15, generated cases: 33
   hello-app V1 sha256: d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03 (byte-exact)
   v2 cases: 59
-#13-owned p6 evidence files restored unchanged (this round's results are recorded in the v3 evidence)
+#13-owned p6 evidence files restored to committed bytes (guard pre-checked them clean before the run; this round's results are recorded in the v3 evidence)
 
 == [2/7] frozen spec suites UNCHANGED (spec-v2 then spec-v3, evidence must stay deterministic)
 spec-v2 suite: PASS (committed evidence byte-identical)
@@ -549,7 +550,7 @@ spec-v3 suite: PASS (committed evidence byte-identical)
 dev signing identity generated (NON-PRODUCTION TEST ROOT)
   private key (gitignored, owner-only): /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/keys/dev-signer.pem
   signer SPKI DER: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/keys/dev-signer.spki.der (91 B)
-  SHA-256(SPKI DER): bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e
+  SHA-256(SPKI DER): 93e56651404392fe65f747bfe149f543f8c2e92f762fe529a4ee0c1f38568a2d
   trust store: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/trust-dev.json (publisher_id 'dev-publisher')
 d=1 test identity generated (PUBLIC, NON-PRODUCTION): SPKI sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3
   private key (gitignored): /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/keys/d1-test-signer.pem
@@ -605,20 +606,20 @@ VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests
 golden replica verified PASS
 
 == [6/7] dev-key v3 packages (AC1 traceable provenance, upgrade + conflict discriminators)
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3: tbs 244 B + der 70 B = 314 B, package_sha256 1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40, content_identity(SHA-256(TBS)) 829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3: tbs 244 B + der 71 B = 315 B, package_sha256 185d5ef4feb9e7b6ee2d53f709ebdd4cbab48b4ceb612cbe748538b094620222, content_identity(SHA-256(TBS)) 956440f9536974d848885afcb72768d4a66b424cc6fb329117fb41ed62b1cdde
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3.provenance.json
 VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
-{"app_id": "lc-test-app", "app_version": "1.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0xde8e3439", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40", "publisher_id": "dev-publisher", "publisher_key_sha256": "bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 70, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
+{"app_id": "lc-test-app", "app_version": "1.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "956440f9536974d848885afcb72768d4a66b424cc6fb329117fb41ed62b1cdde", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0xde8e3439", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "185d5ef4feb9e7b6ee2d53f709ebdd4cbab48b4ceb612cbe748538b094620222", "publisher_id": "dev-publisher", "publisher_key_sha256": "93e56651404392fe65f747bfe149f543f8c2e92f762fe529a4ee0c1f38568a2d", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 71, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
 packed+verified /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3: tbs 244 B + der 72 B = 316 B, package_sha256 da88a9198604a6650bb31407676a251a5af016631a014b8526fbf35f4c289424, content_identity(SHA-256(TBS)) 82095c30b467b3b3f459bb630c0953fd292a1f576d9d10b127b2a6fd204a2eb7
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3: tbs 244 B + der 70 B = 314 B, package_sha256 7bc9356807e2eb70608ae07c7a46f3dc36e01e917a1dcb724e87749a75a39e35, content_identity(SHA-256(TBS)) 1a8013a70cb3f2e6cd7459d7499d7f836e03698229ca5f5b7e26d6a92df3e227
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3.provenance.json
 VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3
-{"app_id": "lc-test-app", "app_version": "2.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "82095c30b467b3b3f459bb630c0953fd292a1f576d9d10b127b2a6fd204a2eb7", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0xde8e3439", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "da88a9198604a6650bb31407676a251a5af016631a014b8526fbf35f4c289424", "publisher_id": "dev-publisher", "publisher_key_sha256": "bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 72, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
+{"app_id": "lc-test-app", "app_version": "2.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "1a8013a70cb3f2e6cd7459d7499d7f836e03698229ca5f5b7e26d6a92df3e227", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0xde8e3439", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "7bc9356807e2eb70608ae07c7a46f3dc36e01e917a1dcb724e87749a75a39e35", "publisher_id": "dev-publisher", "publisher_key_sha256": "93e56651404392fe65f747bfe149f543f8c2e92f762fe529a4ee0c1f38568a2d", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 70, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
 packed+verified /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3
-packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3: tbs 244 B + der 71 B = 315 B, package_sha256 54216062e1da36087bdb06e4a28092d58daec2d644f103c112a39cf6cf423a87, content_identity(SHA-256(TBS)) e49690f9f489a696d63998483414c662ebc1d2e3a6fb24facd7dfb61287825fb
+packed /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3: tbs 244 B + der 71 B = 315 B, package_sha256 3ed15a161ec54f3aa6519ba3262a87d9dbffa0aee38f72c296499a791bd4d8ca, content_identity(SHA-256(TBS)) 919582c5e0787c5cf94dbb39c61c7b1efd4c1858826f905c713dd43eb36b5138
 provenance -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3.provenance.json
 VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3
-{"app_id": "lc-test-app", "app_version": "1.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "e49690f9f489a696d63998483414c662ebc1d2e3a6fb24facd7dfb61287825fb", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0x4e3129a8", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "2b22aaac5ed17fa345769505be9ec187655446c6234880c19f6084fcb9ad3a3c", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "54216062e1da36087bdb06e4a28092d58daec2d644f103c112a39cf6cf423a87", "publisher_id": "dev-publisher", "publisher_key_sha256": "bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 71, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
+{"app_id": "lc-test-app", "app_version": "1.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "919582c5e0787c5cf94dbb39c61c7b1efd4c1858826f905c713dd43eb36b5138", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0x4e3129a8", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "2b22aaac5ed17fa345769505be9ec187655446c6234880c19f6084fcb9ad3a3c", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "3ed15a161ec54f3aa6519ba3262a87d9dbffa0aee38f72c296499a791bd4d8ca", "publisher_id": "dev-publisher", "publisher_key_sha256": "93e56651404392fe65f747bfe149f543f8c2e92f762fe529a4ee0c1f38568a2d", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 71, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
 packed+verified /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3
 
 == [7/7] v3 rejection matrix + cross-version discrimination + evidence
@@ -629,6 +630,13 @@ packed+verified /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/pa
   ok golden_der_independent_cross: predicate
   ok golden_low_s_variant_same_identity: PASS
   ok dev_provenance_traceable: predicate
+[v3-cases] packer admission semantics: generic profile 2 default pack + explicit target-Host policy separation (Issue #20 fix)
+  ok pack_default_generic_profile2_shape: predicate
+  ok pack_default_generic_profile2_verifier_pass: PASS
+  ok generic_profile2_vs_line_crossing_host: BAD_PACKAGE [line-crossing-64 requires capability bits]
+  ok pack_large_quota_with_sufficient_host_policy: PASS
+  ok large_quota_pkg_vs_insufficient_host: RESOURCE_LIMIT [exceeds the Host control message capacity]
+  ok pack_large_quota_insufficient_host_refusal: refused
 [v3-cases] rejection matrix: structure / DER / manifest encoding
   ok magic_v2_on_v3: BAD_PACKAGE [container magic]
   ok magic_v1_on_v3: BAD_PACKAGE [container magic]
@@ -696,7 +704,7 @@ packed+verified /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/pa
   ok helloapp_v1_image_in_v3_container: BAD_PACKAGE [abi_version]
   ok helloapp_v1_image_pack_refusal: refused
   ok v2abi_image_pack_refusal: refused
-v3 case suite: 67 entries, all expectations matched
+v3 case suite: 73 entries, all expectations matched
 results -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/v3-cases/v3-cases-results.json
 evidence -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/docs/evidence/p6-package-v3-artifacts.json
 
@@ -706,5 +714,5 @@ controlled image /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/p
 golden replica  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/golden-replica.neapp.v3
   sha256 c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342
 dev package     /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
-  sha256 1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40
+  sha256 185d5ef4feb9e7b6ee2d53f709ebdd4cbab48b4ceb612cbe748538b094620222
 evidence log    /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/20/docs/evidence/p6-package-v3-checks.log

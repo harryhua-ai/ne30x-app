@@ -42,9 +42,8 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import neapp_format as fmt  # noqa: E402
-import neapp_v3_format as fmt3  # noqa: E402
+import neapp_format as fmt
+import neapp_v3_format as fmt3
 
 EXPECTED_RESULTS = ("PASS",) + tuple(cls.code for cls in fmt.ERROR_CLASSES)
 

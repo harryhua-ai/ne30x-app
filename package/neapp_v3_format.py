@@ -28,6 +28,23 @@ docs/app-package-protocol-v3.md (Issue #19 merged baseline):
         PUBLISHER_UNTRUSTED / SIGNATURE_INVALID / TARGET_INCOMPATIBLE /
         ABI_INCOMPATIBLE / RESOURCE_LIMIT)
 
+verify_package_v3 separates the two verification tiers of §2.3/§4.1:
+
+  * intrinsic tier (host_admission=False): bounded structure, manifest
+    unique encoding, trust mapping, signature, native cross-checks and the
+    Host-independent manifest policy rules (unknown capability bits,
+    run_profile 2 requiring bit5+bit6, quota/capability mutual
+    consistency, generic 32B control-wire minimum).  This tier is
+    package-intrinsic: it holds for ANY v3 Host.
+  * target-Host admission tier (host_admission=True, the verifier
+    default): additionally applies one CONCRETE DevicePolicyV3 — board,
+    PSRAM, ABI, Host-provided capability bits, business floors
+    (line-crossing-64) and Host capacity ceilings (event/report/state/
+    control/snapshot/load/loader/execution).  Those Host facts are device
+    acceptance per §4.1/§14; the 256/1024B control/snapshot defaults are
+    golden SIMULATION reference values (§13.10), never a universal
+    admission rule.
+
 v3 is an independent container major: it never interprets v1/v2 packages,
 and the v2 reserved bytes [176..191] cannot grant bit6/bit7 anywhere.
 
@@ -318,15 +335,24 @@ def verify_package_v3(
     data: bytes,
     trust: fmt.TrustStore,
     policy: DevicePolicyV3 | None = None,
+    host_admission: bool = True,
 ) -> tuple[dict, None] | tuple[None, PackageError]:
+    """Verify a v3 package; see the module docstring for the two tiers.
+
+    host_admission=True (default, verifier mode) runs the full §2.3 order
+    including the target-Host admission checks of the given (or default)
+    policy.  host_admission=False (packer self-check mode) runs only the
+    package-intrinsic tier; a PASS there never claims any Host would admit
+    the package.
+    """
     policy = policy or default_policy()
     try:
-        return _verify_v3_impl(data, trust, policy)
+        return _verify_v3_impl(data, trust, policy, host_admission)
     except PackageError as exc:
         return None, exc
 
 
-def _verify_v3_impl(data, trust, policy):
+def _verify_v3_impl(data, trust, policy, host_admission=True):
     min_len = HEADER_LEN + MANIFEST_LEN + NATIVE_HEADER_SIZE + MIN_SIG_LEN
     if len(data) < min_len:
         raise BadPackage(f"file is {len(data)} bytes, shorter than the minimum v3 package {min_len}")
@@ -421,15 +447,15 @@ def _verify_v3_impl(data, trust, policy):
             "required_exec_region_bytes is smaller than native_image_size (payload residency)"
         )
 
-    if manifest.target_board_id != policy.target_board_id:
+    if host_admission and manifest.target_board_id != policy.target_board_id:
         raise TargetIncompatible(
             f"target_board_id {manifest.target_board_id:#010x} != policy {policy.target_board_id:#010x}"
         )
-    if manifest.required_psram_mib > policy.psram_mib:
+    if host_admission and manifest.required_psram_mib > policy.psram_mib:
         raise TargetIncompatible(
             f"required_psram_mib {manifest.required_psram_mib} unsupported (policy {policy.psram_mib})"
         )
-    if manifest.required_host_abi != policy.host_abi:
+    if host_admission and manifest.required_host_abi != policy.host_abi:
         raise AbiIncompatible(
             f"required_host_abi {manifest.required_host_abi:#010x} != policy {policy.host_abi:#010x}"
         )
@@ -440,7 +466,7 @@ def _verify_v3_impl(data, trust, policy):
             "(bit8..31 must be zero, §4.1/§10 M8)"
         )
     unsupported = caps & ~policy.host_caps
-    if unsupported:
+    if host_admission and unsupported:
         raise AbiIncompatible(
             f"Host does not provide capability bits {unsupported:#x} "
             f"(package requests {caps:#x}, Host provides {policy.host_caps:#x}, §4.2/§10 M10)"
@@ -461,7 +487,7 @@ def _verify_v3_impl(data, trust, policy):
             f"control_max {manifest.control_max} is below the generic 32B control-wire "
             f"minimum {CONTROL_WIRE_MIN} (§4.1/§10 M11)"
         )
-    if policy.business == "line-crossing-64":
+    if host_admission and policy.business == "line-crossing-64":
         required = (CAP_AI_EVENTS | CAP_REPORT_SUBMIT | CAP_APP_STATE |
                     CAP_SESSION_LIFECYCLE | CAP_CONTROL_RECEIVE | CAP_BUSINESS_SNAPSHOT)
         missing = required & ~caps
@@ -480,46 +506,46 @@ def _verify_v3_impl(data, trust, policy):
                 f"report_max {manifest.report_max} below the line_counting report minimum "
                 f"{policy.report_min_for_report_submit} (§4.1, §10 M11)"
             )
-    if caps & CAP_AI_EVENTS and manifest.event_max > policy.event_buffer_bytes:
+    if host_admission and caps & CAP_AI_EVENTS and manifest.event_max > policy.event_buffer_bytes:
         raise ResourceLimit(
             f"event_max {manifest.event_max} exceeds the Host event buffer "
             f"{policy.event_buffer_bytes}"
         )
-    if caps & CAP_REPORT_SUBMIT and manifest.report_max > policy.report_capacity_bytes:
+    if host_admission and caps & CAP_REPORT_SUBMIT and manifest.report_max > policy.report_capacity_bytes:
         raise ResourceLimit(
             f"report_max {manifest.report_max} exceeds the Host report capacity "
             f"{policy.report_capacity_bytes}"
         )
-    if caps & CAP_APP_STATE and manifest.state_quota > policy.state_quota_bytes:
+    if host_admission and caps & CAP_APP_STATE and manifest.state_quota > policy.state_quota_bytes:
         raise ResourceLimit(
             f"state_quota {manifest.state_quota} exceeds the Host state quota "
             f"{policy.state_quota_bytes}"
         )
-    if caps & CAP_CONTROL_RECEIVE and manifest.control_max > policy.control_msg_bytes:
+    if host_admission and caps & CAP_CONTROL_RECEIVE and manifest.control_max > policy.control_msg_bytes:
         raise ResourceLimit(
             f"control_max {manifest.control_max} exceeds the Host control message capacity "
             f"{policy.control_msg_bytes} (§10 M11)"
         )
-    if caps & CAP_BUSINESS_SNAPSHOT and manifest.snapshot_max > policy.snapshot_ram_bytes:
+    if host_admission and caps & CAP_BUSINESS_SNAPSHOT and manifest.snapshot_max > policy.snapshot_ram_bytes:
         raise ResourceLimit(
             f"snapshot_max {manifest.snapshot_max} exceeds the Host snapshot RAM "
             f"{policy.snapshot_ram_bytes} (§10 M11)"
         )
-    if manifest.native_file_len > policy.load_region_bytes:
+    if host_admission and manifest.native_file_len > policy.load_region_bytes:
         raise ResourceLimit(
             f"native_file_len {manifest.native_file_len} exceeds the Host load region "
             f"{policy.load_region_bytes} (whole file is read into the region before de-headering)"
         )
     target = manifest.native_target_addr
     range_hi = policy.loader_base + policy.loader_size
-    if not (policy.loader_base <= target < range_hi
-            and target + manifest.native_file_len <= range_hi):
+    if host_admission and not (policy.loader_base <= target < range_hi
+                               and target + manifest.native_file_len <= range_hi):
         raise ResourceLimit(
             f"native target_addr {target:#010x}+{manifest.native_file_len}B outside the Host "
             f"loader range {policy.loader_base:#010x}..{range_hi:#010x} (§3.3, independently "
             "known Host placement)"
         )
-    if manifest.required_exec_region_bytes > policy.exec_region_bytes:
+    if host_admission and manifest.required_exec_region_bytes > policy.exec_region_bytes:
         raise ResourceLimit(
             f"required_exec_region_bytes {manifest.required_exec_region_bytes} exceeds the Host "
             f"actual execution region {policy.exec_region_bytes}"

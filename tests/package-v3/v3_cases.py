@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import json
 import struct
 import subprocess
@@ -35,9 +36,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "package"))
-import neapp_format as fmt  # noqa: E402
-import neapp_v2_format as fmt2  # noqa: E402
-import neapp_v3_format as fmt3  # noqa: E402
+fmt = importlib.import_module("neapp_format")
+fmt2 = importlib.import_module("neapp_v2_format")
+fmt3 = importlib.import_module("neapp_v3_format")
 
 VERIFY_V3 = REPO / "package" / "neapp_verify_v3.py"
 VERIFY_V2 = REPO / "package" / "neapp_verify_v2.py"
@@ -361,6 +362,113 @@ def main() -> int:
         and prov["signer_spki_sha256"] == sha256_hex(dev_signer.spki),
         extra={"generator": prov["generator"], "source_commit": prov["source_commit"]},
     )
+
+    print("[v3-cases] packer admission semantics: generic profile 2 default pack + "
+          "explicit target-Host policy separation (Issue #20 fix)")
+    generic_pkg_path = case_dir / "pack-generic-profile2.neapp.v3"
+    generic_pack = subprocess.run(
+        [sys.executable, str(PACK_V3), "--image", str(args.image),
+         "--out", str(generic_pkg_path), "--key", str(work / "keys" / "dev-signer.pem"),
+         "--publisher-id", "dev-publisher", "--app-id", "lc-test-app",
+         "--version", "1.0.0", "--sidecar", "none"],
+        capture_output=True, text=True)
+    if generic_pack.returncode != 0:
+        raise AssertionError(
+            f"packer DEFAULT command failed on a legal generic v3 profile 2 input:\n"
+            f"{generic_pack.stderr}")
+    generic_pkg = generic_pkg_path.read_bytes()
+    m_generic = fmt3.parse_manifest_v3(generic_pkg[16:208])
+    record_predicate(
+        "pack_default_generic_profile2_shape",
+        "the packer DEFAULT command (no capability/quota flags) emits a legal GENERIC "
+        "v3 run_profile 2 package: caps 0x63 "
+        "(log|tick_ms|session_lifecycle|control_receive), control_max 256, no "
+        "bit2/3/4/7 quotas; the packer no longer imposes the simulated "
+        "line-crossing-64 business or its quotas as built-in pack-time admission",
+        m_generic.required_host_caps == 0x63
+        and m_generic.control_max == 256
+        and m_generic.event_max == 0
+        and m_generic.state_quota == 0
+        and m_generic.report_max == 0
+        and m_generic.snapshot_max == 0
+        and m_generic.run_profile == 2,
+        extra={"caps": f"{m_generic.required_host_caps:#x}",
+               "control_max": m_generic.control_max},
+    )
+    generic_host = policy_file("generic-host", {"business": None})
+    record("pack_default_generic_profile2_verifier_pass",
+           "the default-packed generic profile 2 package verifies PASS under a matching "
+           "generic Host policy (business none): legal per frozen v3 §4.1 without any "
+           "Line Crossing specific bits",
+           "PASS", generic_pkg, policy=generic_host)
+    lc_host = policy_file("line-crossing-host", {"business": "line-crossing-64"})
+    record("generic_profile2_vs_line_crossing_host",
+           "the SAME legal generic package under a line-crossing-64 Host policy is "
+           "rejected by HOST business admission (missing bits2/3/4/7): admission is "
+           "target-Host-policy dependent, not a packer-emitted rule",
+           "BAD_PACKAGE", generic_pkg, policy=lc_host,
+           detail_contains="line-crossing-64 requires capability bits")
+
+    large_out = case_dir / "pack-large-quota-512-2048.neapp.v3"
+    large_common = ["--image", str(args.image),
+                    "--key", str(work / "keys" / "dev-signer.pem"),
+                    "--publisher-id", "dev-publisher", "--app-id", "lc-test-app",
+                    "--version", "1.0.0", "--host-caps", "0xff",
+                    "--event-max", "2048", "--state-quota", "4096", "--report-max", "6144",
+                    "--control-max", "512", "--snapshot-max", "2048", "--sidecar", "none"]
+    sufficient = policy_file("host-sufficient-512-2048",
+                             {"business": "line-crossing-64",
+                              "control_msg_bytes": 512, "snapshot_ram_bytes": 2048})
+    large_pack = subprocess.run(
+        [sys.executable, str(PACK_V3), "--out", str(large_out), *large_common,
+         "--host-policy", str(sufficient)],
+        capture_output=True, text=True)
+    if large_pack.returncode != 0:
+        raise AssertionError(
+            f"packer refused a large-quota declaration under its explicitly declared "
+            f"sufficient target-Host policy:\n{large_pack.stderr}")
+    large_pkg = large_out.read_bytes()
+    m_large = fmt3.parse_manifest_v3(large_pkg[16:208])
+    if (m_large.control_max, m_large.snapshot_max) != (512, 2048):
+        raise AssertionError("large-quota package does not carry control_max 512 / "
+                             "snapshot_max 2048")
+    record("pack_large_quota_with_sufficient_host_policy",
+           "signed control_max 512 / snapshot_max 2048 — beyond the golden SIMULATED "
+           "256/1024B reference values (§13.10/§14) — packs and verifies PASS when a "
+           "sufficient target-Host policy is passed EXPLICITLY via --host-policy",
+           "PASS", large_pkg, policy=sufficient)
+    insufficient = policy_file("host-insufficient-simulated-default", {})
+    record("large_quota_pkg_vs_insufficient_host",
+           "the SAME large-quota package against the default simulated Host capacity "
+           "(256/1024B): RESOURCE_LIMIT — the golden simulated values are a reviewable "
+           "verification policy, not pack-time law",
+           "RESOURCE_LIMIT", large_pkg, policy=insufficient,
+           detail_contains="exceeds the Host control message capacity")
+    refused_out = case_dir / "pack-large-quota-refused.neapp.v3"
+    if refused_out.exists():
+        refused_out.unlink()
+    refused_pack = subprocess.run(
+        [sys.executable, str(PACK_V3), "--out", str(refused_out), *large_common,
+         "--host-policy", str(insufficient)],
+        capture_output=True, text=True)
+    if refused_pack.returncode == 0 or "RESOURCE_LIMIT" not in (refused_pack.stderr or ""):
+        raise AssertionError(
+            f"packer must refuse the large-quota declaration under the insufficient "
+            f"target-Host policy with a RESOURCE_LIMIT attribution "
+            f"(rc={refused_pack.returncode})")
+    if refused_out.exists():
+        raise AssertionError("refused pack must not emit the package file")
+    results.append({
+        "case": "pack_large_quota_insufficient_host_refusal",
+        "category": "v3",
+        "expected": "packer exit 2 (RESOURCE_LIMIT under --host-policy 256/1024B)",
+        "observed": "packer exit 2",
+        "detail": (refused_pack.stderr or "").strip().splitlines()[0],
+        "note": "the identical signed declaration packs under the sufficient policy and "
+                "is refused under the insufficient one: target-Host admission is "
+                "explicit, reviewable policy input, never an implied packer default",
+    })
+    print("  ok pack_large_quota_insufficient_host_refusal: refused")
 
     print("[v3-cases] rejection matrix: structure / DER / manifest encoding")
     magic2 = bytearray(dev_pkg)

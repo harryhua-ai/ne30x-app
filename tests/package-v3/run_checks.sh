@@ -23,6 +23,12 @@ sha() {
     else shasum -a 256 "$1" | awk '{print $1}'; fi
 }
 
+bash "$ROOT/tests/package-v3/require_clean_evidence.sh" "$ROOT"
+
+if [ -z "${RUN_CHECKS_CHILD:-}" ]; then
+    bash "$ROOT/tests/package-v3/test_evidence_guard.sh"
+fi
+
 mkdir -p "$ROOT/docs/evidence"
 exec > >(tee "$LOG") 2>&1
 
@@ -32,6 +38,7 @@ command -v "$PYTHON" >/dev/null || fail "python3 missing"
 command -v openssl >/dev/null || fail "openssl missing"
 command -v arm-none-eabi-gcc >/dev/null || fail "arm-none-eabi-gcc missing (needed by the unchanged v1 regression)"
 echo "python3=$($PYTHON --version 2>&1) cryptography=$($PYTHON -c 'import cryptography; print(cryptography.__version__)') openssl=$(openssl version 2>&1 | awk '{print $1 $2}') arm-none-eabi-gcc=$(arm-none-eabi-gcc -dumpversion)"
+echo "non-destructive evidence-guard regression: PASS (tests/package-v3/test_evidence_guard.sh: clean accept, dirty refuse, caller bytes survive, run_checks.sh fail-closed probe self-restored)"
 rm -rf "$WORK"
 mkdir -p "$PKG_DIR" "$IMG_DIR"
 
@@ -66,9 +73,15 @@ print(f"  v2 cases: {snapshot['v2_case_suite_total']}")
 EOF
 git -C "$ROOT" restore -- docs/evidence/p6-package-checks.log \
     docs/evidence/p6-package-artifacts.json docs/evidence/p6-v1-regression-artifacts.json
+for rel in docs/evidence/p6-package-checks.log \
+           docs/evidence/p6-package-artifacts.json \
+           docs/evidence/p6-v1-regression-artifacts.json; do
+    [ -z "$(git -C "$ROOT" status --porcelain -- "$rel")" ] \
+        || fail "$rel is not clean after restore (the fail-closed guard pre-check was violated?)"
+done
 git -C "$ROOT" diff --quiet -- docs/evidence/p3-package-artifacts.json docs/evidence/spec-v2 \
     || fail "frozen #12/#13 evidence files were modified by the regression run"
-echo "#13-owned p6 evidence files restored unchanged (this round's results are recorded in the v3 evidence)"
+echo "#13-owned p6 evidence files restored to committed bytes (guard pre-checked them clean before the run; this round's results are recorded in the v3 evidence)"
 
 HELLO_V1_IMAGE="$ROOT/apps/hello-app/build/hello-app.bin"
 [ -f "$HELLO_V1_IMAGE" ] || fail "hello-app V1 image missing after the v1 regression"
@@ -255,9 +268,29 @@ evidence = {
     "frozen_v1_v2_regression": {
         **frozen,
         "committed_13_evidence_restored_unchanged": True,
+        "evidence_guard": ("fail-closed pre-check tests/package-v3/require_clean_evidence.sh: "
+                           "the run refuses to start when any guarded docs/evidence file "
+                           "already has uncommitted changes, so the post-regression git "
+                           "restore only ever normalizes files that were committed-clean "
+                           "before the run; non-destructiveness is itself regression-tested "
+                           "on every run by tests/package-v3/test_evidence_guard.sh"),
         "note": ("the frozen v1/v2/hello-app regression was re-run this round via the "
                  "UNCHANGED tests/package-v2/run_checks.sh; the #13-owned committed "
-                 "evidence files were restored byte-identical afterwards"),
+                 "evidence files were pre-checked clean by the guard, then restored "
+                 "byte-identical"),
+    },
+    "packer_admission_semantics": {
+        "default_self_check": ("format/signature/intrinsic-manifest-policy only "
+                               "(neapp_v3_format.verify_package_v3 with host_admission="
+                               "False); makes NO Host-admission claim (v3 §4.1/§14)"),
+        "target_host_admission": ("opt-in via neapp_pack_v3.py --host-policy JSON (same "
+                                  "schema as neapp_verify_v3.py --policy); runs the full "
+                                  "§2.3 order incl. Host capacity/business floors against "
+                                  "that explicit, reviewable policy; any rejection refuses "
+                                  "to emit"),
+        "simulated_reference_values_note": ("256B control_msg_bytes / 1024B snapshot_ram_bytes "
+                                            "are golden SIMULATION reference values (v3 "
+                                            "§13.10/§14), never implied pack-time limits"),
     },
     "spec_suites": {
         "spec_v2": {
