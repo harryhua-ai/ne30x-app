@@ -1,0 +1,9 @@
+C01 v3 entry validation (api/table/abi/fnptr)
+C02 v3 session: command consumed mid-session, applied, replied, snapshotted
+CONFIG_APPLY_OCCUPANCY total=176 declared_max=256
+C03 v2 blob migrated in v3 session and survives restart without fake reset
+C04 command consumed without interrupting continuous event stream
+CONFIG_APPLY_OCCUPANCY total=176 declared_max=256
+C05 unauthorized control plane ends session fail-closed
+C06 host-visible reply/snapshot wire rejects stay observable
+[contract-v3] pass=49 fail=0 -> PASS

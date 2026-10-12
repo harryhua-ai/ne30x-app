@@ -1,0 +1,6 @@
+U01 cfg candidate encode/decode roundtrip
+U02 worst-case legal names encode/decode
+U03 candidate negative vectors
+U04 state blob gen schema encode/decode + v2 compatibility
+U05 host snapshot JSON boundary validator
+[unit-v3] pass=68 fail=0 -> PASS

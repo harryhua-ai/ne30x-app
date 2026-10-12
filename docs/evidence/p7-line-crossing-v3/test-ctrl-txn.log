@@ -1,0 +1,25 @@
+V01 stale expected_config_generation rejected, nothing changes
+V02 COUNTERS_RESET without destructive confirmation rejected
+V03 target class change without confirmation rejected
+V04 counter_name-only apply preserves counts/report_seq, advances generation
+V05 line change switches at event boundary, counts preserved
+V06 confirmed target change resets counters, keeps report_seq, rebinds
+V07 target class not in loaded model rejected as invalid
+V08 host fault during preparation rejected as resource, old config kept
+V09 apply commit IO failure -> FAILED_STORAGE_IO, RAM and stored state untouched (flush-defect fixed on v3 path)
+V10 apply commit revision conflict -> FAILED_STATE_CONFLICT, stored bytes win
+V11 storage-unknown commit -> FAILED_STORAGE_UNKNOWN, restricted until verified
+V12 identical duplicate request reuses cached result, no redo
+V13 duplicate request_id with different semantics rejected, no data change
+V14 command wire negatives dropped without reply or commit
+V15 confirmed reset zeroes counters, keeps report_seq and generation
+V16 corrupt stored state: confirmed reset replaces blob (v2 recovery kept)
+V18 degraded storage refuses side-effect command
+V19 v2->v3 same-identity migration keeps counters/report_seq, gen initialized to 1
+V20 corrupt legacy blob not faked into trusted state
+V21 control_next authority: no command NO_EVENT; unauthorized session fatal
+V22 oversized candidate payload rejected whole, no partial effect
+V23 config_generation u32 exhaustion is fail-closed resource rejection
+V24 tracker allocation failure during confirmed target change -> REJECTED_RESOURCE, no commit, no state change, retry succeeds
+V25 target model/class query faults on confirmed target change: prepare-time failure rejects pre-commit, post-prepare consultation trap proves no second post-CAS query and no fake APPLIED
+[ctrl-txn] pass=267 fail=0 -> PASS

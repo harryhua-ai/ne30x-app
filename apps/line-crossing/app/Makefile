@@ -37,7 +37,7 @@ APP_SRCS  := lc_app_entry.c lc_bus.c lc_bus_config.c lc_stateblob.c lc_json.c lc
 
 LC_ALLOC_FLAGS := -D'LC_MALLOC(sz)=lcapp_alloc(sz)' -D'LC_FREE(p)=lcapp_free(p)'
 
-CFLAGS := -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 \
+CFLAGS = -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 \
           -Os -Wall -Werror -ffunction-sections -fdata-sections \
           -ffreestanding -fno-builtin -DLC_APP_TARGET=1 \
           -DLC_APP_ID='"$(APP_ID)"' -DLC_APP_SW_VERSION='"$(PKG_VERSION)"' \
@@ -95,3 +95,68 @@ package: $(IMAGE) $(WORK)/keys/dev-signer.pem
 
 clean:
 	rm -rf $(BUILD)
+
+V3_PKG_VERSION ?= 3.0.0
+V3_HOST_CAPS   ?= 0xff
+V3_EVENT_MAX   ?= 2048
+V3_STATE_QUOTA ?= 4096
+V3_REPORT_MAX  ?= 6144
+V3_CONTROL_MAX ?= 256
+V3_SNAPSHOT_MAX ?= 1024
+V3_PUBLISHER_ID ?= dev-publisher
+
+V3_WORK := $(ROOT_DIR)/tests/line-crossing-v3/work
+V3_POLICY := $(ROOT_DIR)/tests/line-crossing-v3/host_policy_sim.json
+V3_ELF := $(BUILD)/lc-line-crossing-v3.elf
+V3_PAYLOAD := $(BUILD)/lc-line-crossing-v3.payload.bin
+V3_IMAGE := $(BUILD)/lc-line-crossing-v3.bin
+
+V3_APP_SRCS := lc_app_entry_v3.c lc_bus.c lc_bus_config.c lc_stateblob.c \
+               lc_ctrl.c lc_cfgcodec.c lc_json.c lc_arena.c lc_libc_mini.c
+
+V3_OBJS := $(patsubst $(APP_DIR)/src/%.c,$(BUILD)/core_%.o,$(CORE_SRCS)) \
+           $(patsubst %.c,$(BUILD)/v3_%.o,$(V3_APP_SRCS))
+
+.PHONY: image-v3 package-v3 clean-v3
+
+$(BUILD)/v3_%.o: PKG_VERSION = $(V3_PKG_VERSION)
+
+$(BUILD)/v3_%.o: %.c $(wildcard *.h) | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(V3_ELF): $(V3_OBJS) lc_app.ld
+	$(CC) $(CFLAGS) -o $@ $(V3_OBJS) $(LDFLAGS)
+
+$(V3_PAYLOAD): $(V3_ELF)
+	$(OBJCOPY) -O binary $< $@
+
+$(V3_IMAGE): $(V3_ELF) $(V3_PAYLOAD) pack_v3_image.py
+	$(PYTHON) pack_v3_image.py --elf $(V3_ELF) --payload $(V3_PAYLOAD) --out $@ \
+		--exec-base $(EXEC_BASE) --nm $(NM)
+	@$(SIZE) $(V3_ELF)
+
+image-v3: $(V3_IMAGE)
+	@echo "line-crossing-app: v3 image ready -> $(V3_IMAGE)"
+
+$(V3_WORK)/keys/dev-signer.pem:
+	$(PYTHON) $(ROOT_DIR)/tests/package/gen_dev_key.py \
+		--out-dir $(V3_WORK) --publisher-id $(V3_PUBLISHER_ID)
+
+package-v3: $(V3_IMAGE) $(V3_WORK)/keys/dev-signer.pem
+	mkdir -p $(V3_WORK)/pkg
+	$(PYTHON) $(ROOT_DIR)/package/neapp_pack_v3.py \
+		--image $(V3_IMAGE) \
+		--out $(V3_WORK)/pkg/lc-line-crossing-$(V3_PKG_VERSION).neapp.v3 \
+		--key $(V3_WORK)/keys/dev-signer.pem \
+		--publisher-id $(V3_PUBLISHER_ID) --app-id $(APP_ID) \
+		--version $(V3_PKG_VERSION) \
+		--host-caps $(V3_HOST_CAPS) --event-max $(V3_EVENT_MAX) \
+		--state-quota $(V3_STATE_QUOTA) --report-max $(V3_REPORT_MAX) \
+		--control-max $(V3_CONTROL_MAX) --snapshot-max $(V3_SNAPSHOT_MAX) \
+		--host-policy $(V3_POLICY)
+	$(PYTHON) $(ROOT_DIR)/package/neapp_verify_v3.py \
+		--package $(V3_WORK)/pkg/lc-line-crossing-$(V3_PKG_VERSION).neapp.v3 \
+		--trust $(V3_WORK)/trust-dev.json --policy $(V3_POLICY) --expect PASS
+
+clean-v3:
+	rm -f $(V3_OBJS) $(V3_ELF) $(V3_PAYLOAD) $(V3_IMAGE)

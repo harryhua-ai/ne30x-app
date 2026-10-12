@@ -1,0 +1,9 @@
+S01 snapshot projection carries full editable config and trust facts
+S02 worst-case legal snapshot fits declared 1024B quota
+SNAPSHOT_OCCUPANCY total=981 payload=949 declared_max=1024
+S03 degraded storage projected as untrusted, writes withheld
+S04 unbound model projected as unbound, model invalid
+S05 snapshot refreshes at least every 5 seconds
+S06 host snapshot quota exceeded -> whole snapshot withheld, no truncation
+S07 quote-bearing restored name stays valid JSON via escaping
+[snapshot] pass=52 fail=0 -> PASS

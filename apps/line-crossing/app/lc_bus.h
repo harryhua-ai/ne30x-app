@@ -104,6 +104,27 @@ typedef struct lcbus_pending {
     uint8_t  web_done;
 } lcbus_pending_t;
 
+typedef enum {
+    LCBUS_TXN_OK = 0,
+    LCBUS_TXN_ERR_INVALID = -1,
+    LCBUS_TXN_ERR_RESOURCE = -2,
+    LCBUS_TXN_ERR_STATE_CONFLICT = -3,
+    LCBUS_TXN_ERR_STORAGE_IO = -4,
+    LCBUS_TXN_ERR_STORAGE_UNKNOWN = -5
+} lcbus_txn_result_t;
+
+typedef struct lcbus_cfg_txn {
+    lc_bus_config_t  candidate;
+    lcbus_binding_t  new_binding;
+    lc_line_cross_t *new_line;
+    lc_tracker_t    *new_tracker;
+    uint32_t         tracker_carry;
+    int32_t          target_index;
+    uint8_t          target_changed;
+    uint8_t          line_changed;
+    uint8_t          tracker_changed;
+} lcbus_cfg_txn_t;
+
 typedef struct lcbus {
     lcbus_host_ops_t      ops;
     lc_bus_config_t       cfg;
@@ -140,6 +161,10 @@ typedef struct lcbus {
     uint32_t last_rebind_ms;
     uint8_t  last_rebind_valid;
 
+    uint8_t  state_schema;
+    uint32_t config_generation;
+    uint8_t  storage_unknown_latch;
+
     uint32_t heat[LCBUS_HEAT_SIZE];
 
     lcbus_stats_t st;
@@ -163,5 +188,16 @@ void lcbus_flush(lcbus_t *b, int force);
 int  lcbus_apply_config(lcbus_t *b, const lc_bus_config_t *candidate);
 
 void lcbus_reset(lcbus_t *b);
+
+int  lcbus_txn_prepare_config(lcbus_t *b, const lc_bus_config_t *candidate,
+                              lcbus_cfg_txn_t *txn);
+
+int  lcbus_txn_commit_config(lcbus_t *b, lcbus_cfg_txn_t *txn);
+
+void lcbus_txn_abort_config(lcbus_t *b, lcbus_cfg_txn_t *txn);
+
+int  lcbus_txn_commit_reset(lcbus_t *b, int allow_corrupt_replace);
+
+int  lcbus_storage_restricted(const lcbus_t *b);
 
 #endif
