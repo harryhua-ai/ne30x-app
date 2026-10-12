@@ -1,0 +1,881 @@
+{
+  "issue": "harryhua-ai/ne30x-app#20 (P6 v3)",
+  "boundary": "OFFLINE packaging evidence only; NOT NE301 admission/install/execution/hot-reconfiguration/STM32-PKA verification/power-fail-recovery PASS; signing identities are NON-PRODUCTION test roots (per-round dev key + PUBLIC spec d=1) and never device production trust roots",
+  "protocol_authorities": {
+    "v1": "docs/app-package-protocol-v1.md (integrated P2/#6 baseline, unchanged)",
+    "v2": "docs/app-package-protocol-v2-draft.md (integrated #12 baseline, unchanged)",
+    "v3": "docs/app-package-protocol-v3.md (integrated #19 baseline)"
+  },
+  "source_commit": "6d3a9ccc69716c682b8452e0165d281f80c22676",
+  "toolchain": {
+    "python": "Python 3.14.4",
+    "python_cryptography": "48.0.0",
+    "openssl": "OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)"
+  },
+  "frozen_v1_v2_regression": {
+    "suite": "tests/package-v2/run_checks.sh (UNCHANGED, exit 0)",
+    "v1_regression": {
+      "suite": "tests/package/run_package_checks.sh (UNCHANGED, exit 0)",
+      "spec_vectors": 15,
+      "generated_cases": 33,
+      "hello_app_v1_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
+      "hello_app_v1_reproduction": "byte-exact"
+    },
+    "spec_v2_suite": {
+      "suite": "tests/spec-v2/run_all_tests.py (UNCHANGED, exit 0)",
+      "vectors_total": 73,
+      "vectors_passed": 73,
+      "committed_evidence_unchanged": true
+    },
+    "v2_case_suite_total": 59,
+    "committed_13_evidence_restored_unchanged": true,
+    "note": "the frozen v1/v2/hello-app regression was re-run this round via the UNCHANGED tests/package-v2/run_checks.sh; the #13-owned committed evidence files were restored byte-identical afterwards"
+  },
+  "spec_suites": {
+    "spec_v2": {
+      "suite": "tests/spec-v2/run_all_tests.py (UNCHANGED, exit 0)",
+      "vectors_total": 73,
+      "vectors_passed": 73,
+      "committed_evidence_unchanged": true
+    },
+    "spec_v3": {
+      "suite": "tests/spec-v3/run_all_tests.py (UNCHANGED, exit 0)",
+      "vectors_total": 150,
+      "vectors_passed": 150,
+      "committed_evidence_unchanged": true
+    }
+  },
+  "controlled_images": {
+    "lc_v3_test_image": {
+      "path": "tests/package-v3/work/img/lc-v3-test-image.bin",
+      "sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+      "note": "byte-identical to the #19 spec §12.1 golden native image"
+    },
+    "lc_v3_alt_image": {
+      "path": "tests/package-v3/work/img/lc-v3-alt-image.bin",
+      "sha256": "2b22aaac5ed17fa345769505be9ec187655446c6234880c19f6084fcb9ad3a3c"
+    }
+  },
+  "packages": {
+    "golden-replica": {
+      "sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+      "verifier_report": {
+        "app_id": "line-crossing",
+        "app_version": "3.0.0",
+        "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence",
+        "content_identity_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v3",
+        "native_crc32": "0xde8e3439",
+        "native_entry_offset": "0x0",
+        "native_file_len": 36,
+        "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+        "native_image_size": 4,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "publisher_id": "test-publisher",
+        "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+        "report_max": 6144,
+        "required_exec_region_bytes": 4,
+        "required_host_abi": "0x00030000",
+        "required_host_caps": "0xff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 2,
+        "signature_len": 70,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 244
+      }
+    },
+    "lc-test-app-1.0.0": {
+      "sha256": "1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "1.0.0",
+        "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence",
+        "content_identity_sha256": "829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v3",
+        "native_crc32": "0xde8e3439",
+        "native_entry_offset": "0x0",
+        "native_file_len": 36,
+        "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+        "native_image_size": 4,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e",
+        "report_max": 6144,
+        "required_exec_region_bytes": 4,
+        "required_host_abi": "0x00030000",
+        "required_host_caps": "0xff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 2,
+        "signature_len": 70,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 244
+      }
+    },
+    "lc-test-app-2.0.0": {
+      "sha256": "da88a9198604a6650bb31407676a251a5af016631a014b8526fbf35f4c289424",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "2.0.0",
+        "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence",
+        "content_identity_sha256": "82095c30b467b3b3f459bb630c0953fd292a1f576d9d10b127b2a6fd204a2eb7",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v3",
+        "native_crc32": "0xde8e3439",
+        "native_entry_offset": "0x0",
+        "native_file_len": 36,
+        "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+        "native_image_size": 4,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "da88a9198604a6650bb31407676a251a5af016631a014b8526fbf35f4c289424",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e",
+        "report_max": 6144,
+        "required_exec_region_bytes": 4,
+        "required_host_abi": "0x00030000",
+        "required_host_caps": "0xff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 2,
+        "signature_len": 72,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 244
+      }
+    },
+    "lc-v3-alt-1.0.0": {
+      "sha256": "54216062e1da36087bdb06e4a28092d58daec2d644f103c112a39cf6cf423a87",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "1.0.0",
+        "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence",
+        "content_identity_sha256": "e49690f9f489a696d63998483414c662ebc1d2e3a6fb24facd7dfb61287825fb",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v3",
+        "native_crc32": "0x4e3129a8",
+        "native_entry_offset": "0x0",
+        "native_file_len": 36,
+        "native_file_sha256": "2b22aaac5ed17fa345769505be9ec187655446c6234880c19f6084fcb9ad3a3c",
+        "native_image_size": 4,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "54216062e1da36087bdb06e4a28092d58daec2d644f103c112a39cf6cf423a87",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "bdef5dd8e3f09fbeedccb999a203328a55e2e7f70b42672a04ac345d57b68a5e",
+        "report_max": 6144,
+        "required_exec_region_bytes": 4,
+        "required_host_abi": "0x00030000",
+        "required_host_caps": "0xff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 2,
+        "signature_len": 71,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 244
+      }
+    }
+  },
+  "golden_consistency": {
+    "pinned_sha256_tbs": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+    "observed_sha256_tbs": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+    "pinned_sha256_golden_package": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+    "observed_sha256_golden_package": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+    "tbs_byte_identical": true,
+    "package_byte_identical": true,
+    "der_identical_to_pinned": true,
+    "der_note": "the packer (cryptography RFC-6979, deterministic_signing=True) and the #19 pure-Python RFC-6979 prover produce the SAME k for d=1 over the same SHA-256(TBS): the packed replica is byte-identical to golden.neapp.v3, so SHA-256(package) c74f7e46… is reproduced",
+    "spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3"
+  },
+  "v3_case_suite": {
+    "cases_total": 67,
+    "cases": [
+      {
+        "case": "dev_v3_accept",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "package_sha256": "1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40",
+        "content_identity_sha256": "829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854",
+        "detail": "controlled v3-ABI test image, dev-key signed; caps 0xff, quotas 2048/4096/6144/256/1024, run_profile 2, abi 0x00030000",
+        "note": "Issue #20 AC1: 受控测试原生镜像 -> 签名 v3 包 -> 离线验真通过"
+      },
+      {
+        "case": "golden_replica_byte_identical",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "pack_v3 with the PUBLIC d=1 identity reproduces the #19 golden: TBS byte-identical to golden-tbs.bin, whole 314B package byte-identical to golden.neapp.v3 (SHA-256(TBS) d793a455…, SHA-256(package) c74f7e46…)",
+        "pinned_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "observed_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "pinned_package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "observed_package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "package_byte_identical": true
+      },
+      {
+        "case": "golden_artifact_accept",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "content_identity_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "detail": null,
+        "note": "committed #19 golden.neapp.v3 through the independent cryptography-based v3 verifier"
+      },
+      {
+        "case": "golden_der_independent_cross",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "pinned #19 golden DER independently verified over golden-tbs.bin by `cryptography` AND the OpenSSL CLI (independent of the #19 pure-Python prover)",
+        "openssl_exit": 0,
+        "openssl_output": "Verified OK"
+      },
+      {
+        "case": "golden_low_s_variant_same_identity",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "package_sha256": "3bdf2fd70235986a6bffa12c5ec9e969b7e5d3cd5c86ea413c2c634f7dc8d610",
+        "content_identity_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "detail": null,
+        "note": "same #19 golden TBS with re-encoded low-S DER: different valid DER, same SHA-256(TBS) content identity (§2.2)",
+        "predicate": "SHA-256(TBS) unchanged by DER re-encoding",
+        "der_len_original": 70,
+        "der_len_low_s": 71
+      },
+      {
+        "case": "dev_provenance_traceable",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "provenance sidecar carries source/target/publisher/app identity, version, capabilities/quotas/profile, native digest and TBS identity (AC1 traceability)",
+        "generator": "neapp_pack_v3.py 3.0.0",
+        "source_commit": "6d3a9ccc69716c682b8452e0165d281f80c22676"
+      },
+      {
+        "case": "magic_v2_on_v3",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "a2820fb67e7b1728ecb302d26cfdba6de15d582639eab0e94607855e2fd0ab43",
+        "content_identity_sha256": null,
+        "detail": "container magic is not NEAPP v3 (4e45415050 03 00 00); unknown container versions are rejected, never negotiated (§1.3, §10 M2/M3/M4/M5)",
+        "note": "container major downgraded to 2 (unknown version, §1.3/§10)"
+      },
+      {
+        "case": "magic_v1_on_v3",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "8a71348d1eda991d1fb0210d6bb77723d925d9d2d3dc14dd99c9390f36db004b",
+        "content_identity_sha256": null,
+        "detail": "container magic is not NEAPP v3 (4e45415050 03 00 00); unknown container versions are rejected, never negotiated (§1.3, §10 M2/M3/M4/M5)",
+        "note": "container major downgraded to 1 (unknown version, §1.3/§10)"
+      },
+      {
+        "case": "manifest_len_160_in_v3",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "b26347630dfc13af4b78f09cde8ec1c5cc23ab1952d351bcd397d369e2fcfdad",
+        "content_identity_sha256": null,
+        "detail": "manifest_len is 160, v3 allows only 192",
+        "note": "manifest_len field = 160 (v1 value) in a v3 header"
+      },
+      {
+        "case": "manifest_len_193_in_v3",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "b044dec5e36cb1982a70db5c86f45baf67933775bfe11e3df8f9ad71d004e123",
+        "content_identity_sha256": null,
+        "detail": "manifest_len is 193, v3 allows only 192",
+        "note": "manifest_len field = 193 in a v3 header"
+      },
+      {
+        "case": "image_len_below_header",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "21233a2c6eca54b66c32974d1ce14b3e7988f42f5e8125c9f6b946bba26bb49d",
+        "content_identity_sha256": null,
+        "detail": "image_len 31 cannot hold the 32-byte native header",
+        "note": "image_len 31 cannot hold the 32B native header"
+      },
+      {
+        "case": "image_len_overflow",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "8d3811baf44e76f6ce79aa662b8d8425dd68db7c76dd7f890b603562a5373588",
+        "content_identity_sha256": null,
+        "detail": "image_len 4294967295 exceeds the v3 native file cap 2097152",
+        "note": "image_len 0xFFFFFFFF (overflow-safe rejection)"
+      },
+      {
+        "case": "truncate_whole_package",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "20664262d3886fd2bd735faf72700f7e1d6b90fa4242bc3f4ba52a893bf48929",
+        "content_identity_sha256": null,
+        "detail": "file is 10 bytes, shorter than the minimum v3 package 248",
+        "note": "package truncated below the minimum v3 length"
+      },
+      {
+        "case": "truncate_signature",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "f58b00994ae72814c9569bf2d0f2f0087e02c614a7a88a9c0f2035bba4f2433a",
+        "content_identity_sha256": null,
+        "detail": "DER: SEQUENCE length does not consume the signature exactly",
+        "note": "DER signature truncated by one byte"
+      },
+      {
+        "case": "der_tail_byte",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "a4173b13b4a44ab2de715efdcdd5505fbed3da4e43cfad43713239f78c1c9f49",
+        "content_identity_sha256": null,
+        "detail": "DER: SEQUENCE length does not consume the signature exactly",
+        "note": "valid DER + one trailing byte (tail must be fully consumed)"
+      },
+      {
+        "case": "der_second_object",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "b36acd82766ff0a6487b72c4c607302eb324126f96ef170593fed895410c110b",
+        "content_identity_sha256": null,
+        "detail": "DER: SEQUENCE length does not consume the signature exactly",
+        "note": "second DER object appended (70B DER + 2B)"
+      },
+      {
+        "case": "der_r_zero",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "40a908fa9811a31aee9e8a38857bb132c0035ca336337e37b7e039c527790cd2",
+        "content_identity_sha256": null,
+        "detail": "DER: r outside P-256 range",
+        "note": "DER with r=0 (outside P-256 range)"
+      },
+      {
+        "case": "der_nonminimal_length",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "23b2839ff30cc6d90eca22cc1990ed22f58807d0526fdd3ebf27e1aff9ef0f66",
+        "content_identity_sha256": null,
+        "detail": "DER: long form used for short length (non-minimal)",
+        "note": "DER non-minimal long-form length encoding"
+      },
+      {
+        "case": "nmf2_magic_in_v3",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "5a60b407965bc142d8dd5b784d97dd30b0558166690d61601557ad3ce96d310e",
+        "content_identity_sha256": null,
+        "detail": "manifest magic is not NMF3",
+        "note": "manifest magic NMF2 inside a v3 container (re-signed, §10 M6 flavor)"
+      },
+      {
+        "case": "reserved_58_nonzero",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "d89a28b42df152f3babc4571917cd2877e5183ff4c18789da3898e97663826e1",
+        "content_identity_sha256": null,
+        "detail": "manifest reserved bytes (58..59) are not zero",
+        "note": "manifest reserved[58..59] nonzero (v1-inherited invariant, re-signed)"
+      },
+      {
+        "case": "reserved_184_nonzero",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "7d59d864b5c41189f3ce03872a92a662f96eeacdaa94bc9b0b0a465832be3f7e",
+        "content_identity_sha256": null,
+        "detail": "manifest reserved bytes (184..191) are not zero",
+        "note": "manifest reserved[184..191] nonzero (v3 invariant, re-signed, §10 M9)"
+      },
+      {
+        "case": "abi_v2_value_in_nmf3_m6",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "f228642e22cda2f7e94fd8da825ef6093f884f60d70dc9f687950394a82d57ed",
+        "content_identity_sha256": null,
+        "detail": "v3 manifest required_host_abi must be 0x00030000, got 0x00020000 (format invariant, §3.1/§10 M6)",
+        "note": "M6: v3 container declaring required_host_abi=0x00020000 (re-signed)"
+      },
+      {
+        "case": "tamper_native_payload",
+        "category": "v3",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "package_sha256": "2af4fa476230f8fe13efebbd9f468fee2b5f92b355f26cb696e0df707115e400",
+        "content_identity_sha256": null,
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "one true native payload byte flipped inside the signed region; DER untouched",
+        "tamper_offset": 242,
+        "signed_len": 244,
+        "payload_region": "[240, 244)"
+      },
+      {
+        "case": "tamper_manifest_caps_escalation",
+        "category": "v3",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "package_sha256": "5a895843c66cbded0978eec20a1bc5995d8abafb6514d093c3838868b35dca90",
+        "content_identity_sha256": null,
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "signed capability mask flipped in place: permissions cannot be escalated without invalidating the signature"
+      },
+      {
+        "case": "tamper_manifest_control_max",
+        "category": "v3",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "package_sha256": "4e9b0c5fde24c554f166ec440e016793cefddc00a95374c98e5632cd89193503",
+        "content_identity_sha256": null,
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "signed control_max quota flipped in place"
+      },
+      {
+        "case": "tamper_manifest_version",
+        "category": "v3",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "package_sha256": "3d3a8e6f1cdb8f2340a334da2a51073d71934aa63ac866100c43daf4312101b2",
+        "content_identity_sha256": null,
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "signed version metadata flipped in place"
+      },
+      {
+        "case": "tamper_der_region",
+        "category": "v3",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "package_sha256": "4a3efe49032f93e1155b3630ae60d4943b654b94fd8ff2cc0344b86f6a5c0351",
+        "content_identity_sha256": null,
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "DER signature byte corrupted (TBS untouched) — proves corrupted signatures fail, not payload coverage"
+      },
+      {
+        "case": "wrong_signer_key",
+        "category": "v3",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "package_sha256": "ae88b901582fa31fd4141fdec18690ec8ec53ff618c53f91e30989e4e723c7d5",
+        "content_identity_sha256": null,
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "TBS signed by an ephemeral non-trusted key; manifest fingerprint still names the trusted dev key"
+      },
+      {
+        "case": "unknown_publisher",
+        "category": "v3",
+        "expected": "PUBLISHER_UNTRUSTED",
+        "observed": "PUBLISHER_UNTRUSTED",
+        "package_sha256": "3c8c02ec6cc80e0b82d6a85a54f57472b52d4e0d11f4816e60c1affb1d7d3cb6",
+        "content_identity_sha256": null,
+        "detail": "publisher_id 'other-pub' is not in the local trust mapping",
+        "note": "publisher_id absent from the Host trust mapping (re-signed; the package-carried fingerprint cannot self-trust, §2.3)"
+      },
+      {
+        "case": "publisher_fingerprint_mismatch",
+        "category": "v3",
+        "expected": "PUBLISHER_UNTRUSTED",
+        "observed": "PUBLISHER_UNTRUSTED",
+        "package_sha256": "3a6b1054e1035be296a40771e67ebf374958d1f412d225443d117b39e33a8814",
+        "content_identity_sha256": null,
+        "detail": "manifest publisher_key_sha256 does not match the trusted key for publisher_id 'dev-publisher'",
+        "note": "manifest publisher_key_sha256 no longer matches the trusted store entry (re-signed)"
+      },
+      {
+        "case": "native_header_abi_v2_mismatch",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "3253ce3fbe3737ec18720388215d94d5c7c2f1d9e29b2e5aa9e449c416ec62f5",
+        "content_identity_sha256": null,
+        "detail": "manifest required_host_abi 0x00030000 != native header abi_version 0x00020000 (§3.3 cross-check, §10 M6)",
+        "note": "ONLY the native header abi_version flipped to 0x00020000, manifest keeps 0x00030000, native SHA updated, re-signed (§3.3/§10 M6)"
+      },
+      {
+        "case": "native_reserved0_nonzero",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "b176a15bd1d068d65e2dd9b6abc6dcefa85d47d6f0fbfe35682468935bb720f2",
+        "content_identity_sha256": null,
+        "detail": "native header reserved0 is 0x1, must be all zero",
+        "note": "native header reserved0=1 with matching digest, re-signed (v1-inherited rule)"
+      },
+      {
+        "case": "resigned_payload_crc_stale",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "dc4d1f9d42029c485687ed8db6d1daed613fffa9714fbb1cb7043b89fc36a581",
+        "content_identity_sha256": null,
+        "detail": "native payload CRC-32 mismatch",
+        "note": "payload flipped + valid re-sign, native header CRC not synchronized"
+      },
+      {
+        "case": "resigned_payload_digest_stale",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "99308458cd0f19a3ead3cae11ce1d7993c871170f4959eda888f9a7ffe2b61d5",
+        "content_identity_sha256": null,
+        "detail": "manifest native_file_sha256 does not match the native image bytes",
+        "note": "payload flipped + CRC synchronized + valid re-sign, manifest native_file_sha256 left stale"
+      },
+      {
+        "case": "manifest_native_len_mismatch",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "9fd2124779139af28141e797d0a6965dcc1c7e55a14b8d717127062188c0db63",
+        "content_identity_sha256": null,
+        "detail": "manifest native_file_len 37 != container image_len 36",
+        "note": "manifest native_file_len = +1 (re-signed)"
+      },
+      {
+        "case": "entry_odd_signed",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "083b11d53b47950e1803b9e50e3943e06aa19483f44a6fa5702c5ee8fc0ecb9d",
+        "content_identity_sha256": null,
+        "detail": "native entry_offset 0x51 is outside the payload",
+        "note": "odd Thumb entry offset (0x51, outside the 4B test payload), native+manifest consistent, re-signed"
+      },
+      {
+        "case": "caps_unknown_bit8_m8",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "e7d3189bc9df4ed0bfdd47ae900ce7272de03316bf79a9d044cdc33021c01cec",
+        "content_identity_sha256": null,
+        "detail": "required_host_caps has unknown bits 0x100 (bit8..31 must be zero, §4.1/§10 M8)",
+        "note": "capability bit8 set (unknown, §4.1/§10 M8) — re-signed"
+      },
+      {
+        "case": "profile1_in_v3_m9",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "5ecc5da1d7f2bbf6d1fe4a9003aac27d0c13f86653d8bc61622dd3862f517f99",
+        "content_identity_sha256": null,
+        "detail": "unknown run_profile 1 (v3 allows only 2, §3.2/§10 M9)",
+        "note": "run_profile 1 (the v2 value) is not a legal v3 value (re-signed, §10 M9)"
+      },
+      {
+        "case": "profile2_missing_bit5",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "42586e9a63e81222d8e664c1bca0cf1cf5f76e652c5a6764d96cb5cbceec4629",
+        "content_identity_sha256": null,
+        "detail": "run_profile 2 requires the session_lifecycle capability (bit5, §4.1)",
+        "note": "run_profile 2 without session_lifecycle bit5 (re-signed)"
+      },
+      {
+        "case": "profile2_missing_bit6",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "1987a8864dad543ef1ee117cc4b504a5c358c890040beff41394c83e6623b481",
+        "content_identity_sha256": null,
+        "detail": "run_profile 2 requires the control_receive capability (bit6, §4.1)",
+        "note": "run_profile 2 without control_receive bit6 (re-signed)"
+      },
+      {
+        "case": "cap_bit6_without_control_max",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "d33cf5b057b4c11d9ba8dcacbcec4297143a0f02444719ecd344f5f059a68608",
+        "content_identity_sha256": null,
+        "detail": "control_receive (bit6) requires a nonzero control_max",
+        "note": "control_receive bit6 kept with control_max=0 (re-signed)"
+      },
+      {
+        "case": "snapshot_max_without_bit7",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "90b198422e945d7c07a2894d7a0781d9faffdb30057cde6114f2a9b8571ed176",
+        "content_identity_sha256": null,
+        "detail": "snapshot_max set without the business_snapshot (bit7) capability",
+        "note": "snapshot_max kept nonzero while business_snapshot bit7 cleared (no silent reservation, re-signed)"
+      },
+      {
+        "case": "control_max_below_wire_min_m11",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "be864f1ff63133efb11303800eb3fc1b37fd3cedd3b2b2cedac0135faffbff22",
+        "content_identity_sha256": null,
+        "detail": "control_max 16 is below the generic 32B control-wire minimum 32 (§4.1/§10 M11)",
+        "note": "M11: control_max=16 below the generic 32B control-wire minimum (re-signed)"
+      },
+      {
+        "case": "control_max_above_host_m11",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "0a4e3ca29a99463b40c86991e4b0c01bb2c90d6ac239194ab2c14fdf98542e45",
+        "content_identity_sha256": null,
+        "detail": "control_max 512 exceeds the Host control message capacity 256 (§10 M11)",
+        "note": "M11: control_max=512 exceeds the Host control message capacity 256 (re-signed)"
+      },
+      {
+        "case": "snapshot_max_above_host_m11",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "31540a5e582f41efdca8e60c3abd89e4fba3d75f124b716951a337d2d72e76bf",
+        "content_identity_sha256": null,
+        "detail": "snapshot_max 2048 exceeds the Host snapshot RAM 1024 (§10 M11)",
+        "note": "M11: snapshot_max=2048 exceeds the Host snapshot RAM 1024 (re-signed)"
+      },
+      {
+        "case": "event_max_under_business_floor",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "c40bb23973c49cdd9f9c3d3b8265576e1329e30ba0c6fbac5904e4fe823b6c1c",
+        "content_identity_sha256": null,
+        "detail": "event_max 1024 below the 64-detection ai_events minimum 1576 (§4.1, §10 M11)",
+        "note": "M11 flavor: ai_events with event_max=1024 < the 64-detection minimum 1576 (re-signed)"
+      },
+      {
+        "case": "report_max_under_business_floor",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "22f835c215572ea53494354b3dfdd3829f1a1620b091b2e3323d87cfd1d04b60",
+        "content_identity_sha256": null,
+        "detail": "report_max 4096 below the line_counting report minimum 6144 (§4.1, §10 M11)",
+        "note": "M11 flavor: report_submit with report_max=4096 < the 6144B line_counting report minimum (re-signed)"
+      },
+      {
+        "case": "event_max_over_host_buffer",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "6bbdf7e908b74b7d86b8b532f4b1824658eb39952b44e3b1825b090ddb84d27c",
+        "content_identity_sha256": null,
+        "detail": "event_max 3072 exceeds the Host event buffer 2048",
+        "note": "event_max=3072 exceeds the Host event buffer 2048 (re-signed)"
+      },
+      {
+        "case": "state_quota_over_host",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "8e5a28b21b2e3f300e1d7970e788b78d44392eafc3235f1d5a3b8f1247e6e3bc",
+        "content_identity_sha256": null,
+        "detail": "state_quota 8192 exceeds the Host state quota 4096",
+        "note": "state_quota=8192 exceeds the Host state quota 4096 (re-signed)"
+      },
+      {
+        "case": "board_mismatch",
+        "category": "v3",
+        "expected": "TARGET_INCOMPATIBLE",
+        "observed": "TARGET_INCOMPATIBLE",
+        "package_sha256": "9cb9ec7ad6ec8a4e4049f0537a3f055387da7be9a9bbe37fac676e9f10bce758",
+        "content_identity_sha256": null,
+        "detail": "target_board_id 0x00003011 != policy 0x00003010",
+        "note": "target_board_id 0x3011 (re-signed, signature valid must not bypass policy)"
+      },
+      {
+        "case": "psram_mismatch",
+        "category": "v3",
+        "expected": "TARGET_INCOMPATIBLE",
+        "observed": "TARGET_INCOMPATIBLE",
+        "package_sha256": "000d922a85b00362261a88389dd2ae828b1ba88f64532018c72beae13a4de5fd",
+        "content_identity_sha256": null,
+        "detail": "required_psram_mib 128 unsupported (policy 64)",
+        "note": "required_psram_mib=128 unsupported (re-signed)"
+      },
+      {
+        "case": "exec_region_over_host_actual",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "3f559bfd1b040ed6cea4282b97bd3bd6a062f3d908d92a58e8cd0e7be45d26f5",
+        "content_identity_sha256": null,
+        "detail": "required_exec_region_bytes 3145728 exceeds the Host actual execution region 2097152",
+        "note": "required_exec_region_bytes=3MiB exceeds the Host actual 2MiB region (re-signed)"
+      },
+      {
+        "case": "target_outside_host_loader_range",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "0753b94a355861f6d41fcbdbc651a6c764e95fe4ee8b2c89c8a348195562296f",
+        "content_identity_sha256": null,
+        "detail": "native target_addr 0x94e00000+36B outside the Host loader range 0x93e00000..0x94000000 (§3.3, independently known Host placement)",
+        "note": "self-consistent target 0x94E00000 (native+manifest agree, digest updated, re-signed) outside the Host-independently-known loader range"
+      },
+      {
+        "case": "native_file_overrides_small_load_region",
+        "category": "v3",
+        "expected": "RESOURCE_LIMIT",
+        "observed": "RESOURCE_LIMIT",
+        "package_sha256": "1ce75b58ad73ed99d5c194a9d603dad1e4cf23551448ff57f452bf17d557fd40",
+        "content_identity_sha256": null,
+        "detail": "native_file_len 36 exceeds the Host load region 32 (whole file is read into the region before de-headering)",
+        "note": "native_file_len=36 exceeds a 32B Host load region even though the declared residency is 4B (load transient vs residency, v1 §2.3 rule)"
+      },
+      {
+        "case": "host_missing_bit7_m10",
+        "category": "v3",
+        "expected": "ABI_INCOMPATIBLE",
+        "observed": "ABI_INCOMPATIBLE",
+        "package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "content_identity_sha256": null,
+        "detail": "Host does not provide capability bits 0x80 (package requests 0xff, Host provides 0x7f, §4.2/§10 M10)",
+        "note": "M10: all capability bits known, but this Host does not provide business_snapshot bit7 (golden package, signature valid)"
+      },
+      {
+        "case": "v3_golden_on_v2_verifier_m2",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "detail": "container magic is not NEAPP v2 (4e45415050 02 00 00); unknown container versions are rejected, never negotiated (§1.3/§8 M2)",
+        "note": "§10 M2: the unmodified v2 verifier rejects the v3 container magic; it never parses the 192B manifest as v2 (v2 tooling untouched)"
+      },
+      {
+        "case": "v3_golden_on_v1_verifier_m3",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+        "detail": "container magic is not NEAPP v1 (4e45415050 01 00 00)",
+        "note": "§10 M3: the unmodified v1 verifier rejects the v3 container magic"
+      },
+      {
+        "case": "v2_golden_on_v3_verifier_m4",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e",
+        "content_identity_sha256": null,
+        "detail": "container magic is not NEAPP v3 (4e45415050 03 00 00); unknown container versions are rejected, never negotiated (§1.3, §10 M2/M3/M4/M5)",
+        "note": "M4: frozen #12 v2 golden package fed to the v3 verifier (unknown container magic; v2 packages keep v2 rules and can never gain bit6/bit7 from v2 reserved bytes)"
+      },
+      {
+        "case": "v1_golden_on_v3_verifier_m5",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679",
+        "content_identity_sha256": null,
+        "detail": "container magic is not NEAPP v3 (4e45415050 03 00 00); unknown container versions are rejected, never negotiated (§1.3, §10 M2/M3/M4/M5)",
+        "note": "M5: frozen #6 v1 golden package fed to the v3 verifier (unknown container magic)"
+      },
+      {
+        "case": "v2_reserved_bits_no_v3_upgrade_m4",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "M4 semantics: the v2 golden declares abi 0x00020000, run_profile 1 and caps ⊆ bits 0..5 with its [176..191] reserved bytes all zero; a v3 Host would serve only the frozen 48B table — control_receive/business_snapshot are never inferred from v2 reserved bytes (no privilege upgrade)",
+        "v2_abi": "0x00020000",
+        "v2_caps": "0x3f",
+        "v2_profile": 1
+      },
+      {
+        "case": "downgrade_discriminator",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "same publisher/app identity at 2.0.0 and 1.0.0: the signed version triple and distinct SHA-256(TBS) identities are exactly the inputs a device needs to classify DOWNGRADE_FORBIDDEN (v1 §3/§5.1 semantics inherited by v3 §10)",
+        "identity_2_0_0": "82095c30b467b3b3f459bb630c0953fd292a1f576d9d10b127b2a6fd204a2eb7",
+        "identity_1_0_0": "829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854"
+      },
+      {
+        "case": "content_conflict_discriminator",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "same publisher/app/version, different native content: two different SHA-256(TBS) identities — the offline discriminator input for VERSION_CONTENT_CONFLICT",
+        "identity_main": "829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854",
+        "identity_alt": "e49690f9f489a696d63998483414c662ebc1d2e3a6fb24facd7dfb61287825fb"
+      },
+      {
+        "case": "idempotent_repack_same_identity",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "repacking identical image+metadata through the packer CLI reproduces the identical TBS and, under RFC-6979, the identical package bytes: idempotent content identity (§2.2)",
+        "identity": "829582c77f60f55b865fb7368d42c8a0d14b1fa5777a71655a4dce3c64b59854"
+      },
+      {
+        "case": "helloapp_v1_image_pinned",
+        "category": "v3",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "hello-app V1 regression image is the pinned historical build (SHA-256 d6eec431…, reproduced byte-for-byte by the UNCHANGED v1 regression)",
+        "hello_app_v1_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03"
+      },
+      {
+        "case": "helloapp_v1_image_in_v3_container",
+        "category": "v3",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "package_sha256": "2629864cbac9329d9086242f28cde5a82865a68eaa886d86b450b184514275a3",
+        "content_identity_sha256": null,
+        "detail": "manifest required_host_abi 0x00030000 != native header abi_version 0x00010000 (§3.3 cross-check, §10 M6)",
+        "note": "hello-app V1 image (sha256 d6eec431…, abi_version 0x00010000) used as an additional v3 input WITHOUT rebuild: v1-ABI native inside a v3 container must fail the ABI cross-check"
+      },
+      {
+        "case": "helloapp_v1_image_pack_refusal",
+        "category": "v3",
+        "expected": "packer exit 2 (native ABI != 0x00030000 refused)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: native header abi_version 0x00010000 != requested host ABI 0x00030000 (v3 pins 0x00030000)",
+        "note": "hello-app V1 image as extra v3 input: the packer refuses it before signing"
+      },
+      {
+        "case": "v2abi_image_pack_refusal",
+        "category": "v3",
+        "expected": "packer exit 2 (native ABI 0x00020000 refused)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: native header abi_version 0x00020000 != requested host ABI 0x00030000 (v3 pins 0x00030000)",
+        "note": "v2-ABI native image cannot be passed off as a v3 test image"
+      }
+    ]
+  },
+  "key_discipline": {
+    "private_keys_committed": false,
+    "private_key_locations": [
+      "tests/package-v3/work/keys/dev-signer.pem (per-round, gitignored, 0600)",
+      "tests/package-v3/work/keys/d1-test-signer.pem (PUBLIC spec §12 scalar, gitignored)"
+    ],
+    "trust_roots": "NON-PRODUCTION dev/test identities only; no production key material; neither identity is a device production trust root"
+  }
+}
