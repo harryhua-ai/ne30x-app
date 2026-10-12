@@ -697,8 +697,39 @@ static void maybe_close_window(lcbus_t *b, uint32_t now)
 
 static void encode_state(lcbus_t *b, uint8_t *buf, uint32_t cap, uint32_t *len)
 {
-    *len = lc_st_encode(buf, cap, &b->cfg, b->total_in, b->total_out,
-                        b->window_in, b->window_out, b->report_seq);
+    if (b->state_schema == 2u) {
+        *len = lc_st_encode_gen(buf, cap, &b->cfg, b->total_in, b->total_out,
+                                b->window_in, b->window_out, b->report_seq,
+                                b->config_generation);
+    } else {
+        *len = lc_st_encode(buf, cap, &b->cfg, b->total_in, b->total_out,
+                            b->window_in, b->window_out, b->report_seq);
+    }
+}
+
+static lc_st_status_t decode_state_blob(uint8_t schema, const uint8_t *in,
+                                        uint32_t len, lc_bus_config_t *cfg,
+                                        uint32_t *ti, uint32_t *to,
+                                        uint32_t *wi, uint32_t *wo,
+                                        uint32_t *seq, uint32_t *gen,
+                                        int *v2_migrated)
+{
+    *v2_migrated = 0;
+    *gen = 0;
+    if (schema == 2u) {
+        lc_st_status_t d = lc_st_decode_gen(in, len, cfg, ti, to, wi, wo, seq, gen);
+        if ((d == LC_ST_ERR_SCHEMA || d == LC_ST_ERR_SIZE) &&
+            len >= LC_ST_BLOB_SIZE &&
+            lc_rd_u32(in + 4) == LC_ST_BLOB_SCHEMA) {
+            d = lc_st_decode(in, len, cfg, ti, to, wi, wo, seq);
+            if (d == LC_ST_OK) {
+                *gen = 1u;
+                *v2_migrated = 1;
+            }
+        }
+        return d;
+    }
+    return lc_st_decode(in, len, cfg, ti, to, wi, wo, seq);
 }
 
 static void lc_persist_log(lcbus_t *b, lcbus_persist_state_t st, const char *msg)
@@ -718,8 +749,20 @@ static int stored_matches_memory(lcbus_t *b, const uint8_t *sb, uint32_t slen)
 
 static void adopt_stored(lcbus_t *b, const lc_bus_config_t *cfg,
                          uint32_t ti, uint32_t to, uint32_t wi, uint32_t wo,
-                         uint32_t seq, uint32_t rev)
+                         uint32_t seq, uint32_t rev, uint32_t gen)
 {
+    int line_stale = b->line &&
+        (cfg->line_x1_permille != b->cfg.line_x1_permille ||
+         cfg->line_y1_permille != b->cfg.line_y1_permille ||
+         cfg->line_x2_permille != b->cfg.line_x2_permille ||
+         cfg->line_y2_permille != b->cfg.line_y2_permille ||
+         cfg->outside_x_permille != b->cfg.outside_x_permille ||
+         cfg->outside_y_permille != b->cfg.outside_y_permille);
+    int tracker_stale = b->tracker &&
+        (cfg->max_dist_permille != b->cfg.max_dist_permille ||
+         cfg->track_history_k != b->cfg.track_history_k ||
+         cfg->max_miss != b->cfg.max_miss ||
+         cfg->k_confirm != b->cfg.k_confirm);
     b->cfg = *cfg;
     b->total_in = ti;
     b->total_out = to;
@@ -730,6 +773,16 @@ static void adopt_stored(lcbus_t *b, const lc_bus_config_t *cfg,
     b->window_carried = (wi || wo) ? 1u : 0u;
     b->report_seq = seq;
     b->revision = rev;
+    if (b->state_schema == 2u) b->config_generation = gen;
+    if (line_stale) {
+        lc_line_cross_destroy(b->line);
+        b->line = NULL;
+    }
+    if (tracker_stale) {
+        b->next_id_carry = lc_tracker_next_id(b->tracker);
+        lc_tracker_destroy(b->tracker);
+        b->tracker = NULL;
+    }
     b->state_dirty = 0;
     b->business_mutated = 0;
     b->corrupt_reset_armed = 0;
@@ -788,8 +841,11 @@ static int verify_stored(lcbus_t *b)
     }
 
     lc_bus_config_t scfg;
-    uint32_t sti, sto, swi, swo, sseq;
-    lc_st_status_t d = lc_st_decode(sb, slen, &scfg, &sti, &sto, &swi, &swo, &sseq);
+    uint32_t sti, sto, swi, swo, sseq, sgen;
+    int migrated = 0;
+    lc_st_status_t d = decode_state_blob(b->state_schema, sb, slen, &scfg,
+                                         &sti, &sto, &swi, &swo, &sseq, &sgen,
+                                         &migrated);
     if (d != LC_ST_OK) {
         b->revision = srev;
         if (b->persist_state == LCBUS_PERSIST_CORRUPT && b->corrupt_reset_armed &&
@@ -809,7 +865,12 @@ static int verify_stored(lcbus_t *b)
         return 0;
     }
     if (!b->business_mutated) {
-        adopt_stored(b, &scfg, sti, sto, swi, swo, sseq, srev);
+        adopt_stored(b, &scfg, sti, sto, swi, swo, sseq, srev, sgen);
+        if (migrated) {
+            b->state_dirty = 1;
+            b->business_mutated = 1;
+            lc_log(b, "LC_APP: v2 state migrated to v3 schema; generation initialized");
+        }
         lc_log(b, "LC_APP: stored state adopted after recovery");
         return 0;
     }
@@ -833,6 +894,7 @@ static void try_commit(lcbus_t *b, int depth)
     if (r == LC_RET_OK) {
         b->revision = newrev;
         b->state_dirty = 0;
+        b->storage_unknown_latch = 0;
         b->st.state_commits_ok++;
         b->persist_state = LCBUS_PERSIST_OK;
         return;
@@ -843,6 +905,9 @@ static void try_commit(lcbus_t *b, int depth)
     }
     b->st.state_commit_failures++;
     b->state_dirty = 1;
+    if (r == LC_RET_STORAGE_UNKNOWN) {
+        b->storage_unknown_latch = 1;
+    }
     if (r == LC_RET_REVISION_CONFLICT) {
         b->st.state_conflicts++;
         if (depth < 2) {
@@ -863,8 +928,9 @@ static void try_commit(lcbus_t *b, int depth)
 void lcbus_flush(lcbus_t *b, int force)
 {
     if (b->session_fatal) return;
-    int locked = b->persist_state != LCBUS_PERSIST_OK &&
-                 b->persist_state != LCBUS_PERSIST_NONE;
+    int locked = b->storage_unknown_latch ||
+                 (b->persist_state != LCBUS_PERSIST_OK &&
+                  b->persist_state != LCBUS_PERSIST_NONE);
     if (!locked && !b->state_dirty && !force) return;
     uint32_t now = now_tick(b);
     if (!force && b->last_flush_valid &&
@@ -875,6 +941,7 @@ void lcbus_flush(lcbus_t *b, int force)
     b->last_flush_valid = 1;
     if (locked) {
         int v = verify_stored(b);
+        if (v == 0) b->storage_unknown_latch = 0;
         if (v == 1 && b->state_dirty) try_commit(b, 1);
         return;
     }
@@ -888,10 +955,18 @@ void lcbus_restore(lcbus_t *b)
     int32_t r = b->ops.state_read(b->ops.user, buf, (uint32_t)sizeof(buf), &len, &rev);
     if (r == LC_RET_OK) {
         lc_bus_config_t cfg;
-        uint32_t ti, to, wi, wo, seq;
-        lc_st_status_t d = lc_st_decode(buf, len, &cfg, &ti, &to, &wi, &wo, &seq);
+        uint32_t ti, to, wi, wo, seq, gen;
+        int migrated = 0;
+        lc_st_status_t d = decode_state_blob(b->state_schema, buf, len, &cfg,
+                                             &ti, &to, &wi, &wo, &seq, &gen,
+                                             &migrated);
         if (d == LC_ST_OK) {
-            adopt_stored(b, &cfg, ti, to, wi, wo, seq, rev);
+            adopt_stored(b, &cfg, ti, to, wi, wo, seq, rev, gen);
+            if (migrated) {
+                b->state_dirty = 1;
+                b->business_mutated = 1;
+                lc_log(b, "LC_APP: v2 state migrated to v3 schema; generation initialized");
+            }
             lc_log(b, "LC_APP: persisted state restored");
             return;
         }
@@ -1062,6 +1137,274 @@ void lcbus_init(lcbus_t *b, const lcbus_host_ops_t *ops)
     b->binding.target_index = -1;
     b->model_state = LCBUS_MSTATE_UNSUPPORTED_MODEL;
     b->persist_state = LCBUS_PERSIST_NONE;
+    b->state_schema = 1;
+    b->config_generation = 0;
+    b->storage_unknown_latch = 0;
     b->next_id_carry = 1;
     b->window_start_ms = ops->tick_ms(ops->user);
+}
+
+static int find_target_index(lcbus_t *b, const char *name)
+{
+    uint8_t meta[LC_MODEL_META_SIZE];
+    int32_t r = b->ops.model_meta(b->ops.user, meta);
+    if (r == LC_RET_UNAUTHORIZED) {
+        b->session_fatal = 1;
+        return -2;
+    }
+    if (r != LC_RET_OK) return -2;
+    lcbus_binding_t parsed;
+    lc_memset(&parsed, 0, sizeof(parsed));
+    parsed.target_index = -1;
+    if (parse_meta_strict(meta, &parsed) != 1) return -2;
+    char cname[64];
+    for (uint32_t i = 0; i < parsed.class_count; i++) {
+        uint32_t alen = 0;
+        int32_t cr = b->ops.class_name(b->ops.user, parsed.model_generation,
+                                       parsed.class_generation, i,
+                                       cname, (uint32_t)sizeof(cname), &alen);
+        if (cr == LC_RET_UNAUTHORIZED) {
+            b->session_fatal = 1;
+            return -2;
+        }
+        if (cr != LC_RET_OK) return -2;
+        if (alen >= (uint32_t)sizeof(cname)) return -2;
+        cname[alen] = '\0';
+        if (lc_strcmp(cname, name) == 0) return (int)i;
+    }
+    return -1;
+}
+
+int lcbus_storage_restricted(const lcbus_t *b)
+{
+    if (b->session_fatal) return 1;
+    if (b->storage_unknown_latch) return 1;
+    if (b->persist_state == LCBUS_PERSIST_DEGRADED) return 1;
+    if (b->persist_state == LCBUS_PERSIST_CONFLICT) return 1;
+    return 0;
+}
+
+int lcbus_txn_prepare_config(lcbus_t *b, const lc_bus_config_t *candidate,
+                             lcbus_cfg_txn_t *txn)
+{
+    lc_memset(txn, 0, sizeof(*txn));
+    txn->target_index = -1;
+    if (!candidate || !lc_bus_config_valid(candidate)) return LCBUS_TXN_ERR_INVALID;
+    txn->candidate = *candidate;
+    txn->target_changed =
+        lc_strcmp(candidate->target_class_name, b->cfg.target_class_name) != 0;
+    txn->line_changed =
+        candidate->line_x1_permille != b->cfg.line_x1_permille ||
+        candidate->line_y1_permille != b->cfg.line_y1_permille ||
+        candidate->line_x2_permille != b->cfg.line_x2_permille ||
+        candidate->line_y2_permille != b->cfg.line_y2_permille ||
+        candidate->outside_x_permille != b->cfg.outside_x_permille ||
+        candidate->outside_y_permille != b->cfg.outside_y_permille;
+    txn->tracker_changed =
+        candidate->max_dist_permille != b->cfg.max_dist_permille ||
+        candidate->track_history_k != b->cfg.track_history_k ||
+        candidate->max_miss != b->cfg.max_miss ||
+        candidate->k_confirm != b->cfg.k_confirm;
+    if (b->state_schema == 2u && b->config_generation == 0xFFFFFFFFu) {
+        return LCBUS_TXN_ERR_RESOURCE;
+    }
+    if (txn->target_changed && b->binding.bound) {
+        int idx = find_target_index(b, candidate->target_class_name);
+        if (idx == -2) return LCBUS_TXN_ERR_RESOURCE;
+        if (idx < 0) return LCBUS_TXN_ERR_INVALID;
+        txn->target_index = idx;
+    }
+    if (txn->line_changed) {
+        txn->new_line = lc_line_cross_create(
+            candidate->line_x1_permille / 1000.0f, candidate->line_y1_permille / 1000.0f,
+            candidate->line_x2_permille / 1000.0f, candidate->line_y2_permille / 1000.0f,
+            candidate->outside_x_permille / 1000.0f, candidate->outside_y_permille / 1000.0f);
+        if (!txn->new_line) return LCBUS_TXN_ERR_RESOURCE;
+    }
+    if (txn->tracker_changed && !txn->target_changed) {
+        lc_tracker_config_t tc;
+        tc.max_dist_permille = candidate->max_dist_permille;
+        tc.track_history_k = candidate->track_history_k;
+        tc.max_miss = candidate->max_miss;
+        tc.k_confirm = candidate->k_confirm;
+        txn->tracker_carry = b->tracker ? lc_tracker_next_id(b->tracker)
+                                        : b->next_id_carry;
+        txn->new_tracker = lc_tracker_create(&tc, txn->tracker_carry);
+        if (!txn->new_tracker) {
+            lcbus_txn_abort_config(b, txn);
+            return LCBUS_TXN_ERR_RESOURCE;
+        }
+    }
+    return LCBUS_TXN_OK;
+}
+
+void lcbus_txn_abort_config(lcbus_t *b, lcbus_cfg_txn_t *txn)
+{
+    (void)b;
+    if (txn->new_line) {
+        lc_line_cross_destroy((lc_line_cross_t *)txn->new_line);
+        txn->new_line = NULL;
+    }
+    if (txn->new_tracker) {
+        lc_tracker_destroy((lc_tracker_t *)txn->new_tracker);
+        txn->new_tracker = NULL;
+    }
+}
+
+static void txn_switch(lcbus_t *b, lcbus_cfg_txn_t *txn, uint32_t newrev, uint32_t gen)
+{
+    uint32_t now = now_tick(b);
+    b->cfg = txn->candidate;
+    if (txn->target_changed) {
+        b->total_in = 0;
+        b->total_out = 0;
+        b->window_in = 0;
+        b->window_out = 0;
+        b->carried_in = 0;
+        b->carried_out = 0;
+        b->window_carried = 0;
+        b->gaps_window = 0;
+        b->lost_window = 0;
+        b->lost_unknown_window = 0;
+        b->unusable_window = 0;
+        b->window_start_ms = now;
+        clear_transient(b);
+        b->binding.bound = 0;
+        b->binding.target_index = -1;
+        b->binding.target_name[0] = '\0';
+    }
+    if (txn->line_changed) {
+        if (b->line) lc_line_cross_destroy(b->line);
+        b->line = txn->new_line;
+        txn->new_line = NULL;
+    }
+    if (!txn->target_changed && txn->tracker_changed) {
+        if (b->tracker) lc_tracker_destroy(b->tracker);
+        b->tracker = txn->new_tracker;
+        txn->new_tracker = NULL;
+        b->next_id_carry = txn->tracker_carry;
+    }
+    b->revision = newrev;
+    if (b->state_schema == 2u) b->config_generation = gen;
+    b->state_dirty = 0;
+    b->business_mutated = 0;
+    b->storage_unknown_latch = 0;
+    b->corrupt_reset_armed = 0;
+    b->persist_state = LCBUS_PERSIST_OK;
+    b->st.state_commits_ok++;
+    if (txn->target_changed) lcbus_rebind(b, 1);
+}
+
+int lcbus_txn_commit_config(lcbus_t *b, lcbus_cfg_txn_t *txn)
+{
+    uint32_t gen = b->config_generation;
+    if (b->state_schema == 2u) {
+        gen = b->config_generation + 1u;
+        if (gen == 0u) {
+            lcbus_txn_abort_config(b, txn);
+            return LCBUS_TXN_ERR_RESOURCE;
+        }
+    }
+    uint32_t ti = txn->target_changed ? 0u : b->total_in;
+    uint32_t to = txn->target_changed ? 0u : b->total_out;
+    uint32_t wi = txn->target_changed ? 0u : b->window_in;
+    uint32_t wo = txn->target_changed ? 0u : b->window_out;
+    uint8_t blob[LC_ST_BLOB_MAX];
+    uint32_t len;
+    if (b->state_schema == 2u) {
+        len = lc_st_encode_gen(blob, (uint32_t)sizeof(blob), &txn->candidate,
+                               ti, to, wi, wo, b->report_seq, gen);
+    } else {
+        len = lc_st_encode(blob, (uint32_t)sizeof(blob), &txn->candidate,
+                           ti, to, wi, wo, b->report_seq);
+    }
+    if (len == 0u) {
+        lcbus_txn_abort_config(b, txn);
+        b->st.state_commit_failures++;
+        return LCBUS_TXN_ERR_STORAGE_IO;
+    }
+    uint32_t newrev = 0;
+    int32_t r = b->ops.state_commit(b->ops.user, blob, len, b->revision, &newrev);
+    if (r == LC_RET_UNAUTHORIZED) {
+        b->session_fatal = 1;
+        lcbus_txn_abort_config(b, txn);
+        return LCBUS_TXN_ERR_STORAGE_IO;
+    }
+    if (r != LC_RET_OK) {
+        b->st.state_commit_failures++;
+        lcbus_txn_abort_config(b, txn);
+        if (r == LC_RET_REVISION_CONFLICT) {
+            b->st.state_conflicts++;
+            return LCBUS_TXN_ERR_STATE_CONFLICT;
+        }
+        if (r == LC_RET_STORAGE_UNKNOWN) {
+            b->storage_unknown_latch = 1;
+            return LCBUS_TXN_ERR_STORAGE_UNKNOWN;
+        }
+        return LCBUS_TXN_ERR_STORAGE_IO;
+    }
+    txn_switch(b, txn, newrev, gen);
+    return LCBUS_TXN_OK;
+}
+
+int lcbus_txn_commit_reset(lcbus_t *b, int allow_corrupt_replace)
+{
+    if (b->session_fatal) return LCBUS_TXN_ERR_STORAGE_IO;
+    if (lcbus_storage_restricted(b)) return LCBUS_TXN_ERR_STORAGE_UNKNOWN;
+    if (b->persist_state == LCBUS_PERSIST_CORRUPT && !allow_corrupt_replace) {
+        return LCBUS_TXN_ERR_STORAGE_UNKNOWN;
+    }
+    uint8_t blob[LC_ST_BLOB_MAX];
+    uint32_t len;
+    if (b->state_schema == 2u) {
+        len = lc_st_encode_gen(blob, (uint32_t)sizeof(blob), &b->cfg,
+                               0u, 0u, 0u, 0u, b->report_seq, b->config_generation);
+    } else {
+        len = lc_st_encode(blob, (uint32_t)sizeof(blob), &b->cfg,
+                           0u, 0u, 0u, 0u, b->report_seq);
+    }
+    if (len == 0u) {
+        b->st.state_commit_failures++;
+        return LCBUS_TXN_ERR_STORAGE_IO;
+    }
+    uint32_t newrev = 0;
+    int32_t r = b->ops.state_commit(b->ops.user, blob, len, b->revision, &newrev);
+    if (r == LC_RET_UNAUTHORIZED) {
+        b->session_fatal = 1;
+        return LCBUS_TXN_ERR_STORAGE_IO;
+    }
+    if (r != LC_RET_OK) {
+        b->st.state_commit_failures++;
+        if (r == LC_RET_REVISION_CONFLICT) {
+            b->st.state_conflicts++;
+            return LCBUS_TXN_ERR_STATE_CONFLICT;
+        }
+        if (r == LC_RET_STORAGE_UNKNOWN) {
+            b->storage_unknown_latch = 1;
+            return LCBUS_TXN_ERR_STORAGE_UNKNOWN;
+        }
+        return LCBUS_TXN_ERR_STORAGE_IO;
+    }
+    b->total_in = 0;
+    b->total_out = 0;
+    b->window_in = 0;
+    b->window_out = 0;
+    b->carried_in = 0;
+    b->carried_out = 0;
+    b->window_carried = 0;
+    b->gaps_window = 0;
+    b->lost_window = 0;
+    b->lost_unknown_window = 0;
+    b->unusable_window = 0;
+    b->window_start_ms = now_tick(b);
+    clear_transient(b);
+    b->corrupt_reset_armed = 0;
+    b->revision = newrev;
+    b->state_dirty = 0;
+    b->business_mutated = 0;
+    b->storage_unknown_latch = 0;
+    b->persist_state = LCBUS_PERSIST_OK;
+    b->st.state_commits_ok++;
+    lc_log(b, "LC_APP: counters reset committed at event boundary");
+    return LCBUS_TXN_OK;
 }

@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include "lc_app_abi_v2.h"
+#include "lc_app_abi_v3.h"
 
 #define LCSTUB_MAX_CLASSES  16
 #define LCSTUB_MAX_EVENTS   64
@@ -12,6 +13,9 @@
 #define LCSTUB_LOG_LINE_LEN 96
 #define LCSTUB_STATE_CAP    4096
 #define LCSTUB_EVENT_MAX    1600
+#define LCSTUB_MAX_COMMANDS 8
+#define LCSTUB_MAX_REPLIES  16
+#define LCSTUB_MAX_SNAPSHOTS 8
 
 typedef enum {
     LCSTUB_FN_LOG = 0,
@@ -24,6 +28,9 @@ typedef enum {
     LCSTUB_FN_STATE_READ,
     LCSTUB_FN_STATE_COMMIT,
     LCSTUB_FN_SHOULD_STOP,
+    LCSTUB_FN_CONTROL_NEXT,
+    LCSTUB_FN_CONTROL_REPLY,
+    LCSTUB_FN_SNAPSHOT_PUBLISH,
     LCSTUB_FN_COUNT
 } lcstub_fn_t;
 
@@ -81,6 +88,32 @@ typedef struct lcstub {
     uint32_t default_webhook_state;
     int      verify_report_seq;
 
+    uint8_t  commands[LCSTUB_MAX_COMMANDS][LC_CTRL_MSG_BUF_CAP];
+    uint32_t command_len[LCSTUB_MAX_COMMANDS];
+    int      cmd_head, cmd_count;
+    int      ctrl_unauthorized;
+    int      ctrl_delivered_valid;
+    uint32_t delivered_session;
+    uint32_t delivered_request;
+    uint32_t control_max;
+    uint32_t snapshot_ram;
+    uint32_t snapshot_wire_rejects;
+    uint32_t reply_wire_rejects;
+
+    struct {
+        int      present;
+        uint8_t  bytes[LC_CTRL_HEADER_SIZE];
+    } replies[LCSTUB_MAX_REPLIES];
+    int reply_count;
+
+    struct {
+        int      present;
+        uint32_t len;
+        uint8_t  bytes[LC_SNAPSHOT_BUF_CAP];
+    } snapshots[LCSTUB_MAX_SNAPSHOTS];
+    int snapshot_count;
+    int snapshot_slot;
+
     int32_t  fault_code[LCSTUB_FN_COUNT];
     int      fault_times[LCSTUB_FN_COUNT];
 
@@ -120,6 +153,27 @@ void lcstub_push_frame(lcstub_t *s, uint32_t seq, uint32_t mono_ms,
 void lcstub_wr32(uint8_t *p, uint32_t v);
 
 void lcstub_make_table(lcstub_t *s, lc_app_api_v2_t *out);
+
+void lcstub_make_table_v3(lcstub_t *s, lc_app_api_v3_t *out);
+
+uint32_t lcstub_make_command(uint8_t *out, uint32_t cap, uint32_t msg_type,
+                             uint32_t session_gen, uint32_t request_id,
+                             uint32_t expected_gen, uint32_t flags,
+                             const void *payload, uint32_t payload_len);
+
+void lcstub_push_command(lcstub_t *s, const void *bytes, uint32_t len);
+
+void lcstub_set_control_capacity(lcstub_t *s, uint32_t control_max, uint32_t snapshot_ram);
+
+int  lcstub_reply_count(const lcstub_t *s);
+
+const uint8_t *lcstub_reply(const lcstub_t *s, int index);
+
+int lcstub_snapshot_count(const lcstub_t *s);
+
+const uint8_t *lcstub_snapshot(const lcstub_t *s, int index, uint32_t *len);
+
+int lcstub_snapshot_valid_json(const uint8_t *payload, uint32_t len);
 
 uint32_t    lcstub_calls(const lcstub_t *s, lcstub_fn_t fn);
 const char *lcstub_last_log(const lcstub_t *s);

@@ -1,0 +1,9 @@
+native_v3_image: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/21/apps/line-crossing/app/build/lc-line-crossing-v3.bin
+native_v3_image_sha256: cbe3531427ad1a12814163a86e6a344c5019635652be2b0d1a817416b1fe9e9e
+v3_package: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/21/tests/line-crossing-v3/work/pkg/lc-line-crossing-3.0.0.neapp.v3
+v3_package_sha256: a2f321b1ccf65d56332cd02e23cd995d8f92ff06ef122582ca8a42c28536cd05  (per-run dev-key signature; identity, not a pinned artifact)
+signing_identity: NON-PRODUCTION per-run dev key (tests/package/gen_dev_key.py), gitignored
+verifier: package/neapp_pack_v3.py --host-policy + package/neapp_verify_v3.py --policy --expect PASS (see native-v3-package.log)
+declared_quotas: control_max=256 snapshot_max=1024 event_max=2048 report_max=6144 state_quota=4096 caps=0xff profile=2
+measured_occupancy: CONFIG_APPLY_total=176B (<=256), worst_snapshot_total<=1024B (see test logs for exact worst-case numbers)
+boundary: offline packaging/verification only — no device install/execution/hot-config (v3 spec §14)

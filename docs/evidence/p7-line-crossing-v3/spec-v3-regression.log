@@ -1,0 +1,10 @@
+.neapp v3 spec vector suite (evidence -> docs/evidence/spec-v3/)
+vectors: 150  PASS: 150  FAIL: 0
+hashes:
+  SHA-256(TBS)      = d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e
+  SHA-256(package)  = c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342
+  cmd CONFIG_APPLY  = e6fafa1183d9fadd84ee17721994ce2f758b8b988970a7c5b8f5fb6d7ecec3ca
+  cmd COUNTERS_RST  = 5d0a37ef0587533cbb141da8ad08fadb43b0e88d4ed115bb52d1ab4aeb8f43fb
+  reply APPLIED     = 054b7356b81fb555d6bdbc05f6d666cedb0d84a98555476a06cb32df09d87eed
+  snapshot          = 9e1031d07cb4b1217429a927bc3f69909c9cad84ef9036975fab99afa77403b5
+RESULT: PASS. Host-side spec evidence only — no real Host compile, no device/resource writes, no Line Crossing Web (spec §14).

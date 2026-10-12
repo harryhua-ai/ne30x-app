@@ -14,6 +14,8 @@ lcstub_t *lcstub_new(void)
     s->default_mqtt_state = LC_RSTATE_PENDING;
     s->default_webhook_state = LC_RSTATE_PENDING;
     s->verify_report_seq = 1;
+    s->control_max = LC_CTRL_CONTROL_MAX_DECLARED;
+    s->snapshot_ram = LC_CTRL_SNAPSHOT_MAX_DECLARED;
     return s;
 }
 
@@ -456,4 +458,371 @@ void lcstub_make_table(lcstub_t *s, lc_app_api_v2_t *out)
     out->state_read = fn_state_read;
     out->state_commit = fn_state_commit;
     out->should_stop = fn_should_stop;
+}
+
+static int32_t fn_control_next(void *out, uint32_t cap, uint32_t *actual_len)
+{
+    lcstub_t *s = g_cur;
+    if (!s) return -1;
+    s->calls[LCSTUB_FN_CONTROL_NEXT]++;
+    int32_t f = take_fault(s, LCSTUB_FN_CONTROL_NEXT);
+    if (f != LC_RET_OK) return f;
+    if (!s->authorized || s->ctrl_unauthorized) return LC_RET_UNAUTHORIZED;
+    if (s->cmd_count == 0) return LC_RET_NO_EVENT;
+    int slot = s->cmd_head;
+    if (cap < s->command_len[slot]) {
+        *actual_len = s->command_len[slot];
+        return LC_RET_BUFFER_TOO_SMALL;
+    }
+    memcpy(out, s->commands[slot], s->command_len[slot]);
+    *actual_len = s->command_len[slot];
+    uint32_t type = (uint32_t)s->commands[slot][LC_CTRL_OFF_MSG_TYPE] |
+                    ((uint32_t)s->commands[slot][LC_CTRL_OFF_MSG_TYPE + 1u] << 8);
+    (void)type;
+    s->delivered_session = lc_rd_u32(s->commands[slot] + LC_CTRL_OFF_SESSION_GENERATION);
+    s->delivered_request = lc_rd_u32(s->commands[slot] + LC_CTRL_OFF_REQUEST_ID);
+    s->ctrl_delivered_valid = 1;
+    s->cmd_head = (s->cmd_head + 1) % LCSTUB_MAX_COMMANDS;
+    s->cmd_count--;
+    return LC_RET_OK;
+}
+
+static int utf8_valid_bytes(const uint8_t *p, uint32_t n)
+{
+    uint32_t i = 0;
+    while (i < n) {
+        uint8_t c = p[i];
+        uint32_t need = 0;
+        uint32_t cp = 0;
+        if (c < 0x80u) { i++; continue; }
+        else if ((c & 0xE0u) == 0xC0u) { need = 1; cp = c & 0x1Fu; }
+        else if ((c & 0xF0u) == 0xE0u) { need = 2; cp = c & 0x0Fu; }
+        else if ((c & 0xF8u) == 0xF0u) { need = 3; cp = c & 0x07u; }
+        else return 0;
+        i++;
+        if (i + need > n) return 0;
+        while (need > 0) {
+            if ((p[i] & 0xC0u) != 0x80u) return 0;
+            cp = (cp << 6) | (p[i] & 0x3Fu);
+            i++;
+            need--;
+        }
+        if (cp > 0x10FFFFu) return 0;
+        if (cp >= 0xD800u && cp <= 0xDFFFu) return 0;
+    }
+    return 1;
+}
+
+typedef struct {
+    char keys[64][48];
+    int  counts[64];
+    int  n;
+} stub_keyset_t;
+
+static int stub_key_seen(stub_keyset_t *ks, const char *key, uint32_t len)
+{
+    for (int i = 0; i < ks->n; i++) {
+        if (strlen(ks->keys[i]) == len && memcmp(ks->keys[i], key, len) == 0) {
+            ks->counts[i]++;
+            return 1;
+        }
+    }
+    if (ks->n < 64 && len < 48) {
+        memcpy(ks->keys[ks->n], key, len);
+        ks->keys[ks->n][len] = '\0';
+        ks->counts[ks->n] = 1;
+        ks->n++;
+    }
+    return 0;
+}
+
+static const uint8_t *stub_scan_value(const uint8_t *p, const uint8_t *end,
+                                      stub_keyset_t *ks, int depth);
+
+static const uint8_t *stub_scan_string(const uint8_t *p, const uint8_t *end)
+{
+    if (p >= end || *p != '"') return NULL;
+    p++;
+    while (p < end && *p != '"') {
+        if (*p == '\\') {
+            p++;
+            if (p >= end) return NULL;
+            if (*p == 'u') {
+                for (int k = 0; k < 4; k++) {
+                    p++;
+                    if (p >= end || !((*p >= '0' && *p <= '9') ||
+                                      (*p >= 'a' && *p <= 'f') ||
+                                      (*p >= 'A' && *p <= 'F'))) return NULL;
+                }
+            } else if (*p != '"' && *p != '\\' && *p != '/' && *p != 'b' &&
+                       *p != 'f' && *p != 'n' && *p != 'r' && *p != 't') {
+                return NULL;
+            }
+            p++;
+        } else if (*p < 0x20u) {
+            return NULL;
+        } else {
+            p++;
+        }
+    }
+    if (p >= end) return NULL;
+    return p + 1;
+}
+
+static const uint8_t *stub_scan_object(const uint8_t *p, const uint8_t *end,
+                                       stub_keyset_t *ks, int depth);
+
+static const uint8_t *stub_skip_ws(const uint8_t *p, const uint8_t *end)
+{
+    while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
+    return p;
+}
+
+static const uint8_t *stub_scan_value(const uint8_t *p, const uint8_t *end,
+                                      stub_keyset_t *ks, int depth)
+{
+    if (depth > 16) return NULL;
+    p = stub_skip_ws(p, end);
+    if (p >= end) return NULL;
+    if (*p == '"') return stub_scan_string(p, end);
+    if (*p == '{') return stub_scan_object(p, end, ks, depth + 1);
+    if (*p == '[') {
+        p++;
+        p = stub_skip_ws(p, end);
+        if (p < end && *p == ']') return p + 1;
+        for (;;) {
+            p = stub_scan_value(p, end, ks, depth + 1);
+            if (!p) return NULL;
+            p = stub_skip_ws(p, end);
+            if (p < end && *p == ',') { p++; continue; }
+            if (p < end && *p == ']') return p + 1;
+            return NULL;
+        }
+    }
+    const uint8_t *start = p;
+    while (p < end && ((*p >= '0' && *p <= '9') || *p == '-' || *p == '+' ||
+                       *p == '.' || *p == 'e' || *p == 'E')) p++;
+    if (p > start) {
+        for (const uint8_t *q = start; q < p; q++) {
+            if ((q + 3 <= p && memcmp(q, "NaN", 3) == 0) ||
+                (q + 8 <= p && memcmp(q, "Infinity", 8) == 0)) {
+                return NULL;
+            }
+        }
+        return p;
+    }
+    if (p + 4 <= end && memcmp(p, "true", 4) == 0) return p + 4;
+    if (p + 5 <= end && memcmp(p, "false", 5) == 0) return p + 5;
+    if (p + 4 <= end && memcmp(p, "null", 4) == 0) return p + 4;
+    return NULL;
+}
+
+static const uint8_t *stub_scan_object(const uint8_t *p, const uint8_t *end,
+                                       stub_keyset_t *ks, int depth)
+{
+    stub_keyset_t local;
+    stub_keyset_t *set = ks ? ks : &local;
+    set->n = 0;
+    p = stub_skip_ws(p + 1, end);
+    if (p < end && *p == '}') return p + 1;
+    for (;;) {
+        p = stub_skip_ws(p, end);
+        if (p >= end || *p != '"') return NULL;
+        const uint8_t *kstart = p + 1;
+        p = stub_scan_string(p, end);
+        if (!p) return NULL;
+        uint32_t klen = (uint32_t)((p - 1) - kstart);
+        if (!utf8_valid_bytes(kstart, klen)) return NULL;
+        if (stub_key_seen(set, (const char *)kstart, klen)) return NULL;
+        p = stub_skip_ws(p, end);
+        if (p >= end || *p != ':') return NULL;
+        p = stub_scan_value(p + 1, end, NULL, depth);
+        if (!p) return NULL;
+        p = stub_skip_ws(p, end);
+        if (p < end && *p == ',') { p++; continue; }
+        if (p < end && *p == '}') return p + 1;
+        return NULL;
+    }
+}
+
+int lcstub_snapshot_valid_json(const uint8_t *payload, uint32_t len)
+{
+    if (!payload || len == 0 || len > 4096) return 0;
+    if (!utf8_valid_bytes(payload, len)) return 0;
+    const uint8_t *end = payload + len;
+    const uint8_t *p = stub_skip_ws(payload, end);
+    if (p >= end || *p != '{') return 0;
+    p = stub_scan_object(p, end, NULL, 0);
+    if (!p) return 0;
+    p = stub_skip_ws(p, end);
+    return p == end;
+}
+
+static int32_t fn_control_reply(const void *buf, uint32_t len)
+{
+    lcstub_t *s = g_cur;
+    if (!s) return -1;
+    s->calls[LCSTUB_FN_CONTROL_REPLY]++;
+    int32_t f = take_fault(s, LCSTUB_FN_CONTROL_REPLY);
+    if (f != LC_RET_OK) return f;
+    if (!s->authorized || s->ctrl_unauthorized) return LC_RET_UNAUTHORIZED;
+    if (!buf || len != LC_CTRL_HEADER_SIZE) {
+        s->reply_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    const uint8_t *p = (const uint8_t *)buf;
+    if (lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC ||
+        p[LC_CTRL_OFF_HEADER_VERSION] != LC_CTRL_HEADER_VERSION ||
+        p[LC_CTRL_OFF_HEADER_VERSION + 1u] != 0u ||
+        p[LC_CTRL_OFF_MSG_TYPE] != LC_CTRL_TYPE_REPLY ||
+        p[LC_CTRL_OFF_MSG_TYPE + 1u] != 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_TOTAL_LEN) != len) {
+        s->reply_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    if (lc_rd_u32(p + LC_CTRL_OFF_SESSION_GENERATION) == 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_REQUEST_ID) == 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_CONFIG_GENERATION) == 0u) {
+        s->reply_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    if (!s->ctrl_delivered_valid ||
+        lc_rd_u32(p + LC_CTRL_OFF_SESSION_GENERATION) != s->delivered_session ||
+        lc_rd_u32(p + LC_CTRL_OFF_REQUEST_ID) != s->delivered_request) {
+        s->reply_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    if (len > s->control_max) return LC_RET_QUOTA_EXCEEDED;
+    if (s->reply_count < LCSTUB_MAX_REPLIES) {
+        memcpy(s->replies[s->reply_count].bytes, buf, len);
+        s->replies[s->reply_count].present = 1;
+        s->reply_count++;
+    }
+    return LC_RET_OK;
+}
+
+static int32_t fn_snapshot_publish(const void *buf, uint32_t len)
+{
+    lcstub_t *s = g_cur;
+    if (!s) return -1;
+    s->calls[LCSTUB_FN_SNAPSHOT_PUBLISH]++;
+    int32_t f = take_fault(s, LCSTUB_FN_SNAPSHOT_PUBLISH);
+    if (f != LC_RET_OK) return f;
+    if (!s->authorized || s->ctrl_unauthorized) return LC_RET_UNAUTHORIZED;
+    if (!buf || len < LC_CTRL_HEADER_SIZE || len > sizeof(s->snapshots[0].bytes)) {
+        s->snapshot_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    const uint8_t *p = (const uint8_t *)buf;
+    if (lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC ||
+        p[LC_CTRL_OFF_HEADER_VERSION] != LC_CTRL_HEADER_VERSION ||
+        p[LC_CTRL_OFF_HEADER_VERSION + 1u] != 0u ||
+        p[LC_CTRL_OFF_MSG_TYPE] != LC_CTRL_TYPE_SNAPSHOT ||
+        p[LC_CTRL_OFF_MSG_TYPE + 1u] != 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_TOTAL_LEN) != len ||
+        lc_rd_u32(p + LC_CTRL_OFF_SESSION_GENERATION) != 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_REQUEST_ID) != 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_CONFIG_GENERATION) == 0u ||
+        lc_rd_u32(p + LC_CTRL_OFF_FLAGS) != 0u) {
+        s->snapshot_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    if (!lcstub_snapshot_valid_json(p + LC_CTRL_HEADER_SIZE,
+                                    len - LC_CTRL_HEADER_SIZE)) {
+        s->snapshot_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    if (len > s->snapshot_ram) return LC_RET_QUOTA_EXCEEDED;
+    int idx = s->snapshot_slot % LCSTUB_MAX_SNAPSHOTS;
+    s->snapshots[idx].present = 1;
+    s->snapshots[idx].len = len;
+    memcpy(s->snapshots[idx].bytes, buf, len);
+    s->snapshot_slot++;
+    if (s->snapshot_count < LCSTUB_MAX_SNAPSHOTS) s->snapshot_count++;
+    return LC_RET_OK;
+}
+
+void lcstub_make_table_v3(lcstub_t *s, lc_app_api_v3_t *out)
+{
+    g_cur = s;
+    memset(out, 0, sizeof(*out));
+    out->table_size = LC_APP_API_V3_TABLE_SIZE;
+    out->abi_version = LC_APP_ABI_V3;
+    out->log = fn_log;
+    out->tick_ms = fn_tick_ms;
+    out->event_next = fn_event_next;
+    out->model_meta = fn_model_meta;
+    out->class_name = fn_class_name;
+    out->report_submit = fn_report_submit;
+    out->report_status = fn_report_status;
+    out->state_read = fn_state_read;
+    out->state_commit = fn_state_commit;
+    out->should_stop = fn_should_stop;
+    out->control_next = fn_control_next;
+    out->control_reply = fn_control_reply;
+    out->snapshot_publish = fn_snapshot_publish;
+}
+
+uint32_t lcstub_make_command(uint8_t *out, uint32_t cap, uint32_t msg_type,
+                             uint32_t session_gen, uint32_t request_id,
+                             uint32_t expected_gen, uint32_t flags,
+                             const void *payload, uint32_t payload_len)
+{
+    uint32_t total = LC_CTRL_HEADER_SIZE + payload_len;
+    if (!out || cap < total || total > LC_CTRL_MSG_BUF_CAP) return 0;
+    memset(out, 0, LC_CTRL_HEADER_SIZE);
+    lcstub_wr32(out + LC_CTRL_OFF_PROTO_MAGIC, LC_CTRL_PROTO_MAGIC);
+    out[LC_CTRL_OFF_HEADER_VERSION] = (uint8_t)LC_CTRL_HEADER_VERSION;
+    out[LC_CTRL_OFF_MSG_TYPE] = (uint8_t)(msg_type & 0xFFu);
+    out[LC_CTRL_OFF_MSG_TYPE + 1u] = (uint8_t)((msg_type >> 8) & 0xFFu);
+    lcstub_wr32(out + LC_CTRL_OFF_TOTAL_LEN, total);
+    lcstub_wr32(out + LC_CTRL_OFF_SESSION_GENERATION, session_gen);
+    lcstub_wr32(out + LC_CTRL_OFF_REQUEST_ID, request_id);
+    lcstub_wr32(out + LC_CTRL_OFF_CONFIG_GENERATION, expected_gen);
+    lcstub_wr32(out + LC_CTRL_OFF_STATE_REVISION, 0u);
+    lcstub_wr32(out + LC_CTRL_OFF_FLAGS, flags);
+    if (payload_len) memcpy(out + LC_CTRL_HEADER_SIZE, payload, payload_len);
+    return total;
+}
+
+void lcstub_push_command(lcstub_t *s, const void *bytes, uint32_t len)
+{
+    if (!bytes || len == 0 || len > LC_CTRL_MSG_BUF_CAP) return;
+    if (s->cmd_count >= LCSTUB_MAX_COMMANDS) return;
+    int slot = (s->cmd_head + s->cmd_count) % LCSTUB_MAX_COMMANDS;
+    memcpy(s->commands[slot], bytes, len);
+    s->command_len[slot] = len;
+    s->cmd_count++;
+}
+
+void lcstub_set_control_capacity(lcstub_t *s, uint32_t control_max, uint32_t snapshot_ram)
+{
+    s->control_max = control_max;
+    s->snapshot_ram = snapshot_ram;
+}
+
+int lcstub_reply_count(const lcstub_t *s) { return s->reply_count; }
+
+const uint8_t *lcstub_reply(const lcstub_t *s, int index)
+{
+    if (index < 0 || index >= s->reply_count) return NULL;
+    return s->replies[index].bytes;
+}
+
+int lcstub_snapshot_count(const lcstub_t *s)
+{
+    int last = (s->snapshot_slot - 1 + LCSTUB_MAX_SNAPSHOTS * 8) % LCSTUB_MAX_SNAPSHOTS;
+    (void)last;
+    return s->snapshot_slot;
+}
+
+const uint8_t *lcstub_snapshot(const lcstub_t *s, int index, uint32_t *len)
+{
+    if (index < 0 || index >= s->snapshot_slot || index < s->snapshot_slot - LCSTUB_MAX_SNAPSHOTS) {
+        return NULL;
+    }
+    int idx = index % LCSTUB_MAX_SNAPSHOTS;
+    if (!s->snapshots[idx].present) return NULL;
+    if (len) *len = s->snapshots[idx].len;
+    return s->snapshots[idx].bytes;
 }

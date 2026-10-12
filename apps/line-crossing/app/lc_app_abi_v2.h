@@ -122,6 +122,8 @@ typedef struct lc_app_api_v2 {
 #define LC_APP_STATE_QUOTA       4096u
 #define LC_APP_REPORT_MAX        6144u
 
+#ifndef LC_APP_ABI_INLINE_HELPERS
+#define LC_APP_ABI_INLINE_HELPERS
 static inline uint32_t lc_tick_diff(uint32_t later, uint32_t earlier)
 {
     return (uint32_t)(later - earlier);
@@ -137,6 +139,7 @@ static inline int lc_finite_f32_bits(uint32_t bits)
 {
     return ((bits & 0x7F800000u) != 0x7F800000u) ? 1 : 0;
 }
+#endif
 
 #ifdef __cplusplus
 }

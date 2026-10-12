@@ -1,0 +1,18 @@
+{
+  "target_board_id": "0x00003010",
+  "psram_mib": 64,
+  "host_abi": "0x00030000",
+  "host_caps": "0x000000FF",
+  "loader_base": "0x93E00000",
+  "loader_size": "0x200000",
+  "load_region_bytes": "0x200000",
+  "exec_region_bytes": "0x200000",
+  "event_buffer_bytes": 2048,
+  "report_capacity_bytes": 6144,
+  "state_quota_bytes": 4096,
+  "control_msg_bytes": 256,
+  "snapshot_ram_bytes": 1024,
+  "business": "line-crossing-64",
+  "event_min_for_ai_events": 1576,
+  "report_min_for_report_submit": 6144
+}
