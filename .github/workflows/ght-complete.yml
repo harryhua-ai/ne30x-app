@@ -92,7 +92,7 @@ jobs:
           # an attempt's own durable runtime binding always wins). Must move
           # together with a reviewed `ght activate-runtime <digest>` pin
           # change.
-          GHT_RUNTIME_REF: 0ed2fea809c350377988604144fe3eb804014c83008dc96e7631b3a4bdeee01f
+          GHT_RUNTIME_REF: 743a713193def2e7afd5c9c614e05968a1ea50b2c6249d6c5ff219cbc5441096
           # Completion-only machine identity: audit metadata for completed_by
           # under the installation token; the runtime refuses it on every
           # non-completion command.
