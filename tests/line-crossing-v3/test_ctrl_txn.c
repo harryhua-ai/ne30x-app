@@ -11,6 +11,13 @@
 int g_pass = 0;
 int g_fail = 0;
 
+int lc_alloc_fail_armed;
+
+void *lc_test_alloc(size_t sz)
+{
+    return lc_alloc_fail_armed ? NULL : malloc(sz);
+}
+
 static lcstub_t *s;
 static lc_app_api_v3_t tbl;
 static lcbus_t bus;
@@ -789,6 +796,166 @@ static void t_v23_generation_exhaustion(void)
     teardown();
 }
 
+static void t_v24_tracker_alloc_fail_rejected(void)
+{
+    printf("V24 tracker allocation failure during confirmed target change -> REJECTED_RESOURCE, no commit, no state change, retry succeeds\n");
+    setup();
+    run_crossing(1, 500, 100);
+    lcbus_flush(&bus, 1);
+    uint8_t saved[LCSTUB_STATE_CAP];
+    uint32_t saved_len = s->state_len;
+    memcpy(saved, s->state_blob, saved_len);
+    uint32_t rev0 = bus.revision;
+    uint32_t total0 = bus.total_in;
+    uint32_t commits0 = s->calls[LCSTUB_FN_STATE_COMMIT];
+    lc_tracker_t *old_tracker = bus.tracker;
+    CHECK(old_tracker != NULL);
+    lc_bus_config_t cand = bus.cfg;
+    lc_strlcpy(cand.target_class_name, "car", sizeof(cand.target_class_name));
+    lc_alloc_fail_armed = 1;
+    CHECK_EQ_I(push_apply(&cand, LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 92,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    lc_alloc_fail_armed = 0;
+    uint32_t st, gen;
+    CHECK_EQ_I(reply_status(0, &st, &gen, NULL, NULL, NULL), 1);
+    CHECK_EQ_I(st, LC_CTRL_RESULT_REJECTED_RESOURCE);
+    CHECK_EQ_I(gen, bus.config_generation);
+    CHECK_EQ_I(lc_strcmp(bus.cfg.target_class_name, "person"), 0);
+    CHECK_EQ_I(bus.total_in, total0);
+    CHECK_EQ_I(bus.revision, rev0);
+    CHECK(bus.tracker == old_tracker);
+    CHECK_EQ_I(bus.binding.bound, 1);
+    CHECK_EQ_I(bus.binding.target_index, 0);
+    CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
+    CHECK_EQ_I(bus.st.alloc_failures, 0u);
+    CHECK_EQ_I(bus.st.state_commit_failures, 0u);
+    CHECK_EQ_I(s->calls[LCSTUB_FN_STATE_COMMIT], commits0);
+    CHECK_EQ_I(s->state_len, saved_len);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    CHECK_EQ_I(ctrl.st.rejected_resource, 1u);
+
+    CHECK_EQ_I(push_apply(&cand, LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 93,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    CHECK_EQ_I(reply_status(1, &st, &gen, NULL, NULL, NULL), 1);
+    CHECK_EQ_I(st, LC_CTRL_RESULT_APPLIED);
+    CHECK_EQ_I(gen, 2u);
+    CHECK_EQ_I(bus.total_in, 0u);
+    CHECK(bus.tracker != NULL);
+    CHECK(bus.tracker != old_tracker);
+    CHECK_EQ_I(bus.binding.bound, 1);
+    CHECK_EQ_I(bus.binding.target_index, 1);
+    CHECK_EQ_I(lc_strcmp(bus.cfg.target_class_name, "car"), 0);
+    teardown();
+}
+
+static void t_v25_target_query_fail_no_fake_apply(void)
+{
+    printf("V25 target model/class query faults on confirmed target change: prepare-time failure rejects pre-commit, post-prepare consultation trap proves no second post-CAS query and no fake APPLIED\n");
+    setup();
+    run_crossing(1, 500, 100);
+    lcbus_flush(&bus, 1);
+    uint8_t saved[LCSTUB_STATE_CAP];
+    uint32_t saved_len = s->state_len;
+    memcpy(saved, s->state_blob, saved_len);
+    uint32_t total0 = bus.total_in;
+    uint32_t commits0 = s->calls[LCSTUB_FN_STATE_COMMIT];
+    lc_tracker_t *old_tracker = bus.tracker;
+    lc_bus_config_t cand = bus.cfg;
+    lc_strlcpy(cand.target_class_name, "car", sizeof(cand.target_class_name));
+    lcstub_fault(s, LCSTUB_FN_CLASS_NAME, LC_RET_IO_ERROR, 1);
+    CHECK_EQ_I(push_apply(&cand, LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 94,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    uint32_t st, gen;
+    CHECK_EQ_I(reply_status(0, &st, &gen, NULL, NULL, NULL), 1);
+    CHECK_EQ_I(st, LC_CTRL_RESULT_REJECTED_RESOURCE);
+    CHECK_EQ_I(gen, bus.config_generation);
+    CHECK_EQ_I(bus.session_fatal, 0);
+    CHECK_EQ_I(lc_strcmp(bus.cfg.target_class_name, "person"), 0);
+    CHECK_EQ_I(bus.total_in, total0);
+    CHECK_EQ_I(bus.binding.bound, 1);
+    CHECK_EQ_I(bus.binding.target_index, 0);
+    CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
+    CHECK(bus.tracker == old_tracker);
+    CHECK_EQ_I(s->calls[LCSTUB_FN_STATE_COMMIT], commits0);
+    CHECK_EQ_I(s->state_len, saved_len);
+    CHECK(memcmp(saved, s->state_blob, saved_len) == 0);
+    CHECK_EQ_I(ctrl.st.rejected_resource, 1u);
+
+    CHECK_EQ_I(push_apply(&cand, LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 95,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    CHECK_EQ_I(reply_status(1, &st, &gen, NULL, NULL, NULL), 1);
+    CHECK_EQ_I(st, LC_CTRL_RESULT_APPLIED);
+    CHECK_EQ_I(gen, 2u);
+    CHECK_EQ_I(bus.binding.target_index, 1);
+    teardown();
+
+    setup();
+    run_crossing(1, 500, 100);
+    commits0 = s->calls[LCSTUB_FN_STATE_COMMIT];
+    cand = bus.cfg;
+    lc_strlcpy(cand.target_class_name, "car", sizeof(cand.target_class_name));
+    lcstub_fault(s, LCSTUB_FN_MODEL_META, LC_RET_UNAUTHORIZED, 1);
+    CHECK_EQ_I(push_apply(&cand, LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 96,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    CHECK_EQ_I(reply_status(0, &st, &gen, NULL, NULL, NULL), 1);
+    CHECK_EQ_I(st, LC_CTRL_RESULT_REJECTED_RESOURCE);
+    CHECK_EQ_I(bus.session_fatal, 1);
+    CHECK_EQ_I(lcbus_storage_restricted(&bus), 1);
+    CHECK_EQ_I(lc_strcmp(bus.cfg.target_class_name, "person"), 0);
+    CHECK_EQ_I(bus.total_in, 1u);
+    CHECK_EQ_I(s->calls[LCSTUB_FN_STATE_COMMIT], commits0);
+
+    CHECK_EQ_I(push_reset(LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 97,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    CHECK_EQ_I(reply_status(1, &st, NULL, NULL, NULL, NULL), 0);
+    CHECK_EQ_I(lcstub_reply_count(s), 1);
+    CHECK_EQ_I(s->calls[LCSTUB_FN_STATE_COMMIT], commits0);
+    CHECK_EQ_I(lc_strcmp(bus.cfg.target_class_name, "person"), 0);
+    teardown();
+
+    setup();
+    run_crossing(1, 500, 100);
+    lcbus_flush(&bus, 1);
+    memcpy(saved, s->state_blob, s->state_len);
+    saved_len = s->state_len;
+    lc_alloc_fail_armed = 0;
+    cand = bus.cfg;
+    lc_strlcpy(cand.target_class_name, "car", sizeof(cand.target_class_name));
+    lcstub_fault_after(s, LCSTUB_FN_MODEL_META, LC_RET_UNAUTHORIZED,
+                       (int)s->calls[LCSTUB_FN_MODEL_META] + 1, 1);
+    lcstub_fault_after(s, LCSTUB_FN_CLASS_NAME, LC_RET_IO_ERROR,
+                       (int)s->calls[LCSTUB_FN_CLASS_NAME] + 2, 1);
+    CHECK_EQ_I(push_apply(&cand, LC_CTRL_FLAG_DESTRUCTIVE_CONFIRMED, 5, 98,
+                          bus.config_generation), 0);
+    poll_ctrl();
+    CHECK_EQ_I(reply_status(0, &st, &gen, NULL, NULL, NULL), 1);
+    CHECK_EQ_I(st, LC_CTRL_RESULT_APPLIED);
+    CHECK_EQ_I(gen, 2u);
+    CHECK_EQ_I(bus.session_fatal, 0);
+    CHECK_EQ_I(bus.st.host_faults, 0u);
+    CHECK_EQ_I(bus.st.model_rebinds, 1u);
+    CHECK_EQ_I(bus.binding.bound, 1);
+    CHECK_EQ_I(bus.binding.target_index, 1);
+    CHECK_EQ_I(bus.model_state, LCBUS_MSTATE_RUNNING);
+    CHECK_EQ_I(bus.total_in, 0u);
+    CHECK_EQ_I(s->calls[LCSTUB_FN_MODEL_META], 2u);
+    CHECK_EQ_I(s->calls[LCSTUB_FN_CLASS_NAME], 3u);
+    lc_bus_config_t scfg;
+    uint32_t ti, to, wi, wo, seq, sgen;
+    CHECK_EQ_I(lc_st_decode_gen(s->state_blob, s->state_len, &scfg, &ti, &to,
+                                &wi, &wo, &seq, &sgen), LC_ST_OK);
+    CHECK_EQ_I(sgen, 2u);
+    CHECK_EQ_I(ti, 0u);
+    CHECK_EQ_I(lc_strcmp(scfg.target_class_name, "car"), 0);
+    teardown();
+}
+
 int main(void)
 {
     t_v01_stale_generation();
@@ -813,5 +980,7 @@ int main(void)
     t_v21_session_authority();
     t_v22_oversized_payload_whole_reject();
     t_v23_generation_exhaustion();
+    t_v24_tracker_alloc_fail_rejected();
+    t_v25_target_query_fail_no_fake_apply();
     TEST_REPORT("ctrl-txn");
 }

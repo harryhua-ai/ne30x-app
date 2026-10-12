@@ -20,4 +20,6 @@ V20 corrupt legacy blob not faked into trusted state
 V21 control_next authority: no command NO_EVENT; unauthorized session fatal
 V22 oversized candidate payload rejected whole, no partial effect
 V23 config_generation u32 exhaustion is fail-closed resource rejection
-[ctrl-txn] pass=189 fail=0 -> PASS
+V24 tracker allocation failure during confirmed target change -> REJECTED_RESOURCE, no commit, no state change, retry succeeds
+V25 target model/class query faults on confirmed target change: prepare-time failure rejects pre-commit, post-prepare consultation trap proves no second post-CAS query and no fake APPLIED
+[ctrl-txn] pass=267 fail=0 -> PASS

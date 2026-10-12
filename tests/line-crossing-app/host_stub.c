@@ -87,6 +87,15 @@ void lcstub_fault(lcstub_t *s, lcstub_fn_t fn, int32_t code, int times)
 {
     s->fault_code[fn] = code;
     s->fault_times[fn] = times;
+    s->fault_skip[fn] = 0;
+}
+
+void lcstub_fault_after(lcstub_t *s, lcstub_fn_t fn, int32_t code, int skip,
+                        int times)
+{
+    s->fault_code[fn] = code;
+    s->fault_times[fn] = times;
+    s->fault_skip[fn] = skip;
 }
 
 void lcstub_state_read_fault(lcstub_t *s, int32_t code, int times)
@@ -193,6 +202,10 @@ void lcstub_push_frame(lcstub_t *s, uint32_t seq, uint32_t mono_ms,
 
 static int32_t take_fault(lcstub_t *s, lcstub_fn_t fn)
 {
+    if (s->fault_skip[fn] > 0) {
+        s->fault_skip[fn]--;
+        return LC_RET_OK;
+    }
     if (s->fault_times[fn] > 0) {
         s->fault_times[fn]--;
         return s->fault_code[fn];

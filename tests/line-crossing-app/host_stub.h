@@ -116,6 +116,7 @@ typedef struct lcstub {
 
     int32_t  fault_code[LCSTUB_FN_COUNT];
     int      fault_times[LCSTUB_FN_COUNT];
+    int      fault_skip[LCSTUB_FN_COUNT];
 
     uint32_t calls[LCSTUB_FN_COUNT];
     char     logs[LCSTUB_LOG_LINES][LCSTUB_LOG_LINE_LEN];
@@ -138,6 +139,8 @@ void lcstub_set_boot_id(lcstub_t *s, uint32_t boot_id);
 void lcstub_set_report_channels(lcstub_t *s, uint32_t mqtt_state, uint32_t webhook_state);
 void lcstub_set_report_state(lcstub_t *s, uint32_t seq, uint32_t mqtt_state, uint32_t web_state);
 void lcstub_fault(lcstub_t *s, lcstub_fn_t fn, int32_t code, int times);
+void lcstub_fault_after(lcstub_t *s, lcstub_fn_t fn, int32_t code, int skip,
+                        int times);
 void lcstub_state_read_fault(lcstub_t *s, int32_t code, int times);
 void lcstub_state_commit_fault(lcstub_t *s, int32_t code, int times);
 

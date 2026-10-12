@@ -33,8 +33,9 @@ step "[1/8] v3 unit tests (candidate codec, state blob gen schema, host JSON bou
     -o "$WORK/test_unit_v3"
 "$WORK/test_unit_v3" | tee "$EVIDENCE_DIR/test-unit-v3.log"
 
-step "[2/8] v3 control-plane transaction tests (AC1/AC2/AC3 incl. flush-defect fix)"
-"$CC" $CFLAGS "$TESTS_DIR/test_ctrl_txn.c" "$STUB" $APP_SRCS $CORE_SRCS \
+step "[2/8] v3 control-plane transaction tests (AC1/AC2/AC3 incl. flush-defect fix, post-CAS switch no-fail, alloc/query fault negatives)"
+"$CC" $CFLAGS -DLC_MALLOC=lc_test_alloc -include "$TESTS_DIR/alloc_fault.h" \
+    "$TESTS_DIR/test_ctrl_txn.c" "$STUB" $APP_SRCS $CORE_SRCS \
     -o "$WORK/test_ctrl_txn"
 "$WORK/test_ctrl_txn" | tee "$EVIDENCE_DIR/test-ctrl-txn.log"
 

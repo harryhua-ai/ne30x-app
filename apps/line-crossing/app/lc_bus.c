@@ -1144,7 +1144,8 @@ void lcbus_init(lcbus_t *b, const lcbus_host_ops_t *ops)
     b->window_start_ms = ops->tick_ms(ops->user);
 }
 
-static int find_target_index(lcbus_t *b, const char *name)
+static int resolve_target_binding(lcbus_t *b, const char *name,
+                                  lcbus_binding_t *out)
 {
     uint8_t meta[LC_MODEL_META_SIZE];
     int32_t r = b->ops.model_meta(b->ops.user, meta);
@@ -1170,7 +1171,13 @@ static int find_target_index(lcbus_t *b, const char *name)
         if (cr != LC_RET_OK) return -2;
         if (alen >= (uint32_t)sizeof(cname)) return -2;
         cname[alen] = '\0';
-        if (lc_strcmp(cname, name) == 0) return (int)i;
+        if (lc_strcmp(cname, name) == 0) {
+            *out = parsed;
+            out->bound = 1;
+            out->target_index = (int32_t)i;
+            lc_strlcpy(out->target_name, name, sizeof(out->target_name));
+            return (int)i;
+        }
     }
     return -1;
 }
@@ -1208,11 +1215,14 @@ int lcbus_txn_prepare_config(lcbus_t *b, const lc_bus_config_t *candidate,
     if (b->state_schema == 2u && b->config_generation == 0xFFFFFFFFu) {
         return LCBUS_TXN_ERR_RESOURCE;
     }
-    if (txn->target_changed && b->binding.bound) {
-        int idx = find_target_index(b, candidate->target_class_name);
-        if (idx == -2) return LCBUS_TXN_ERR_RESOURCE;
-        if (idx < 0) return LCBUS_TXN_ERR_INVALID;
-        txn->target_index = idx;
+    if (txn->target_changed) {
+        lcbus_binding_t resolved;
+        int fr = resolve_target_binding(b, candidate->target_class_name,
+                                        &resolved);
+        if (fr == -2) return LCBUS_TXN_ERR_RESOURCE;
+        if (fr < 0) return LCBUS_TXN_ERR_INVALID;
+        txn->new_binding = resolved;
+        txn->target_index = resolved.target_index;
     }
     if (txn->line_changed) {
         txn->new_line = lc_line_cross_create(
@@ -1220,8 +1230,14 @@ int lcbus_txn_prepare_config(lcbus_t *b, const lc_bus_config_t *candidate,
             candidate->line_x2_permille / 1000.0f, candidate->line_y2_permille / 1000.0f,
             candidate->outside_x_permille / 1000.0f, candidate->outside_y_permille / 1000.0f);
         if (!txn->new_line) return LCBUS_TXN_ERR_RESOURCE;
+    } else if (txn->target_changed && !b->line) {
+        txn->new_line = lc_line_cross_create(
+            candidate->line_x1_permille / 1000.0f, candidate->line_y1_permille / 1000.0f,
+            candidate->line_x2_permille / 1000.0f, candidate->line_y2_permille / 1000.0f,
+            candidate->outside_x_permille / 1000.0f, candidate->outside_y_permille / 1000.0f);
+        if (!txn->new_line) return LCBUS_TXN_ERR_RESOURCE;
     }
-    if (txn->tracker_changed && !txn->target_changed) {
+    if (txn->target_changed || txn->tracker_changed) {
         lc_tracker_config_t tc;
         tc.max_dist_permille = candidate->max_dist_permille;
         tc.track_history_k = candidate->track_history_k;
@@ -1251,8 +1267,14 @@ void lcbus_txn_abort_config(lcbus_t *b, lcbus_cfg_txn_t *txn)
     }
 }
 
-static void txn_switch(lcbus_t *b, lcbus_cfg_txn_t *txn, uint32_t newrev, uint32_t gen)
+static int txn_switch(lcbus_t *b, lcbus_cfg_txn_t *txn, uint32_t newrev, uint32_t gen)
 {
+    if ((txn->target_changed &&
+         (!txn->new_binding.bound || txn->new_tracker == NULL)) ||
+        (!txn->target_changed && txn->tracker_changed &&
+         txn->new_tracker == NULL)) {
+        return -1;
+    }
     uint32_t now = now_tick(b);
     b->cfg = txn->candidate;
     if (txn->target_changed) {
@@ -1269,16 +1291,15 @@ static void txn_switch(lcbus_t *b, lcbus_cfg_txn_t *txn, uint32_t newrev, uint32
         b->unusable_window = 0;
         b->window_start_ms = now;
         clear_transient(b);
-        b->binding.bound = 0;
-        b->binding.target_index = -1;
-        b->binding.target_name[0] = '\0';
+        b->binding = txn->new_binding;
+        b->model_state = LCBUS_MSTATE_RUNNING;
     }
-    if (txn->line_changed) {
+    if (txn->new_line) {
         if (b->line) lc_line_cross_destroy(b->line);
         b->line = txn->new_line;
         txn->new_line = NULL;
     }
-    if (!txn->target_changed && txn->tracker_changed) {
+    if (txn->target_changed || txn->tracker_changed) {
         if (b->tracker) lc_tracker_destroy(b->tracker);
         b->tracker = txn->new_tracker;
         txn->new_tracker = NULL;
@@ -1292,7 +1313,7 @@ static void txn_switch(lcbus_t *b, lcbus_cfg_txn_t *txn, uint32_t newrev, uint32
     b->corrupt_reset_armed = 0;
     b->persist_state = LCBUS_PERSIST_OK;
     b->st.state_commits_ok++;
-    if (txn->target_changed) lcbus_rebind(b, 1);
+    return 0;
 }
 
 int lcbus_txn_commit_config(lcbus_t *b, lcbus_cfg_txn_t *txn)
@@ -1343,7 +1364,14 @@ int lcbus_txn_commit_config(lcbus_t *b, lcbus_cfg_txn_t *txn)
         }
         return LCBUS_TXN_ERR_STORAGE_IO;
     }
-    txn_switch(b, txn, newrev, gen);
+    if (txn_switch(b, txn, newrev, gen) != 0) {
+        lcbus_txn_abort_config(b, txn);
+        b->storage_unknown_latch = 1;
+        b->state_dirty = 1;
+        clear_transient(b);
+        unbind(b, LCBUS_MSTATE_UNSUPPORTED_MODEL);
+        return LCBUS_TXN_ERR_STORAGE_UNKNOWN;
+    }
     return LCBUS_TXN_OK;
 }
 

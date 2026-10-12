@@ -115,6 +115,7 @@ typedef enum {
 
 typedef struct lcbus_cfg_txn {
     lc_bus_config_t  candidate;
+    lcbus_binding_t  new_binding;
     lc_line_cross_t *new_line;
     lc_tracker_t    *new_tracker;
     uint32_t         tracker_carry;

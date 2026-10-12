@@ -84,6 +84,14 @@ App 计数器 `wire_rejected`（Host 登记层本就不得交付此类命令）�
   不变——修复 v2 `lcbus_apply_config` 先改 RAM 后 flush 失败仍返回 0 的缺陷；
   v2 内部 helper 语义保持不变，v3 命令路径一律走
   `lcbus_txn_prepare/commit_config` 事务）。
+- 目标类切换的可失败准备全部前置在 CAS 之前（v3 规范 §9.5 T3）：准备阶段
+  完成 `model_meta`/`class_name` 目标/模型解析并构造完整新绑定，预分配
+  切换后 tracker 与线对象；任一失败（含查询故障/失权、tracker 分配失败）
+  以 `REJECTED_INVALID`/`REJECTED_RESOURCE` 拒绝，旧配置/旧计数/已提交
+  字节不变（V24/V25 负例）。CAS 之后的切换只做已预备资源的纯内存安装，
+  不再发起任何 Host 查询；若切换前置条件不成立（防御路径），不回报
+  `APPLIED`，App 进入 `FAILED_STORAGE_UNKNOWN` + 受限只读对账语义
+  （v3 规范 §9.5 T6、§9.6）。
 - 失败矩阵：`REVISION_CONFLICT`→`FAILED_STATE_CONFLICT`；
   `IO_ERROR`→`FAILED_STORAGE_IO`；`STORAGE_UNKNOWN`→
   `FAILED_STORAGE_UNKNOWN` 且 App 进入受限态（后继有副作用命令一律

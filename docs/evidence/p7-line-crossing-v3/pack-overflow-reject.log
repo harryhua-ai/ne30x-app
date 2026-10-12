@@ -15,9 +15,9 @@ arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=
 arm-none-eabi-objcopy -O binary build/lc-line-crossing-v3.elf build/lc-line-crossing-v3.payload.bin
 python3 pack_v3_image.py --elf build/lc-line-crossing-v3.elf --payload build/lc-line-crossing-v3.payload.bin --out build/lc-line-crossing-v3.bin \
 	--exec-base 0x93E00000 --nm arm-none-eabi-nm
-packed build/lc-line-crossing-v3.bin: 32B NEA1 v3 header + 21304B payload = 21336B, entry_offset 0x9d0, crc32 0xede83832, abi 0x00030000, target 0x93e00000
+packed build/lc-line-crossing-v3.bin: 32B NEA1 v3 header + 21420B payload = 21452B, entry_offset 0x9d0, crc32 0x309c3801, abi 0x00030000, target 0x93e00000
    text	   data	    bss	    dec	    hex	filename
-  21304	      0	 110616	 131920	  20350	build/lc-line-crossing-v3.elf
+  21420	      0	 110616	 132036	  203c4	build/lc-line-crossing-v3.elf
 mkdir -p ../../../tests/line-crossing-v3/work/pkg
 python3 ../../../package/neapp_pack_v3.py \
 	--image build/lc-line-crossing-v3.bin \
