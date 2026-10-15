@@ -1,0 +1,67 @@
+{
+  "bundle_len": 421221,
+  "bundle_path": "docs/evidence/line-crossing-ui/line-crossing.neui",
+  "bundle_sha256": "4ff1f15c91e22308e2aeaa4c8d3adcc161c384b17ca368d77bab3006c5334177",
+  "files": [
+    {
+      "file_len": 6939,
+      "path": "assets/FileSaver.min-D428eXCv.js",
+      "sha256": "37ca34e7ab99ebf9a005aaaee56a1004b196411f9410a0cd25c0ebf9024b7aec"
+    },
+    {
+      "file_len": 268098,
+      "path": "assets/index-BS_63_JL.js",
+      "sha256": "ce01027a8b45a6cf39ac1002ff6fc57833189232b51de1d547471d719ec30271"
+    },
+    {
+      "file_len": 41608,
+      "path": "assets/index-D-isHcyK.css",
+      "sha256": "caa915f0cbaf7e9b499bebc8b7232cc85b96c359c8a3230040dee379794021f1"
+    },
+    {
+      "file_len": 100839,
+      "path": "assets/jmuxer.min.js",
+      "sha256": "87b8dac054a9d2e06dacb8eccb1b3580c39af8634180bc36012c1b7d958c7442"
+    },
+    {
+      "file_len": 682,
+      "path": "assets/videoWorker-CwSEKqUk.js",
+      "sha256": "0f07f17eac982a2ff1eeff58b50c41a69d5237363397cd2ce5415a7c9ea0f439"
+    },
+    {
+      "file_len": 2000,
+      "path": "assets/websocket-init-yiJ-u6et.js",
+      "sha256": "9987a6188be31e521fa577338e11d85b2bfaa0ce4b67b263bdbcde3931df6800"
+    },
+    {
+      "file_len": 399,
+      "path": "index.html",
+      "sha256": "774c23c80e505a2804811ce6d0fffaf304d6dd3136326f5a7cdef85551ad6997"
+    }
+  ],
+  "format": "neui-sidecar-v1",
+  "generator": "neui_pack_v1.py 1.0.0",
+  "manifest": {
+    "app_id": "line-crossing",
+    "file_count": 7,
+    "host_ui_abi": 1,
+    "publisher_id": "test-publisher",
+    "sidecar_version": "1.0.0"
+  },
+  "native_binding": {
+    "native_offline_verified": true,
+    "native_package_path": "docs/evidence/spec-v3/golden.neapp.v3",
+    "native_package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+    "native_package_sha256_note": "whole-file digest recorded for traceability only; the wire binding value is native_tbs_sha256, never this DER-dependent digest",
+    "native_publisher_key_match": true,
+    "native_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e"
+  },
+  "non_production_trust_root": "signing key is a NON-PRODUCTION dev/test identity; not a production trust anchor and never a device production root",
+  "signature": "ECDSA over secp256r1 (P-256), SHA-256, strict DER",
+  "signature_len": 72,
+  "signer_spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+  "source_commit": "81ed4c4dd02f5190ec4131a72da35ca0fd11e234",
+  "spec_authority": "ne301 issue #79 \u00a712 (frozen Sidecar v1 wire, 2026-10-15)",
+  "tbs_len": 421149,
+  "ui_tbs_sha256": "b5f0334b1cd92645606a8f5c2485cec354cb23471d65508a304dd68d6352673e"
+}

@@ -31,5 +31,14 @@ python3 package/sidecar/neui_verify_v1.py \
     --trust "$task_tmpdir/trust.json" \
     --native-package docs/evidence/spec-v3/golden.neapp.v3 \
     --native-trust "$task_tmpdir/trust.json" \
-    > docs/evidence/line-crossing-ui/neui-verification.json
+    --compact > "$task_tmpdir/verification-output.txt"
+python3 - "$task_tmpdir/verification-output.txt" docs/evidence/line-crossing-ui/neui-verification.json <<'PY'
+from pathlib import Path
+import json
+import sys
+report=json.loads(Path(sys.argv[1]).read_text().splitlines()[0])
+if report.get('result') != 'PASS' or not report.get('native_binding_trusted'):
+    raise SystemExit('NEUI verification did not PASS with a trusted native binding')
+Path(sys.argv[2]).write_text(json.dumps(report, indent=2, sort_keys=True)+'\n')
+PY
 cat docs/evidence/line-crossing-ui/neui-verification.json
