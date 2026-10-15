@@ -126,10 +126,10 @@ export function createTestCapabilities(url: URL) {
         return { outcome: 'APPLIED', sessionGeneration, configGeneration: snapshot.configGeneration, snapshot };
     };
 
-    const makeEnableOutcome = (request: { value: boolean }): EnableApplyOutcome => {
+    const makeEnableOutcome = (request: { sessionGeneration: number; value: boolean }): EnableApplyOutcome => {
         if (nextEnableOutcome === 'UNKNOWN') return { outcome: 'UNKNOWN', reason: 'fixture unknown Enable result' };
         if (nextEnableOutcome === 'CONFLICT') return { outcome: 'CONFLICT', reason: 'fixture Enable conflict' };
-        return { outcome: 'APPLIED', value: request.value, observedAtMs: observedAtMs() };
+        return { outcome: 'APPLIED', sessionGeneration: request.sessionGeneration, value: request.value, observedAtMs: observedAtMs() };
     };
 
     const capabilities: LineCrossingCapabilities = {
@@ -189,6 +189,9 @@ export function createTestCapabilities(url: URL) {
                         resolve(makeEnableOutcome(request));
                     };
                 });
+            }
+            if (state.app.state !== 'available' || state.app.value.sessionGeneration !== request.sessionGeneration) {
+                return { outcome: 'CONFLICT', reason: 'fixture Enable session mismatch' };
             }
             if (state.businessEnable.state !== 'available' || state.enableWrite.state !== 'available' || state.enableWrite.value !== true) {
                 return { outcome: 'UNAVAILABLE', reason: 'fixture Enable control unavailable' };

@@ -145,7 +145,7 @@ export type HostApplyOutcome =
     | { outcome: 'CONFLICT' | 'UNKNOWN' | 'UNAVAILABLE'; reason?: string };
 
 export type EnableApplyOutcome =
-    | { outcome: 'APPLIED'; value: boolean; observedAtMs: number }
+    | { outcome: 'APPLIED'; sessionGeneration: number; value: boolean; observedAtMs: number }
     | { outcome: 'CONFLICT' | 'UNKNOWN' | 'UNAVAILABLE'; reason?: string };
 
 export type ResetOutcome =
@@ -165,7 +165,7 @@ export interface LineCrossingCapabilities {
         expectedGeneration: number;
         candidate: HostPolicyConfig;
     }) => Promise<HostApplyOutcome>;
-    setBusinessEnable?: (request: { value: boolean }) => Promise<EnableApplyOutcome>;
+    setBusinessEnable?: (request: { sessionGeneration: number; value: boolean }) => Promise<EnableApplyOutcome>;
     resetStats: (request: { sessionGeneration: number }) => Promise<ResetOutcome>;
     openVideoStream: (request: { sessionGeneration: number }) => Promise<Capability<VideoStreamGrant>>;
 }

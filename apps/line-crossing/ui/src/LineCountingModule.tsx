@@ -157,7 +157,8 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
     const enableWrite: Capability<boolean> = enableWriteCapability.state === 'available' && !isFresh(enableWriteCapability, now)
         ? { state: 'stale', reason: 'Enable write capability observation is stale' }
         : enableWriteCapability;
-    const enableInteractive = typeof capabilities.setBusinessEnable === 'function'
+    const enableInteractive = appSnapshot !== null
+        && typeof capabilities.setBusinessEnable === 'function'
         && effectiveBusinessEnable.state === 'available'
         && enableWrite.state === 'available'
         && enableWrite.value === true
@@ -454,17 +455,23 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
     const handleEnableChange = async (value: boolean) => {
         const consumer = capabilities.setBusinessEnable;
         const current = stateRef.current;
+        const currentSnapshot = current?.app.state === 'available' ? current.app.value : null;
         const currentEnable = current ? capabilityOrUnavailable(current.businessEnable) : null;
         const currentWrite = current ? capabilityOrUnavailable(current.enableWrite) : null;
-        if (!consumer || enableBusyRef.current
+        if (!consumer || enableBusyRef.current || !currentSnapshot
             || !currentEnable || currentEnable.state !== 'available'
             || !currentWrite || currentWrite.state !== 'available' || currentWrite.value !== true) return;
+        const requestedSession = currentSnapshot.sessionGeneration;
         enableBusyRef.current = true;
         setEnableSaving(true);
         setEnableFeedback(null);
         try {
-            const outcome: EnableApplyOutcome = await consumer({ value });
+            const outcome: EnableApplyOutcome = await consumer({ sessionGeneration: requestedSession, value });
             const latest = stateRef.current;
+            if (!sameSessionState(latest, requestedSession)) {
+                setEnableFeedback('lineCrossing.sessionChanged');
+                return;
+            }
             const latestEnable = latest ? capabilityOrUnavailable(latest.businessEnable) : null;
             const latestWrite = latest ? capabilityOrUnavailable(latest.enableWrite) : null;
             if (!latestEnable || latestEnable.state !== 'available'
@@ -477,7 +484,7 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
                 if (outcome.outcome === 'UNKNOWN') toast.error(i18n._('lineCrossing.unknownOutcome'));
                 return;
             }
-            if (outcome.value !== value || outcome.observedAtMs > Date.now()) {
+            if (outcome.sessionGeneration !== requestedSession || outcome.value !== value || outcome.observedAtMs > Date.now()) {
                 setEnableFeedback('lineCrossing.unknownOutcome');
                 return;
             }

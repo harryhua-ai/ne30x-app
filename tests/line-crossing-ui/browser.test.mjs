@@ -2,16 +2,18 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { spawnSync } from 'node:child_process'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import test, { after, before } from 'node:test'
 import { chromium } from './browser-runner/node_modules/playwright-core/index.mjs'
 import { fileURLToPath } from 'node:url'
 
 const testRoot = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(testRoot, '../..')
 const buildRoot = path.join(testRoot, '.build')
 const productionRoot = path.join(buildRoot, 'production')
 const browserRoot = path.join(buildRoot, 'browser')
+const signedRoot = path.join(buildRoot, 'signed')
 const h264Path = path.join(buildRoot, 'line-crossing-test.h264')
 const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 let browser
@@ -94,6 +96,34 @@ const closeStreams = () => {
   }
 }
 
+const extractSignedBundle = () => {
+  const bundle = readFileSync(path.join(repoRoot, 'docs/evidence/line-crossing-ui/line-crossing.neui'))
+  assert.equal(bundle.subarray(0, 8).toString('hex'), '4e45554901000000')
+  const manifestLen = bundle.readUInt32LE(8)
+  const payloadLen = bundle.readUInt32LE(12)
+  const manifest = bundle.subarray(16, 16 + manifestLen)
+  const payload = bundle.subarray(16 + manifestLen, 16 + manifestLen + payloadLen)
+  rmSync(signedRoot, { recursive: true, force: true })
+  mkdirSync(signedRoot, { recursive: true })
+  const fileCount = manifest.readUInt16LE(118)
+  let cursor = 128
+  let offset = 0
+  for (let index = 0; index < fileCount; index += 1) {
+    const pathLen = manifest.readUInt16LE(cursor)
+    const fileLen = manifest.readUInt32LE(cursor + 2)
+    const name = manifest.subarray(cursor + 38, cursor + 38 + pathLen).toString('ascii')
+    const bytes = payload.subarray(offset, offset + fileLen)
+    assert.deepEqual(createHash('sha256').update(bytes).digest(), manifest.subarray(cursor + 6, cursor + 38), `signed asset ${name} digest mismatch`)
+    const target = path.join(signedRoot, name)
+    mkdirSync(path.dirname(target), { recursive: true })
+    writeFileSync(target, bytes)
+    cursor += 38 + pathLen
+    offset += fileLen
+  }
+  assert.equal(cursor, manifestLen)
+  assert.equal(offset, payloadLen)
+}
+
 before(async () => {
   assert.equal(existsSync(chromePath), true, 'Google Chrome is required for the offline browser fixture')
   const generated = spawnSync('ffmpeg', [
@@ -106,6 +136,7 @@ before(async () => {
   frameUnits = locateAccessUnits(readFileSync(h264Path))
   assert.ok(frameUnits.length > 1)
   assert.ok(frameUnits.every(unit => unit.length > 64))
+  extractSignedBundle()
 
   server = createServer((request, response) => {
     const url = new URL(request.url || '/', 'http://127.0.0.1')
@@ -114,6 +145,7 @@ before(async () => {
     response.setHeader('Content-Security-Policy', `default-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:${server.address()?.port}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'`)
     if (url.pathname.startsWith('/production/')) return serveAsset(request, response, productionRoot, '/production')
     if (url.pathname.startsWith('/browser/')) return serveAsset(request, response, browserRoot, '/browser')
+    if (url.pathname.startsWith('/signed/')) return serveAsset(request, response, signedRoot, '/signed')
     response.statusCode = 404
     response.end('not found')
   })
@@ -165,24 +197,35 @@ after(async () => {
 })
 
 test('production entry reports unavailable capabilities without placeholder data or writes', async () => {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
-  await page.goto(`${serverUrl}/production/`, { waitUntil: 'load' })
-  await page.getByTestId('lc-module').waitFor()
-  assert.equal(await page.getByTestId('lc-app-state').getAttribute('data-state'), 'unavailable')
-  assert.equal(await page.getByTestId('lc-video-state').getAttribute('data-state'), 'unavailable')
-  assert.equal(await page.getByTestId('lc-stats-unavailable').count(), 1)
-  assert.equal(await page.getByTestId('lc-events-unavailable').count(), 1)
-  assert.equal(await page.getByTestId('lc-stat-cell').count(), 0)
+  for (const [label, root] of [['rebuilt production build', '/production/'], ['committed signed bundle content', '/signed/']]) {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+    await page.goto(`${serverUrl}${root}`, { waitUntil: 'load' })
+    await page.getByTestId('lc-module').waitFor()
+    assert.equal(await page.getByTestId('lc-app-state').getAttribute('data-state'), 'unavailable', label)
+    assert.equal(await page.getByTestId('lc-video-state').getAttribute('data-state'), 'unavailable', label)
+    assert.equal(await page.getByTestId('lc-stats-unavailable').count(), 1, label)
+    assert.equal(await page.getByTestId('lc-events-unavailable').count(), 1, label)
+    assert.equal(await page.getByTestId('lc-stat-cell').count(), 0, label)
+    assert.equal(await page.getByTestId('lc-reset-stats').isDisabled(), true, label)
 
-  await page.getByTestId('lc-tab-config').click()
-  assert.equal(await page.getByTestId('lc-config-unavailable').count(), 1)
-  assert.equal(await page.getByTestId('lc-save-config').isDisabled(), true)
-  await page.getByTestId('lc-tab-advanced').click()
-  assert.equal(await page.getByTestId('lc-app-settings-unavailable').count(), 1)
-  assert.equal(await page.getByTestId('lc-host-settings-unavailable').count(), 1)
-  assert.equal(await page.getByTestId('lc-save-app').isDisabled(), true)
-  assert.equal(await page.getByTestId('lc-save-host').isDisabled(), true)
-  await page.close()
+    await page.getByTestId('lc-tab-config').click()
+    await page.getByTestId('lc-config-unavailable').waitFor()
+    assert.equal(await page.getByTestId('lc-config-unavailable').count(), 1, label)
+    assert.equal(await page.getByTestId('lc-business-enable').count(), 0, label)
+    assert.equal(await page.getByTestId('lc-save-config').isDisabled(), true, label)
+    assert.equal(await page.evaluate(() => typeof window.__lineCrossingTest), 'undefined', label)
+
+    await page.getByTestId('lc-tab-advanced').click()
+    assert.equal(await page.getByTestId('lc-app-settings-unavailable').count(), 1, label)
+    assert.equal(await page.getByTestId('lc-host-settings-unavailable').count(), 1, label)
+    assert.equal(await page.getByTestId('lc-save-app').isDisabled(), true, label)
+    assert.equal(await page.getByTestId('lc-save-host').isDisabled(), true, label)
+
+    await page.getByTestId('lc-tab-realtime').click()
+    await page.getByTestId('lc-stats-unavailable').waitFor()
+    assert.equal(await page.getByTestId('lc-page-realtime').count(), 1, label)
+    await page.close()
+  }
 })
 
 test('real H.264 playback, line editing, separate saves, reconnect and revoked video grant work offline', async () => {
@@ -343,7 +386,7 @@ test('trusted Enable capability toggles with real outcomes while absent, revoked
 
   await enableSwitch.click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 1)
-  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[0]), { value: true })
+  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[0]), { sessionGeneration: 8, value: true })
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-business-enable-switch"]')?.getAttribute('aria-checked') === 'true')
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Applied')
   assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Running/)
@@ -351,7 +394,7 @@ test('trusted Enable capability toggles with real outcomes while absent, revoked
   await page.evaluate(() => window.__lineCrossingTest.setNextEnableOutcome('UNKNOWN'))
   await enableSwitch.click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 2)
-  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[1]), { value: false })
+  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[1]), { sessionGeneration: 8, value: false })
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Outcome unknown; no automatic retry was sent')
   assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
 
@@ -381,6 +424,49 @@ test('trusted Enable capability toggles with real outcomes while absent, revoked
   await absentSwitch.waitFor({ state: 'detached' })
   assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Stale/)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 4)
+  await page.close()
+})
+
+test('delayed Enable ACK from a superseded session is rejected while the current session APPLIED commits', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+  await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
+  await page.getByTestId('lc-module').waitFor()
+  await page.getByTestId('lc-tab-config').click()
+  await page.getByTestId('lc-page-config').waitFor()
+  await page.evaluate(() => window.__lineCrossingTest.grantEnableControl(false))
+  const enableSwitch = page.getByTestId('lc-business-enable-switch')
+  await enableSwitch.waitFor()
+  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
+
+  await page.evaluate(() => window.__lineCrossingTest.delayNextEnableApply())
+  await enableSwitch.click()
+  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 1)
+  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[0]), { sessionGeneration: 8, value: true })
+  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
+
+  await page.evaluate(() => window.__lineCrossingTest.changeSession())
+  await page.waitForFunction(() => window.__lineCrossingTest.getState().app.value.sessionGeneration === 9)
+  await page.evaluate(() => window.__lineCrossingTest.resolvePendingEnableApply())
+  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'App session changed; reload the current snapshot')
+  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
+  assert.equal(await page.evaluate(() => {
+    const enable = window.__lineCrossingTest.getState().businessEnable
+    return enable.state === 'available' && enable.value === false
+  }), true)
+  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Disabled/)
+  assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 1)
+
+  await page.evaluate(() => window.__lineCrossingTest.setNextEnableOutcome('APPLIED'))
+  await enableSwitch.click()
+  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 2)
+  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[1]), { sessionGeneration: 9, value: true })
+  await page.waitForFunction(() => document.querySelector('[data-testid="lc-business-enable-switch"]')?.getAttribute('aria-checked') === 'true')
+  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Applied')
+  assert.equal(await page.evaluate(() => {
+    const enable = window.__lineCrossingTest.getState().businessEnable
+    return enable.state === 'available' && enable.value === true
+  }), true)
+  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Running/)
   await page.close()
 })
 
