@@ -12,7 +12,38 @@
  "heartbeat_at": "2026-10-15T02:15:26Z",
  "supersedes": null,
  "contract_digest": "828356354aac860db04705944321317d21a7e1eb1540924ac630c3a18cb9cae0",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/26/fdc77b50",
+  "sha": "dc42bbe72753b0d08db14f536b942215d180df46",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "docs/evidence/sidecar-v1/golden-sig.der": "ALLOWED",
+    "docs/evidence/sidecar-v1/golden-tbs.bin": "ALLOWED",
+    "docs/evidence/sidecar-v1/golden.neui": "ALLOWED",
+    "docs/evidence/sidecar-v1/regression.json": "ALLOWED",
+    "docs/evidence/sidecar-v1/report.json": "ALLOWED",
+    "docs/evidence/sidecar-v1/report.md": "ALLOWED",
+    "docs/evidence/sidecar-v1/sidecar-v1-checks.log": "ALLOWED",
+    "docs/ui-sidecar-protocol-v1.md": "ALLOWED",
+    "package/sidecar/neui_pack_v1.py": "ALLOWED",
+    "package/sidecar/neui_sidecar_format.py": "ALLOWED",
+    "package/sidecar/neui_verify_v1.py": "ALLOWED",
+    "tests/sidecar/.gitignore": "ALLOWED",
+    "tests/sidecar/neui_cases.py": "ALLOWED",
+    "tests/sidecar/run_checks.sh": "ALLOWED",
+    "tools/sidecar/make_neui_fixture.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 15,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-15T02:16:59Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
