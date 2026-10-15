@@ -52,12 +52,12 @@ offset  size  field
 128     ...   file_count 条记录，严格按路径原始 ASCII 字典序升序
 ```
 
-每条记录恰为 `path_len_u16(1..160) + file_len_u32(1..1048576) + sha256_of_raw_asset[32] + path[path_len]`，`manifest_len = 128 + 各记录字节数的精确和`（不多一字节、无尾记录）；`asset_payload_len = Σ(file_len)` 且属于 `1..2097152`；`16 + manifest_len + asset_payload_len + DER` 的整体解析使用溢出安全的整数算术（本实现：先对每个 u32 做上界钳制，再做有界加法与截断检查，见 `neui_sidecar_format.py` stage 1）。**必须恰好存在一个 `index.html`**；本工具的实现解释（更严不放宽）：根目录必须恰有一条路径恰为 `index.html` 的记录，且任何其它嵌套同名文件（如 `foo/index.html`）同样拒绝。
+每条记录恰为 `path_len_u16(1..160) + file_len_u32(1..1048576) + sha256_of_raw_asset[32] + path[path_len]`，`manifest_len = 128 + 各记录字节数的精确和`（不多一字节、无尾记录）；`asset_payload_len = Σ(file_len)` 且属于 `1..2097152`；`16 + manifest_len + asset_payload_len + DER` 的整体解析使用溢出安全的整数算术（本实现：先对每个 u32 做上界钳制，再做有界加法与截断检查，见 `neui_sidecar_format.py` stage 1）。**必须恰好存在一个根 `index.html`**：恰有一条路径恰为 `index.html` 的记录。`docs/index.html` 等嵌套同名文件只是每个段都匹配 `[A-Za-z0-9][A-Za-z0-9._-]*` 的普通合法路径，不构成第二个根 `index`，本工具不施加任何超出 §12 的额外拒绝（不收紧冻结 wire）。
 
 ## §2 身份、信任与原生绑定（§12.1/§12.3 冻结）
 
-- **单一受信发行者**：`publisher_id` 必须与已安装 native 的 `publisher_id` 一致；`publisher_key_sha256` 是该发行者在 Host 本地可信映射（`publisher_id → SHA-256(SPKI DER)`，与 v1/v2/v3 同一 JSON 格式）中的指纹；Sidecar **必须**由该 SPKI 对应的 P-256 私钥签名。禁止自带公钥自授信、在线信任表或自行授权。
-- **原生绑定精确值**：`native_tbs_sha256 = SHA-256(原生 .neapp v3 的 TBS)`——**不是**含随机 DER 的整包 `package_sha256`。打包器要求先以 `--native-trust` 对 `--native-package` 做完整离线 v3 验签（intrinsic 层），只从**已验证**的原生 TBS 取该值；验证器在 `--native-package`（可选 `--native-trust`）下核对 `publisher_id + app_id + publisher_key_sha256 + native_tbs_sha256` 四元组全部一致。相同原生 TBS 的合法重签不被误判为不同 App 内容。
+- **单一受信发行者**：`publisher_id` 必须与已安装 native 的 `publisher_id` 一致；`publisher_key_sha256` 是该发行者在 Host 本地可信映射（`publisher_id → SHA-256(SPKI DER)`，与 v1/v2/v3 同一 JSON 格式）中的指纹；Sidecar **必须**由该 SPKI 对应的 P-256 私钥签名。禁止自带公钥自授信、在线信任表或自行授权。打包器据此强制（§12.1 同一受信 SPKI 发行者同时签 Sidecar 与 native）：`--key` 的 SPKI SHA-256 指纹必须等于**已验证** native manifest 的 `publisher_key_sha256`，不匹配即拒绝且不产出 bundle/provenance；打包自验也直接用 `--native-trust` 信任库完成，不再自建以签名钥为锚的信任库。
+- **原生绑定精确值**：`native_tbs_sha256 = SHA-256(原生 .neapp v3 的 TBS)`——**不是**含随机 DER 的整包 `package_sha256`。打包器要求先以 `--native-trust` 对 `--native-package` 做完整离线 v3 验签（intrinsic 层），只从**已验证**的原生 TBS 取该值。验证器在 `--native-package` 下核对 `publisher_id + app_id + publisher_key_sha256 + native_tbs_sha256` 四元组全部一致，并**如实区分信任级别**：给 `--native-trust` 时 native 先通过完整离线 v3 验签，报告 `native_binding_trusted=true`；不给时 native 字节只做结构解析与身份比对（**未验签**），报告 `native_binding_checked=true` 且 `native_binding_trusted=false`——这是独立的 untrusted byte-only 交叉核对，绝不表述为"受信 native 准入/验签"（报告 boundary 字段显式声明）。相同原生 TBS 的合法重签不被误判为不同 App 内容。
 - Host（#83）仍必须以**自己的当前受信 install record / active session** 独立判定此身份；本离线工具的 `--native-package` 交叉核对只是证据工具，不是 Host 判定本身。
 
 ## §3 路径与记录规则（§12.2 冻结）
@@ -89,10 +89,10 @@ offset  size  field
 
 1. 有界容器结构：NEUI v1 magic（未知版本拒绝、从不协商）、两个长度的钳制区间、有界加法的截断检查、DER 长度窗口 8..72（尾段必须被 DER 完整消费）。
 2. 严格 DER 结构解码（完整消费，无 low-S 假设）。
-3. manifest 严格解码：v3 标识符规则、`sidecar_version_major >= 1`、`file_count 1..64`、`host_ui_abi = 1`、`reserved = 0`、记录边界的精确定长、规范路径、严格升序、无重复/大小写折叠碰撞、恰一根 `index.html`、无嵌套同名。
+3. manifest 严格解码：v3 标识符规则、`sidecar_version_major >= 1`、`file_count 1..64`、`host_ui_abi = 1`、`reserved = 0`、记录边界的精确定长、规范路径、严格升序、无重复/大小写折叠碰撞、恰一根 `index.html`（嵌套同名文件是普通合法路径，不额外拒绝）。
 4. 本地信任映射（包自带指纹不能自授信）→ 不匹配即 `PUBLISHER_UNTRUSTED`。
 5. 对原样 TBS 的 ECDSA P-256/SHA-256 验签 → 失败即 `SIGNATURE_INVALID`。
-6. 签名内容交叉检查：`asset_payload_len == Σ(file_len)`、逐文件 SHA-256（恒时比较）；给了 `--native-package` 时再核对原生四元组（含"跨 App"归因）。
+6. 签名内容交叉检查：`asset_payload_len == Σ(file_len)`、逐文件 SHA-256（恒时比较）；给了 `--native-package` 时再核对原生四元组（含"跨 App"归因），信任级别按 §2 报告（`native_binding_trusted` true=已验签 native / false=未验签 byte-only 比对）。
 
 错误类别沿用 v1 §7 的离线子集：`BAD_PACKAGE`（结构/唯一编码/内部不一致/原生绑定不一致）、`PUBLISHER_UNTRUSTED`（不在本地映射或指纹不符）、`SIGNATURE_INVALID`（验签数学失败）。任何失败都不得冒充已受信 bundle；打包器在写出前用同一独立管线自验，任一拒绝即不出包。
 
@@ -104,13 +104,13 @@ offset  size  field
 | 篡改（结构先行） | `tamper_manifest_major_structural`（version_major 翻转为 0） | `BAD_PACKAGE`（结构检查先于签名，规范序） |
 | 替换/错签 | `wrong_signer_key`（临时密钥签真 TBS）、`tamper_der_byte` | `SIGNATURE_INVALID` |
 | 未知发行者/公钥 | `unknown_publisher`（重签+自带指纹）、`publisher_fingerprint_mismatch` | `PUBLISHER_UNTRUSTED` |
-| 错原生身份 | `wrong_native_identity`（对另一合法原生交叉核对） | `BAD_PACKAGE` (`native_tbs_sha256`) |
+| 错原生身份 | `wrong_native_identity`（对另一合法原生交叉核对）、`untrusted_native_byte_only_mismatch`（byte-only 未受信模式仍拒绝异身份字节） | `BAD_PACKAGE` (`native_tbs_sha256`) |
 | 跨 App | `cross_app_app_id_mismatch`（重签、`app_id` 不符原生） | `BAD_PACKAGE` (`cross-App`) |
 | 重放旧 build / 冲突 / 降级 | `classify_downgrade`、`classify_content_conflict`、`classify_native_rebind` | `DOWNGRADE` / `CONTENT_CONFLICT` / `NATIVE_REBIND`（§5） |
 | 错版本 | `version_major_zero`（重签）、`magic_major2` | `BAD_PACKAGE` |
 | 非规范路径/遍历 | `path_leading_slash`、`path_trailing_slash`、`path_dotdot_segment`、`path_dot_segment`、`path_backslash`、`path_percent`、`path_colon`、`path_query`、`path_fragment`、`path_non_ascii`、`path_empty_segment`、`path_hidden_dotfile`、`path_nul` | `BAD_PACKAGE` |
-| 重复/乱序/碰撞 | `duplicate_paths`、`records_unsorted`、`casefold_collision` | `BAD_PACKAGE` |
-| index.html 规则 | `missing_index`、`nested_index_only`、`nested_second_index` | `BAD_PACKAGE` |
+| 重复/乱序/碰撞 | `duplicate_paths`、`records_unsorted`、`casefold_collision`、`duplicate_root_index`（两条根 `index.html` 记录） | `BAD_PACKAGE` |
+| index.html 规则 | `missing_index`、`nested_index_only`（只有嵌套同名、无根 index） | `BAD_PACKAGE` |
 | 记录边界 | `manifest_extra_bytes`、`manifest_truncated_record`、`path_len_zero`、`path_len_161` | `BAD_PACKAGE` |
 | 尺寸负值/超限（重签合法签名仍拒） | `file_len_zero`、`file_len_over_cap`、`file_count_zero`、`file_count_65`、`total_payload_over_cap` | `BAD_PACKAGE` |
 | 整数溢出（溢出安全解析） | `manifest_len_u32max`、`asset_len_u32max`（另 `manifest_len_zero/127/16385`、`asset_len_zero/2097153`） | `BAD_PACKAGE` |
@@ -118,18 +118,18 @@ offset  size  field
 | 内容一致性 | `record_sha_mismatch`、`payload_wrong_order`、`payload_sum_mismatch` | `BAD_PACKAGE` |
 | 域隔离（双向） | `native_v3_package_on_sidecar_verifier`、`sidecar_bundle_on_v3_verifier` | 双向 `BAD_PACKAGE`（对方 magic） |
 | manifest 字段 | `host_ui_abi_2`、`reserved_nonzero`、`publisher_uppercase`、`app_id_bad_padding` | `BAD_PACKAGE` |
-| 打包器 fail-closed | `pack_refusal_missing_index`、`pack_refusal_second_index`、`pack_refusal_empty_file`、`pack_refusal_oversize_file`、`pack_refusal_total_over_cap`、`pack_refusal_too_many_files`、`pack_refusal_symlink_file`、`pack_refusal_symlink_dir_escape`、`pack_refusal_fifo`、`pack_refusal_version_major_zero`、`pack_refusal_native_not_v3`、`pack_refusal_native_signature_invalid`（只用**已验证**原生 TBS）、`pack_refusal_publisher_mismatch`、`pack_refusal_app_mismatch` | 退出码 2，不产出 bundle |
-| 正向（无 low-S 假设/幂等） | `low_s_variant_same_identity`、`idempotent_repack_same_identity`、`golden_native_binding_accept` | `PASS` / 判别成立 |
+| 打包器 fail-closed | `pack_refusal_missing_index`、`pack_refusal_empty_file`、`pack_refusal_oversize_file`、`pack_refusal_total_over_cap`、`pack_refusal_too_many_files`、`pack_refusal_symlink_file`、`pack_refusal_symlink_dir_escape`、`pack_refusal_fifo`、`pack_refusal_version_major_zero`、`pack_refusal_native_not_v3`、`pack_refusal_native_signature_invalid`（只用**已验证**原生 TBS）、`pack_refusal_publisher_mismatch`、`pack_refusal_app_mismatch`、`pack_refusal_signer_key_not_native_publisher`（无关 P-256 钥：§12.1 同一发行者绑定，不产出 bundle/provenance） | 退出码 2，不产出 bundle |
+| 正向（无 low-S 假设/幂等/合法嵌套路径） | `low_s_variant_same_identity`、`idempotent_repack_same_identity`、`golden_native_binding_accept`（`native_binding_trusted=true`）、`untrusted_native_byte_only_accept`（`native_binding_checked=true` 且 `native_binding_trusted=false`）、`nested_index_accept`、`pack_accept_nested_index`（根 index + 嵌套 `docs/index.html` 双工具 PASS） | `PASS` / 判别成立 |
 
 ## §8 工具与一键复现
 
 | 文件 | 作用 |
 | --- | --- |
 | `package/sidecar/neui_sidecar_format.py` | Sidecar v1 格式权威 + 独立验真管线 + 安装转移判别（复用 v1/v3 的 DER/SPKI/标识符/信任库原语；Sidecar 解析与判定全部独立实现） |
-| `package/sidecar/neui_pack_v1.py` | 打包器：资产树 + 元数据 + 私钥 + **已离线验证的原生 v3 包** → `.neui` + 溯源 sidecar；写出前自验，任一约束违反即拒不出包 |
-| `package/sidecar/neui_verify_v1.py` | 离线验真器：`.neui` + 信任库 JSON（可选 `--native-package`/`--native-trust` 原生绑定交叉核对）→ PASS 或 §6 错误类 |
+| `package/sidecar/neui_pack_v1.py` | 打包器：资产树 + 元数据 + 私钥 + **已离线验证的原生 v3 包** → `.neui` + 溯源 sidecar；强制 `--key` 指纹 == native `publisher_key_sha256`（§12.1 同一发行者），写出前用 `--native-trust` 库自验，任一约束违反即拒不出包 |
+| `package/sidecar/neui_verify_v1.py` | 离线验真器：`.neui` + 信任库 JSON（可选 `--native-package` 原生绑定交叉核对；给 `--native-trust` 则 native 先完整验签、`native_binding_trusted=true`，不给则为未验签 byte-only 比对、`native_binding_trusted=false`）→ PASS 或 §6 错误类 |
 | `tools/sidecar/make_neui_fixture.py` | 确定性非生产 fixture 资产树（`base`/`alt` 变体；**不是**真实 counting UI，无产品主张） |
-| `tests/sidecar/neui_cases.py` | 90 项正/负/判别用例（真实 CLI 驱动，逐项类 + 归因断言；产出 `docs/evidence/sidecar-v1/report.json|md`） |
+| `tests/sidecar/neui_cases.py` | 94 项正/负/判别用例（真实 CLI 驱动，逐项类 + 归因断言；产出 `docs/evidence/sidecar-v1/report.json|md`） |
 | `tests/sidecar/run_checks.sh` | 一键全流程：先重跑 native v1/v2/v3 与 spec-v2/v3 全套回归（证据先验 clean、跑后逐字节还原），再跑 Sidecar 全套（§10 边界依然适用） |
 
 依赖：`python3`（含 `cryptography`）、`openssl`（native 套件交叉验签）、`arm-none-eabi-gcc`（仅 native 回归需要构建 hello-app）、`git`。
@@ -181,7 +181,7 @@ python3 package/sidecar/neui_verify_v1.py \
 
 本 Issue 与本文**均无以下 PASS**，任何引用不得写成已证明：
 
-1. **NE301 Host 验签/准入/安装**：#83 未实现；本离线 PASS 不等于 Host 能或会接受同一 wire（Host 必须独立核验并按其 install record 判定身份）。
+1. **NE301 Host 验签/准入/安装**：#83 未实现；本离线 PASS 不等于 Host 能或会接受同一 wire（Host 必须独立核验并按其 install record 判定身份）。`--native-package` 不带 `--native-trust` 的交叉核对只是未验签 byte-only 比对（报告 `native_binding_trusted=false`），不构成受信 native 准入或验签；只有带 `--native-trust` 的核对（`native_binding_trusted=true`）才基于已验签 native。
 2. **设备 LittleFS 空闲空间 / RAM**：§4 上限是打包输入最大值，不是板卡可安装承诺；真实 free bytes、GC、峰值 RAM 未知。
 3. **双工件事务**：native + Sidecar 跨分区无已证实原子事务；暂存/激活/回滚/掉电恢复全部归 #83。
 4. **摄像头 H264 / 视频 / 浏览器可信加载**：#84 未实现；浏览器 HTTP 传输完整性不在本工具范围内（#79 §8）。

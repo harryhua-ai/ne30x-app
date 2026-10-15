@@ -21,8 +21,12 @@ package/sidecar/neui_sidecar_format.py, in the normative order:
      file_len), per-asset SHA-256 in record order, and — when
      --native-package is given — the native binding (native_tbs_sha256,
      publisher_id, app_id, publisher_key_sha256 must all match the native
-     .neapp v3 package; with --native-trust the native must first PASS
-     full offline v3 verification)
+     .neapp v3 package).  With --native-trust the native must first PASS
+     full offline v3 verification and the report marks the binding
+     native_binding_trusted=true; without it the native bytes are only
+     structurally parsed and identity-compared — reported as
+     native_binding_trusted=false (an untrusted byte-only cross-check,
+     never presented as verified native admission)
 
 Failure classes: BAD_PACKAGE, SIGNATURE_INVALID, PUBLISHER_UNTRUSTED.
 
@@ -59,7 +63,10 @@ def main() -> int:
                              "(native_tbs_sha256 + publisher_id + app_id + key fingerprint)")
     parser.add_argument("--native-trust", type=Path, default=None,
                         help="optional trust store JSON; given together with --native-package, "
-                             "the native must first PASS full offline v3 verification")
+                             "the native must first PASS full offline v3 verification and the "
+                             "binding is reported native_binding_trusted=true; omitted, the "
+                             "cross-check is an untrusted byte-only comparison reported "
+                             "native_binding_trusted=false")
     parser.add_argument("--expect", choices=EXPECTED_RESULTS, default=None,
                         help="assert this exact verification result (test harness mode)")
     parser.add_argument("--compact", action="store_true", help="one-line JSON output")

@@ -1,9 +1,9 @@
 # NEUI Sidecar v1 offline pack/verify — evidence report (Issue #26)
 
 - Protocol authority: ne301 issue #79 §12 (frozen Sidecar v1 wire, 2026-10-15)
-- Source commit: `28a515408c803ad304cffe3fc8dbc71f968a9995`
+- Source commit: `dc42bbe72753b0d08db14f536b942215d180df46`
 - Toolchain: python 3.14.4, cryptography 48.0.0, OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)
-- Cases: 90 total — 13 positive/predicate, 63 verifier rejection, 14 packer refusal
+- Cases: 94 total — 16 positive/predicate, 64 verifier rejection, 14 packer refusal
 
 ## Golden vector (deterministic, PUBLIC d=1 test signer)
 

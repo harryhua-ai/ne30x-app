@@ -257,11 +257,6 @@ def parse_manifest(raw: bytes) -> SidecarManifest:
     if index_count != 1:
         raise fmt.BadPackage(
             f"exactly one {INDEX_PATH!r} entry is required, found {index_count}")
-    nested_index = [r.path for r in records
-                    if r.path != INDEX_PATH and r.path.rsplit("/", 1)[-1] == INDEX_PATH]
-    if nested_index:
-        raise fmt.BadPackage(
-            f"nested {INDEX_PATH!r} entries are not allowed: {nested_index!r}")
     return SidecarManifest(
         publisher_id=publisher_id,
         app_id=app_id,
@@ -306,15 +301,17 @@ def native_v3_tbs_info(native_bytes: bytes, native_trust: fmt.TrustStore | None 
     signed_len = fmt.HEADER_LEN + manifest_len + image_len
     if len(native_bytes) < signed_len:
         raise fmt.BadPackage("native package truncated below its signed region")
+    native_verified = False
     if native_trust is not None:
         report, err = fmt3.verify_package_v3(native_bytes, native_trust, host_admission=False)
         if err is not None:
             raise fmt.BadPackage(
                 "native package failed offline v3 verification: "
                 f"{err.code}: {err.detail}")
+        native_verified = True
     native_manifest = fmt3.parse_manifest_v3(native_bytes[16:16 + manifest_len])
     tbs = native_bytes[:signed_len]
-    return hashlib.sha256(tbs).hexdigest(), native_manifest
+    return hashlib.sha256(tbs).hexdigest(), native_manifest, native_verified
 
 
 def classify_install_transition(prev: SidecarManifest | None, prev_tbs_hex: str | None,
@@ -413,8 +410,10 @@ def _verify_impl(data, trust, native_package, native_trust):
         cursor += rec.file_len
 
     native_binding_checked = False
+    native_binding_trusted = False
     if native_package is not None:
-        native_tbs_hex, native_manifest = native_v3_tbs_info(native_package, native_trust)
+        native_tbs_hex, native_manifest, native_verified = native_v3_tbs_info(
+            native_package, native_trust)
         if not fmt.constant_time_eq(manifest.native_tbs_sha256, bytes.fromhex(native_tbs_hex)):
             raise fmt.BadPackage(
                 f"native_tbs_sha256 {manifest.native_tbs_sha256.hex()} does not match the "
@@ -433,6 +432,7 @@ def _verify_impl(data, trust, native_package, native_trust):
                 "sidecar publisher_key_sha256 does not match the native package "
                 "publisher_key_sha256")
         native_binding_checked = True
+        native_binding_trusted = native_verified
 
     report = {
         "result": "PASS",
@@ -458,10 +458,13 @@ def _verify_impl(data, trust, native_package, native_trust):
             for rec in manifest.records
         ],
         "native_binding_checked": native_binding_checked,
+        "native_binding_trusted": native_binding_trusted,
         "boundary": (
             "offline verification only: not NE301 Host admission/install, LittleFS free "
             "space, RAM fit, dual-artifact transaction, camera H264, browser trusted "
-            "loading, or User product acceptance"
+            "loading, or User product acceptance; native_binding_trusted=false means the "
+            "--native-package bytes were only structurally parsed and identity-compared, "
+            "never signature-verified (no trusted native admission)"
         ),
     }
     return report, None

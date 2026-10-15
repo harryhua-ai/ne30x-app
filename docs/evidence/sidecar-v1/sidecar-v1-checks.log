@@ -6,9 +6,9 @@ python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2
 V2 image  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/apps/hello-app/build-v2/hello-app-v2.bin
   sha256 e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd
 V1 package /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/package/work/pkg/hello-app-v1.neapp
-  sha256 7231099e25d630c94194e458ff1b0de76d6cbe950dcb85e975912b825f853668
+  sha256 c83dc434177f0ff1ac31af7d8ccda7f74fadbcf902aca57f46baf679444ae36a
 V2 package /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/package/work/pkg/hello-app-v2.neapp
-  sha256 e843e0da02d71a95f5104d0826c5f06ef9686346755fc98894793cdbb6d3f643
+  sha256 eeb151850d72be340caccb094345347296eb9d240f27b0d9dd518e203bca5481
 native-owned evidence files restored byte-identical (regression observed, no churn)
 
 == [3/6] native v2 pack/verify suite UNCHANGED (tests/package-v2/run_checks.sh)
@@ -16,7 +16,7 @@ native-owned evidence files restored byte-identical (regression observed, no chu
 golden replica  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/package-v2/work/pkg/golden-replica.neapp.v2
   sha256 aad02bca22a1e10cd70f73d592ad89440e11a12a9c361abb5c99271087af3112
 dev package     /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2
-  sha256 68f827c43ac44a9f3079c6b661b01000c69df879c0f4708a5d01454b50b7f75f
+  sha256 d254db8943078e64178875f2df26ea91aa702456a9e283440e88f05b969ad714
 evidence log    /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/docs/evidence/p6-package-checks.log
 native-owned evidence files restored byte-identical (regression observed, no churn)
 
@@ -25,7 +25,7 @@ native-owned evidence files restored byte-identical (regression observed, no chu
 golden replica  /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/package-v3/work/pkg/golden-replica.neapp.v3
   sha256 c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342
 dev package     /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
-  sha256 f8175cf44ee60ef3669af3dfd31b8426400af02420dbfa7692231f894b166428
+  sha256 4d2f4cb82adb981d42eae2ebe3ff809d5380ad066924f73d43ef97bfeb5fc181
 evidence log    /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/docs/evidence/p6-package-v3-checks.log
 native-owned evidence files restored byte-identical (regression observed, no churn)
 
@@ -40,6 +40,8 @@ spec-v3 suite: PASS (committed evidence byte-identical)
   ok golden_replica_byte_identical: predicate
   ok golden_bundle_accept: PASS
   ok golden_native_binding_accept: predicate
+  ok untrusted_native_byte_only_accept: predicate
+  ok untrusted_native_byte_only_mismatch: BAD_PACKAGE [native_tbs_sha256]
   ok idempotent_repack_same_identity: predicate
   ok low_s_variant_same_identity: PASS
 [neui-cases] install transition classification (§12.1/§12.3)
@@ -98,7 +100,8 @@ spec-v3 suite: PASS (committed evidence byte-identical)
   ok casefold_collision: BAD_PACKAGE [case folding]
   ok missing_index: BAD_PACKAGE [exactly one]
   ok nested_index_only: BAD_PACKAGE [exactly one]
-  ok nested_second_index: BAD_PACKAGE [nested]
+  ok nested_index_accept: PASS
+  ok duplicate_root_index: BAD_PACKAGE [duplicate asset path]
   ok manifest_extra_bytes: BAD_PACKAGE [extra bytes after the last record]
   ok manifest_truncated_record: BAD_PACKAGE [truncated inside record]
   ok path_leading_slash: BAD_PACKAGE [absolute]
@@ -121,7 +124,7 @@ spec-v3 suite: PASS (committed evidence byte-identical)
   ok total_payload_over_cap: BAD_PACKAGE [sum to more than]
 [neui-cases] packer fail-closed refusals (AC1/AC2)
   ok pack_refusal_missing_index: refused
-  ok pack_refusal_second_index: refused
+  ok pack_accept_nested_index: predicate
   ok pack_refusal_empty_file: refused
   ok pack_refusal_oversize_file: refused
   ok pack_refusal_total_over_cap: refused
@@ -134,13 +137,14 @@ spec-v3 suite: PASS (committed evidence byte-identical)
   ok pack_refusal_native_signature_invalid: refused
   ok pack_refusal_publisher_mismatch: refused
   ok pack_refusal_app_mismatch: refused
+  ok pack_refusal_signer_key_not_native_publisher: refused
 [neui-cases] provenance traceability (AC1)
   ok pack_provenance_traceable: predicate
-neui case suite: 90 entries, all expectations matched
+neui case suite: 94 entries, all expectations matched
 results -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/neui-cases-results.json
 report  -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/docs/evidence/sidecar-v1/report.json
 native regression summary -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/docs/evidence/sidecar-v1/regression.json
-sidecar case suite total: 90 entries, all expectations matched
+sidecar case suite total: 94 entries, all expectations matched
 
 == ALL SIDECAR V1 CHECKS PASSED
 golden bundle  docs/evidence/sidecar-v1/golden.neui

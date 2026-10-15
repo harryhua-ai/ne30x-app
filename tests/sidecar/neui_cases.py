@@ -237,8 +237,12 @@ def expect_pack_refusal(name: str, work: Path, fixture: Path, out: Path,
                         version: str = "1.0.0", publisher: str = PUBLISHER,
                         app: str = APP_ID, native: Path | None = None,
                         extra: list[str] | None = None,
-                        stderr_contains: str = "") -> None:
-    proc = pack_sidecar(work, fixture, out, work / "keys" / "d1-test-signer.pem",
+                        stderr_contains: str = "",
+                        signer_pem: Path | None = None,
+                        refuse_emit: Path | None = None) -> None:
+    proc = pack_sidecar(work, fixture, out,
+                        signer_pem if signer_pem is not None
+                        else work / "keys" / "d1-test-signer.pem",
                         version=version, publisher=publisher, app=app,
                         native=native, extra=extra)
     if proc.returncode == 0:
@@ -251,6 +255,8 @@ def expect_pack_refusal(name: str, work: Path, fixture: Path, out: Path,
                              f"got {proc.stderr!r}")
     if out.exists():
         raise AssertionError(f"{name}: refused pack must not emit the bundle file")
+    if refuse_emit is not None and refuse_emit.exists():
+        raise AssertionError(f"{name}: refused pack must not emit {refuse_emit.name}")
     results.append({
         "case": name,
         "category": "packer-refusal",
@@ -402,17 +408,38 @@ def main() -> int:
         "native_tbs_sha256 all match the verified native TBS "
         + NATIVE_TBS_SHA256,
         rep_native["native_binding_checked"] is True
+        and rep_native["native_binding_trusted"] is True
         and rep_native["native_tbs_sha256"] == NATIVE_TBS_SHA256
         and rep_native["publisher_key_sha256"] == SPKI_SHA256
         and rep_native["file_count"] == 4
         and rep_native["ui_tbs_sha256"] == GOLDEN_UI_TBS_SHA256,
         extra={"native_tbs_sha256": rep_native["native_tbs_sha256"],
                "publisher_key_sha256": rep_native["publisher_key_sha256"],
+               "native_binding_trusted": rep_native["native_binding_trusted"],
                "file_count": rep_native["file_count"],
                "sidecar_version": rep_native["sidecar_version"],
                "asset_payload_len": rep_native["asset_payload_len"],
                "manifest_len": rep_native["manifest_len"],
                "signature_len": rep_native["signature_len"]})
+
+    rep_untrusted = run_verifier(golden_dir / "golden.neui", trust_d1, "PASS",
+                                 native_package=NATIVE_GOLDEN)
+    record_predicate(
+        "untrusted_native_byte_only_accept",
+        "--native-package WITHOUT --native-trust is a distinct trust level: the native bytes "
+        "are only structurally parsed and identity-compared (never signature-verified), "
+        "reported native_binding_checked=true with native_binding_trusted=false and no "
+        "trusted-native-admission claim",
+        rep_untrusted["native_binding_checked"] is True
+        and rep_untrusted["native_binding_trusted"] is False
+        and rep_untrusted["native_tbs_sha256"] == NATIVE_TBS_SHA256,
+        extra={"native_binding_checked": rep_untrusted["native_binding_checked"],
+               "native_binding_trusted": rep_untrusted["native_binding_trusted"]})
+    verify_bytes("untrusted_native_byte_only_mismatch", golden_bundle, case_dir, trust_d1,
+                 "BAD_PACKAGE", detail_contains="native_tbs_sha256",
+                 note="the byte-only untrusted cross-check still rejects a syntactically "
+                      "valid native package whose identity bytes differ",
+                 native_package=native_alt)
 
     golden_repack = work / "golden-repack.neui"
     proc = pack_sidecar(work, fixture_base, golden_repack, d1_pem)
@@ -674,7 +701,7 @@ def main() -> int:
 
     def manifest_case(name, fixed_kwargs=None, records=None, payload=None,
                       asset_len=None, contains=None, note="", signer_key=signer,
-                      manifest_tail=b""):
+                      manifest_tail=b"", expect="BAD_PACKAGE"):
         kwargs = {"count": 1, "fp": signer.fingerprint, **(fixed_kwargs or {})}
         f = fixed_block(native_tbs=native_tbs_raw, **kwargs)
         recs = records if records is not None else [idx_rec]
@@ -682,7 +709,7 @@ def main() -> int:
         verify_bytes(name,
                      build_forged(f, recs, pay, signer_key, asset_len=asset_len,
                                   manifest_tail=manifest_tail),
-                     case_dir, trust_d1, "BAD_PACKAGE", detail_contains=contains,
+                     case_dir, trust_d1, expect, detail_contains=contains,
                      note=note)
 
     manifest_case("host_ui_abi_2", fixed_kwargs={"abi": 2}, contains="host_ui_abi",
@@ -755,11 +782,22 @@ def main() -> int:
     nested_only = forge_record(b"foo/index.html", 4, hashlib.sha256(b"aaaa").digest())
     manifest_case("nested_index_only",
                   records=[nested_only], payload=b"aaaa", contains="exactly one",
-                  note="only a nested foo/index.html and no root index.html (re-signed)")
-    manifest_case("nested_second_index",
-                  fixed_kwargs={"count": 2}, records=[nested_only, idx_rec],
-                  payload=b"aaaa" + golden_payload, contains="nested",
-                  note="root index.html plus a nested foo/index.html (re-signed)")
+                  note="only a nested foo/index.html and no ROOT index.html (re-signed)")
+    nested_docs_rec = forge_record(b"docs/index.html", 5,
+                                   hashlib.sha256(b"<h1>n").digest())
+    manifest_case("nested_index_accept",
+                  fixed_kwargs={"count": 2}, records=[nested_docs_rec, idx_rec],
+                  payload=b"<h1>n" + golden_payload, expect="PASS",
+                  note="root index.html plus nested docs/index.html (every segment matches "
+                       "the frozen charset, records correctly sorted docs/index.html < "
+                       "index.html) is a legal manifest: exactly-one counts the ROOT "
+                       "index.html only, no extra nested-name rejection")
+    manifest_case("duplicate_root_index",
+                  fixed_kwargs={"count": 2}, records=[idx_rec, idx_rec],
+                  payload=golden_payload + golden_payload,
+                  contains="duplicate asset path",
+                  note="two records for the ROOT index.html can never both be admitted: "
+                       "strict ascending order rejects the exact repeat")
     manifest_case("manifest_extra_bytes",
                   fixed_kwargs={"count": 1}, records=[idx_rec],
                   payload=golden_payload, contains="extra bytes after the last record",
@@ -830,11 +868,25 @@ def main() -> int:
                                                        "js/app.js": b";\n"}),
                         case_dir / "no-index.neui",
                         stderr_contains="exactly one root 'index.html'")
-    expect_pack_refusal("pack_refusal_second_index", work,
-                        make_tree(trees / "two-index", {"index.html": b"<h1>x</h1>\n",
-                                                        "sub/index.html": b"<h1>y</h1>\n"}),
-                        case_dir / "two-index.neui",
-                        stderr_contains="nested")
+    nested_tree = make_tree(trees / "nested-index",
+                            {"index.html": b"<h1>root</h1>\n",
+                             "docs/index.html": b"<h1>docs</h1>\n"})
+    nested_out = case_dir / "nested-pack.neui"
+    proc = pack_sidecar(work, nested_tree, nested_out, d1_pem)
+    if proc.returncode != 0:
+        raise AssertionError(f"nested-index pack failed: {proc.stderr}")
+    rep_nested = run_verifier(nested_out, trust_d1, "PASS", native_package=NATIVE_GOLDEN,
+                              native_trust=trust_d1)
+    record_predicate(
+        "pack_accept_nested_index",
+        "an asset tree with a ROOT index.html plus a nested docs/index.html packs and "
+        "verifies PASS under the full native binding: nested same-name assets are ordinary "
+        "legal paths sorted docs/index.html < index.html; exactly-one applies to the root "
+        "entry only",
+        rep_nested["file_count"] == 2
+        and [f["path"] for f in rep_nested["files"]] == ["docs/index.html", "index.html"],
+        extra={"files": rep_nested["files"],
+               "native_binding_trusted": rep_nested["native_binding_trusted"]})
     expect_pack_refusal("pack_refusal_empty_file", work,
                         make_tree(trees / "empty", {"index.html": b""}),
                         case_dir / "empty.neui",
@@ -894,6 +946,15 @@ def main() -> int:
     expect_pack_refusal("pack_refusal_app_mismatch", work, fixture_base,
                         case_dir / "app-mismatch.neui", app="other-app",
                         stderr_contains="app_id")
+    other_signer_pem = keys / "other-test-signer.pem"
+    other_signer_pem.write_text(_pem_for(other_key).decode(), encoding="ascii")
+    mismatch_prov = case_dir / "signer-mismatch.neui.provenance.json"
+    expect_pack_refusal("pack_refusal_signer_key_not_native_publisher", work, fixture_base,
+                        case_dir / "signer-mismatch.neui", signer_pem=other_signer_pem,
+                        extra=["--sidecar", str(mismatch_prov)],
+                        stderr_contains="does not match the native package "
+                                        "publisher_key_sha256",
+                        refuse_emit=mismatch_prov)
 
     print("[neui-cases] provenance traceability (AC1)")
     prov_bundle = work / "prov.neui"
@@ -906,8 +967,9 @@ def main() -> int:
         "pack_provenance_traceable",
         "provenance sidecar records the format authority, NON-PRODUCTION trust-root "
         "notice, generator, source commit, ui_tbs_sha256, signer SPKI fingerprint, the "
-        "native binding (verified native TBS; whole-file native digest labelled "
-        "traceability-only) and the full per-file digest list",
+        "native binding (verified native TBS; signer fingerprint equals the native "
+        "publisher_key_sha256; whole-file native digest labelled traceability-only) and "
+        "the full per-file digest list",
         prov["format"] == "neui-sidecar-v1"
         and "ne301 issue #79" in prov["spec_authority"]
         and "NON-PRODUCTION" in prov["non_production_trust_root"]
@@ -915,6 +977,7 @@ def main() -> int:
         and prov["signer_spki_sha256"] == SPKI_SHA256
         and prov["native_binding"]["native_tbs_sha256"] == NATIVE_TBS_SHA256
         and prov["native_binding"]["native_offline_verified"] is True
+        and prov["native_binding"]["native_publisher_key_match"] is True
         and "traceability only" in prov["native_binding"]["native_package_sha256_note"]
         and prov["manifest"]["sidecar_version"] == "1.0.0"
         and prov["manifest"]["file_count"] == 4

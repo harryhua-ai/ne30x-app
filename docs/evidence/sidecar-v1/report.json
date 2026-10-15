@@ -2,7 +2,7 @@
   "issue": "harryhua-ai/ne30x-app#26 (sidecar v1 offline pack/verify/golden)",
   "protocol_authority": "ne301 issue #79 §12 (frozen Sidecar v1 wire, 2026-10-15)",
   "boundary": "OFFLINE packaging evidence only; NOT NE301 Host verification/admission/install, NOT device LittleFS free space, RAM, dual-artifact transaction, camera H264, browser trusted loading, or User product acceptance; the §12.2 caps are maximum accepted bundle-INPUT limits, not a device installability promise; signing identities are NON-PRODUCTION test roots (the PUBLIC spec d=1 key and ephemeral test keys) and never device production trust roots",
-  "source_commit": "28a515408c803ad304cffe3fc8dbc71f968a9995",
+  "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46",
   "toolchain": {
     "python": "3.14.4",
     "python_cryptography": "48.0.0",
@@ -35,10 +35,10 @@
     }
   },
   "case_suite": {
-    "cases_total": 90,
+    "cases_total": 94,
     "by_expected": {
-      "BAD_PACKAGE": 56,
-      "PASS": 13,
+      "BAD_PACKAGE": 57,
+      "PASS": 16,
       "PUBLISHER_UNTRUSTED": 2,
       "SIGNATURE_INVALID": 5,
       "packer exit 2 (fail-closed, no bundle emitted)": 14
@@ -86,11 +86,30 @@
         "note": "committed golden bundle verifies PASS with the native-binding cross-check against the committed #19 native v3 golden: publisher_id/app_id/publisher_key_sha256/native_tbs_sha256 all match the verified native TBS d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
         "native_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
         "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+        "native_binding_trusted": true,
         "file_count": 4,
         "sidecar_version": "1.0.0",
         "asset_payload_len": 553,
         "manifest_len": 327,
         "signature_len": 72
+      },
+      {
+        "case": "untrusted_native_byte_only_accept",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "--native-package WITHOUT --native-trust is a distinct trust level: the native bytes are only structurally parsed and identity-compared (never signature-verified), reported native_binding_checked=true with native_binding_trusted=false and no trusted-native-admission claim",
+        "native_binding_checked": true,
+        "native_binding_trusted": false
+      },
+      {
+        "case": "untrusted_native_byte_only_mismatch",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+        "detail": "native_tbs_sha256 d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e does not match the native package TBS digest 2cc7d91030e32c395e8998820a7393dbcc90c7fdc7be62a0b127f2f79ab40f81",
+        "note": "the byte-only untrusted cross-check still rejects a syntactically valid native package whose identity bytes differ"
       },
       {
         "case": "idempotent_repack_same_identity",
@@ -229,7 +248,7 @@
         "category": "sidecar",
         "expected": "SIGNATURE_INVALID",
         "observed": "SIGNATURE_INVALID",
-        "bundle_sha256": "3c7b40bf2850bc6856c0af7f3c8407fc154c4b45a578ab88e72007e60bb2312e",
+        "bundle_sha256": "90ad8990385b21bb3c95ea073a38343bb5d412273c2fda213e9c6c4c35c957cd",
         "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
         "note": "TBS signed by an ephemeral non-trusted key; manifest fingerprint still names the trusted d=1 key"
       },
@@ -238,7 +257,7 @@
         "category": "sidecar",
         "expected": "PUBLISHER_UNTRUSTED",
         "observed": "PUBLISHER_UNTRUSTED",
-        "bundle_sha256": "ea7d997baa9fef1c7fb11ef43abf779c2f43fea8f5f9aae4c0a455d1feeffdfa",
+        "bundle_sha256": "22d1bdd69dc33d7957492158be2aab6bc7f895994261de1dfcef5699a4934bf7",
         "detail": "publisher_id 'other-pub' is not in the local trust mapping",
         "note": "publisher_id absent from the Host trust mapping; the bundle-carried fingerprint cannot self-trust"
       },
@@ -247,7 +266,7 @@
         "category": "sidecar",
         "expected": "PUBLISHER_UNTRUSTED",
         "observed": "PUBLISHER_UNTRUSTED",
-        "bundle_sha256": "cef7b23689d6e486da43efd10a48756a120000b2cb7f5b2ec241354692be7cd8",
+        "bundle_sha256": "5dc01088a38e4cbe61e267b54189d3eacdccd61aaed799865c4a3c856f3831c2",
         "detail": "manifest publisher_key_sha256 does not match the trusted key for publisher_id 'test-publisher'",
         "note": "manifest publisher_key_sha256 no longer matches the trusted store entry (re-signed)"
       },
@@ -553,16 +572,25 @@
         "observed": "BAD_PACKAGE",
         "bundle_sha256": "4b716a0d390aa1306517b51c2b5767e473e56d59bc0f8a5c8c086e1b39020bfd",
         "detail": "exactly one 'index.html' entry is required, found 0",
-        "note": "only a nested foo/index.html and no root index.html (re-signed)"
+        "note": "only a nested foo/index.html and no ROOT index.html (re-signed)"
       },
       {
-        "case": "nested_second_index",
+        "case": "nested_index_accept",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "bundle_sha256": "6304a5c3dfb40475cbc318887ecdce3ce5228f9b5e99d7f2807e2f25f47c2fc7",
+        "detail": null,
+        "note": "root index.html plus nested docs/index.html (every segment matches the frozen charset, records correctly sorted docs/index.html < index.html) is a legal manifest: exactly-one counts the ROOT index.html only, no extra nested-name rejection"
+      },
+      {
+        "case": "duplicate_root_index",
         "category": "sidecar",
         "expected": "BAD_PACKAGE",
         "observed": "BAD_PACKAGE",
-        "bundle_sha256": "189be63e22f519061c2dffef90cbb6d6cc3c23b6d498191ad1afe04742ded0b5",
-        "detail": "nested 'index.html' entries are not allowed: ['foo/index.html']",
-        "note": "root index.html plus a nested foo/index.html (re-signed)"
+        "bundle_sha256": "d43275220a909f8b37e4474cabfc5b2bf262abc538d78891d93b99028fb9cae9",
+        "detail": "duplicate asset path 'index.html' (records must be strictly ascending)",
+        "note": "two records for the ROOT index.html can never both be admitted: strict ascending order rejects the exact repeat"
       },
       {
         "case": "manifest_extra_bytes",
@@ -735,12 +763,24 @@
         "note": "pack_refusal_missing_index"
       },
       {
-        "case": "pack_refusal_second_index",
-        "category": "packer-refusal",
-        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
-        "observed": "packer exit 2",
-        "detail": "ERROR: nested 'index.html' entries are not allowed: ['sub/index.html']",
-        "note": "pack_refusal_second_index"
+        "case": "pack_accept_nested_index",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "an asset tree with a ROOT index.html plus a nested docs/index.html packs and verifies PASS under the full native binding: nested same-name assets are ordinary legal paths sorted docs/index.html < index.html; exactly-one applies to the root entry only",
+        "files": [
+          {
+            "file_len": 14,
+            "path": "docs/index.html",
+            "sha256": "2563965beb3c04c46be627f05446abd1c71d79d4e2169932f78288547c32c5bb"
+          },
+          {
+            "file_len": 14,
+            "path": "index.html",
+            "sha256": "a1b621ccd84058b649aa13bfa4c50048c8686a69bfba652e320316d6953b6e63"
+          }
+        ],
+        "native_binding_trusted": true
       },
       {
         "case": "pack_refusal_empty_file",
@@ -779,7 +819,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: asset root rejected: symbolic-link asset is not packable: /tmp/neui-final/trees/symlink-file/link.txt",
+        "detail": "ERROR: asset root rejected: symbolic-link asset is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/trees/symlink-file/link.txt",
         "note": "pack_refusal_symlink_file"
       },
       {
@@ -787,7 +827,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: asset root rejected: symbolic-link directory is not packable: /tmp/neui-final/trees/symlink-dir/escape",
+        "detail": "ERROR: asset root rejected: symbolic-link directory is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/trees/symlink-dir/escape",
         "note": "pack_refusal_symlink_dir_escape"
       },
       {
@@ -795,7 +835,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: asset root rejected: non-regular asset is not packable: /tmp/neui-final/trees/fifo/pipe",
+        "detail": "ERROR: asset root rejected: non-regular asset is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/trees/fifo/pipe",
         "note": "pack_refusal_fifo"
       },
       {
@@ -839,13 +879,21 @@
         "note": "pack_refusal_app_mismatch"
       },
       {
+        "case": "pack_refusal_signer_key_not_native_publisher",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: sidecar signing key fingerprint 6e5fb882bdaf673a7309471449a4aabcf4ac5d268f5ecc6dc9e7a7294f7cf4a6 does not match the native package publisher_key_sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3; the same trusted SPKI publisher must sign both the Sidecar and its native package",
+        "note": "pack_refusal_signer_key_not_native_publisher"
+      },
+      {
         "case": "pack_provenance_traceable",
         "category": "sidecar",
         "expected": "PASS",
         "observed": "PASS",
-        "note": "provenance sidecar records the format authority, NON-PRODUCTION trust-root notice, generator, source commit, ui_tbs_sha256, signer SPKI fingerprint, the native binding (verified native TBS; whole-file native digest labelled traceability-only) and the full per-file digest list",
+        "note": "provenance sidecar records the format authority, NON-PRODUCTION trust-root notice, generator, source commit, ui_tbs_sha256, signer SPKI fingerprint, the native binding (verified native TBS; signer fingerprint equals the native publisher_key_sha256; whole-file native digest labelled traceability-only) and the full per-file digest list",
         "generator": "neui_pack_v1.py 1.0.0",
-        "source_commit": "28a515408c803ad304cffe3fc8dbc71f968a9995"
+        "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46"
       }
     ]
   },
@@ -856,5 +904,32 @@
       "ephemeral negative-test keys (in-memory only)"
     ],
     "trust_roots": "NON-PRODUCTION test identities only; no production key material; the d=1 identity is the PUBLIC spec test scalar and never a device production trust root"
+  },
+  "native_regression": {
+    "issue": "harryhua-ai/ne30x-app#26 (AC4 native regression)",
+    "boundary": "native v1/v2/v3 pack/verify/spec suites re-run UNCHANGED from this branch; their owned docs/evidence files were pre-checked committed-clean, then restored byte-identical after each run",
+    "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46",
+    "suites": {
+      "tests/package/run_package_checks.sh": {
+        "result": "PASS (exit 0)",
+        "log": "tests/sidecar/work/native-v1-suite.log"
+      },
+      "tests/package-v2/run_checks.sh": {
+        "result": "PASS (exit 0)",
+        "log": "tests/sidecar/work/native-v2-suite.log"
+      },
+      "tests/package-v3/run_checks.sh": {
+        "result": "PASS (exit 0)",
+        "note": "internally re-runs the v1 regression, tests/package-v2/run_checks.sh, tests/spec-v2 and tests/spec-v3",
+        "log": "tests/sidecar/work/native-v3-suite.log"
+      },
+      "tests/spec-v2/run_all_tests.py": {
+        "result": "PASS (exit 0, committed evidence byte-identical)"
+      },
+      "tests/spec-v3/run_all_tests.py": {
+        "result": "PASS (exit 0, committed evidence byte-identical)"
+      }
+    },
+    "owned_evidence_restored_byte_identical": true
   }
 }

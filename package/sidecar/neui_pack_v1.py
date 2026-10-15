@@ -10,8 +10,9 @@ the offline verifier must later reject (fail-closed at pack time).
 Pinning enforced here:
   * asset root: regular files only (symlinks, non-regular files and any
     escape from the root are rejected), relative POSIX paths, records in
-    strict raw-ASCII ascending path order, exactly one root index.html and
-    no nested index.html
+    strict raw-ASCII ascending path order, exactly one root index.html
+    (nested same-name assets such as docs/index.html are ordinary legal
+    paths)
   * caps are the §12.2 maximum bundle-INPUT limits (file_count 1..64,
     path_len <= 160, file_len 1..1048576, payload 1..2097152,
     manifest_len <= 16384); they make no device storage promise
@@ -19,6 +20,11 @@ Pinning enforced here:
     package under --native-trust (intrinsic tier); native_tbs_sha256 is
     derived from that VERIFIED native TBS, never from the DER-dependent
     whole-file package digest
+  * publisher-key identity (§12.1): the SPKI SHA-256 fingerprint of the
+    --key signing key must equal the VERIFIED native manifest
+    publisher_key_sha256 — the same trusted SPKI publisher must sign the
+    Sidecar and its native package; any other key is refused before
+    anything is emitted
   * signature domain: NEUI magic + manifest + payload only; nothing is
     appended to any native .neapp container
 
@@ -27,8 +33,9 @@ development/test identity; it is never committed and never a device
 production trust root.  Only the SPKI SHA-256 fingerprint is written into
 the manifest and provenance sidecar.
 
-The output bundle is OFFLINE evidence: packing (plus self-verification)
-does not mean NE301 admitted or installed anything.
+The output bundle is OFFLINE evidence: packing (plus self-verification
+under the --native-trust store) does not mean NE301 admitted or installed
+anything.
 """
 
 from __future__ import annotations
@@ -149,7 +156,7 @@ def main() -> int:
     native_bytes = args.native_package.read_bytes()
     native_trust = fmt.load_trust_store(args.native_trust)
     try:
-        native_tbs_hex, native_manifest = sc.native_v3_tbs_info(native_bytes, native_trust)
+        native_tbs_hex, native_manifest, _ = sc.native_v3_tbs_info(native_bytes, native_trust)
     except fmt.PackageError as exc:
         print(f"ERROR: native package rejected: {exc.code}: {exc.detail}", file=sys.stderr)
         return 2
@@ -160,6 +167,12 @@ def main() -> int:
     if args.app_id != native_manifest.app_id:
         print(f"ERROR: app_id {args.app_id!r} != native package app_id "
               f"{native_manifest.app_id!r}", file=sys.stderr)
+        return 2
+    if not fmt.constant_time_eq(spki_sha, native_manifest.publisher_key_sha256):
+        print(f"ERROR: sidecar signing key fingerprint {spki_sha.hex()} does not match the "
+              f"native package publisher_key_sha256 "
+              f"{native_manifest.publisher_key_sha256.hex()}; the same trusted SPKI publisher "
+              "must sign both the Sidecar and its native package", file=sys.stderr)
         return 2
 
     try:
@@ -192,12 +205,6 @@ def main() -> int:
         if len(index_hits) != 1:
             print(f"ERROR: exactly one root {sc.INDEX_PATH!r} is required, found "
                   f"{len(index_hits)}", file=sys.stderr)
-            return 2
-        nested_index = [rel for rel in paths
-                        if rel != sc.INDEX_PATH and rel.rsplit("/", 1)[-1] == sc.INDEX_PATH]
-        if nested_index:
-            print(f"ERROR: nested {sc.INDEX_PATH!r} entries are not allowed: {nested_index}",
-                  file=sys.stderr)
             return 2
         total = 0
         for rel, blob in assets:
@@ -237,10 +244,7 @@ def main() -> int:
     signature = key.sign(tbs, algorithm)
     bundle = tbs + signature
 
-    self_trust = fmt.TrustStore(publishers={
-        args.publisher_id: (hashlib.sha256(spki).hexdigest(), spki),
-    })
-    report, err = sc.verify_bundle(bundle, self_trust)
+    report, err = sc.verify_bundle(bundle, native_trust)
     if err is not None:
         print(f"ERROR: packer self-verification rejected the bundle: {err.code}: {err.detail}",
               file=sys.stderr)
@@ -286,6 +290,7 @@ def main() -> int:
                 ),
                 "native_tbs_sha256": native_tbs_hex,
                 "native_offline_verified": True,
+                "native_publisher_key_match": True,
             },
             "files": report["files"],
         }
