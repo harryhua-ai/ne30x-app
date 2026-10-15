@@ -12,6 +12,8 @@ The source tests were reviewed. `Web/src/test/lineCountingApi.test.ts` asserts t
 
 Production mounts `unavailableCapabilities`. It performs no fetch, cookie lookup, Host admin call, or placeholder-data generation. A future trusted Host integration must provide `LineCrossingCapabilities` and supply observed snapshots plus write/video grants. If those capabilities are absent, stale, expired, or revoked, the UI reports unavailable/stale and disables the dependent action.
 
+Business Enable keeps its observed value in `businessEnable` and gains an App-owned optional consumer: a trusted Host integration may implement `setBusinessEnable`, and only when the observation and a separate fresh `enableWrite` permission are both available does Configuration render an interactive Enable switch. Toggling submits the requested value outside `CONFIG_APPLY` and displays its own returned result: `APPLIED` commits the returned observed value; `CONFLICT`, `UNKNOWN`, and `UNAVAILABLE` show the matching status without retry, optimistic success, or replay; if the observation or permission turns unavailable, stale, or revoked before the result arrives, the result is discarded as unavailable. Production, which has no trusted capability, keeps the switch exactly as read-only as before, and Enable is never part of the v3 candidate, native App start/stop, or any new wire format.
+
 | Source UI value | App candidate field | Conversion |
 |---|---|---|
 | `counter_name` | `counter_name` | unchanged |
@@ -40,6 +42,7 @@ A video grant is bound to its App session and explicit expiry. `Live` requires v
 6. **Local diagnostics:** source logging called the shared request service, which is outside the App capability boundary. `streamLog.ts` now emits a local `line-crossing-media-diagnostic` event without exposing the stream URL or issuing a request.
 7. **Utility closure:** only the source `sleep` helper is extracted; the broader utility index also imports unrelated route/storage concerns. Unused `tw-animate-css` is removed from the source stylesheet import because no migrated component uses it.
 8. **Comments:** explanatory comments and lint/type suppression comments were removed from copied non-vendor code as required. FileSaver's MIT license banner is retained.
+9. **Enable consumer seam:** the migrated ConfigPage stays observation-only by default; the optional `setBusinessEnable` typed consumer on the capability boundary lets a future trusted Host grant operate the existing switch with its own APPLIED/UNKNOWN result. Enable remains outside the v3 candidate, `CONFIG_APPLY`, and native App start/stop.
 
 ## Reproduction
 
@@ -51,7 +54,7 @@ bash tests/line-crossing-ui/run.sh
 
 The script uses `pnpm install --offline --ignore-scripts`, `npm ci --offline --ignore-scripts`, and the local Vite build. Browser tests require Google Chrome at `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome` and `ffmpeg`. The fixture generates an H264 Baseline Annex-B stream locally and serves HTTP/WebSocket only on `127.0.0.1`; its CSP permits only same-origin resources and that loopback WebSocket. Test-only capabilities are compiled only from `tests/line-crossing-ui/src/test-main.tsx`; the production entry does not import them.
 
-The suite exercises production unavailable/read-only presentation; actual H264 MSE/JMuxer playback and natural dimensions; line dragging with discard and APPLIED save; candidate field exclusion; class-change confirmation; independent App/Host saves; permission revocation; reconnect and video grant revocation; unknown result/no replay; stale snapshot blocking; session-generation races; and worker-load failure. Contract checks enforce the NEUI v1 asset envelope and reject legacy admin/root media paths.
+The suite exercises production unavailable/read-only presentation; actual H264 MSE/JMuxer playback and natural dimensions; line dragging with discard and APPLIED save; candidate field exclusion; class-change confirmation; independent App/Host saves; permission revocation; reconnect and video grant revocation; unknown result/no replay; stale snapshot blocking; session-generation races; and worker-load failure. It also covers the trusted Enable toggle against the real ConfigPage with absent, revoked, unknown, conflict, and stale grants staying read-only without replay; mouse and touchscreen PointerEvent dragging of either endpoint as draft-only writes committed only by an authorized APPLIED; and the independent Save partial-failure matrix where App APPLIED meets Host UNKNOWN/CONFLICT and Host APPLIED meets App UNKNOWN/CONFLICT with per-side statuses, no optimistic commit, and one side's pending draft never replaying or saving the other. Contract checks enforce the NEUI v1 asset envelope and reject legacy admin/root media paths.
 
 ## NEUI and evidence boundary
 

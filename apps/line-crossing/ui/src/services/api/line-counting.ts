@@ -126,6 +126,7 @@ export interface LineCrossingUiState {
     app: Capability<AppSnapshot>;
     configWrite: Capability<boolean>;
     businessEnable: Capability<boolean>;
+    enableWrite: Capability<boolean>;
     stats: Capability<LineCountingStats>;
     events: Capability<LineCountingEvents>;
     tracks: Capability<LineTrack[]>;
@@ -141,6 +142,10 @@ export type ApplyOutcome =
 
 export type HostApplyOutcome =
     | { outcome: 'APPLIED'; sessionGeneration: number; generation: number; snapshot: HostPolicySnapshot }
+    | { outcome: 'CONFLICT' | 'UNKNOWN' | 'UNAVAILABLE'; reason?: string };
+
+export type EnableApplyOutcome =
+    | { outcome: 'APPLIED'; value: boolean; observedAtMs: number }
     | { outcome: 'CONFLICT' | 'UNKNOWN' | 'UNAVAILABLE'; reason?: string };
 
 export type ResetOutcome =
@@ -160,6 +165,7 @@ export interface LineCrossingCapabilities {
         expectedGeneration: number;
         candidate: HostPolicyConfig;
     }) => Promise<HostApplyOutcome>;
+    setBusinessEnable?: (request: { value: boolean }) => Promise<EnableApplyOutcome>;
     resetStats: (request: { sessionGeneration: number }) => Promise<ResetOutcome>;
     openVideoStream: (request: { sessionGeneration: number }) => Promise<Capability<VideoStreamGrant>>;
 }
@@ -211,6 +217,7 @@ export const unavailableCapabilities: LineCrossingCapabilities = {
         app: unavailable('Host App snapshot capability is unavailable'),
         configWrite: unavailable('App configuration capability is unavailable'),
         businessEnable: unavailable('Business Enable capability is unavailable'),
+        enableWrite: unavailable('Business Enable control capability is unavailable'),
         stats: unavailable('Statistics capability is unavailable'),
         events: unavailable('Event capability is unavailable'),
         tracks: unavailable('Track capability is unavailable'),

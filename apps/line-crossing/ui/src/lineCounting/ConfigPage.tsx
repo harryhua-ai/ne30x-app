@@ -10,11 +10,25 @@ export interface ConfigPageProps {
     config: LineCountingConfig;
     status: LineCountingStatus;
     businessEnable: Capability<boolean>;
+    enableInteractive: boolean;
+    enableBusy: boolean;
+    enableFeedback: string | null;
     writeAllowed: boolean;
     onChange: (patch: Partial<LineCountingConfig>) => void;
+    onEnableChange: (value: boolean) => void;
 }
 
-export default function ConfigPage({ config, status, businessEnable, writeAllowed, onChange }: ConfigPageProps) {
+export default function ConfigPage({
+    config,
+    status,
+    businessEnable,
+    enableInteractive,
+    enableBusy,
+    enableFeedback,
+    writeAllowed,
+    onChange,
+    onEnableChange,
+}: ConfigPageProps) {
     const { i18n } = useLingui();
     const classes = status.model.classes ?? [];
     const modelLoaded = status.model.name.length > 0;
@@ -31,8 +45,16 @@ export default function ConfigPage({ config, status, businessEnable, writeAllowe
                     {businessEnabled === null
                         ? <span data-testid="lc-business-enable-state" title={businessEnable.state === 'unavailable' || businessEnable.state === 'stale' ? businessEnable.reason : undefined}>{enableLabel}</span>
                         : <div className="flex items-center gap-2">
-                            <Switch checked={businessEnabled} disabled aria-label={i18n._('sys.line_counting.enable')} />
+                            <Switch
+                                checked={businessEnabled}
+                                disabled={!enableInteractive}
+                                aria-label={i18n._('sys.line_counting.enable')}
+                                data-testid="lc-business-enable-switch"
+                                onCheckedChange={onEnableChange}
+                            />
                             <span data-testid="lc-business-enable-state">{enableLabel}</span>
+                            {enableBusy && <span data-testid="lc-enable-status">{i18n._('sys.line_counting.saving')}</span>}
+                            {enableFeedback && <span role="status" data-testid="lc-enable-status">{i18n._(enableFeedback)}</span>}
                         </div>}
                 </div>
                 <div className="space-y-1">

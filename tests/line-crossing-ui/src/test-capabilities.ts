@@ -2,6 +2,7 @@ import type {
     AppSnapshot,
     ApplyOutcome,
     Capability,
+    EnableApplyOutcome,
     HostApplyOutcome,
     HostPolicyConfig,
     HostPolicySnapshot,
@@ -76,6 +77,7 @@ export function createTestCapabilities(url: URL) {
         app: available(appSnapshot),
         configWrite: available(true),
         businessEnable: { state: 'unavailable', reason: 'Business Enable capability unavailable in fixture' },
+        enableWrite: { state: 'unavailable', reason: 'Business Enable control capability unavailable in fixture' },
         stats: available({ window: { in: 7, out: 3 }, total: { in: 107, out: 43 } }),
         events: available({
             server_now_ms: Date.now(),
@@ -90,10 +92,15 @@ export function createTestCapabilities(url: URL) {
     const listeners = new Set<(next: LineCrossingUiState) => void>();
     const appCalls: unknown[] = [];
     const hostCalls: unknown[] = [];
+    const enableCalls: unknown[] = [];
     const resetCalls: unknown[] = [];
     let nextOutcome: 'APPLIED' | 'UNKNOWN' | 'CONFLICT' | 'MISMATCH_SESSION' = 'APPLIED';
+    let nextHostOutcome: 'APPLIED' | 'UNKNOWN' | 'CONFLICT' = 'APPLIED';
+    let nextEnableOutcome: 'APPLIED' | 'UNKNOWN' | 'CONFLICT' = 'APPLIED';
     let delayNextApply = false;
+    let delayNextEnableApply = false;
     let pendingResolve: (() => void) | null = null;
+    let pendingEnableResolve: (() => void) | null = null;
 
     const emit = (patch: Partial<LineCrossingUiState>) => {
         state = { ...state, ...patch, revision: state.revision + 1 };
@@ -119,6 +126,12 @@ export function createTestCapabilities(url: URL) {
         return { outcome: 'APPLIED', sessionGeneration, configGeneration: snapshot.configGeneration, snapshot };
     };
 
+    const makeEnableOutcome = (request: { value: boolean }): EnableApplyOutcome => {
+        if (nextEnableOutcome === 'UNKNOWN') return { outcome: 'UNKNOWN', reason: 'fixture unknown Enable result' };
+        if (nextEnableOutcome === 'CONFLICT') return { outcome: 'CONFLICT', reason: 'fixture Enable conflict' };
+        return { outcome: 'APPLIED', value: request.value, observedAtMs: observedAtMs() };
+    };
+
     const capabilities: LineCrossingCapabilities = {
         readState: async () => state,
         subscribe: (listener) => {
@@ -132,7 +145,11 @@ export function createTestCapabilities(url: URL) {
                 return new Promise<ApplyOutcome>((resolve) => {
                     pendingResolve = () => {
                         pendingResolve = null;
-                        resolve(makeAppOutcome(request));
+                        const result = makeAppOutcome(request);
+                        if (result.outcome === 'APPLIED' && state.app.state === 'available' && result.snapshot.sessionGeneration === state.app.value.sessionGeneration) {
+                            emit({ app: available({ ...result.snapshot, observedAtMs: observedAtMs() }) });
+                        }
+                        resolve(result);
                     };
                 });
             }
@@ -147,6 +164,8 @@ export function createTestCapabilities(url: URL) {
         },
         applyHostPolicy: async (request) => {
             hostCalls.push(clone(request));
+            if (nextHostOutcome === 'UNKNOWN') return { outcome: 'UNKNOWN', reason: 'fixture unknown Host result' };
+            if (nextHostOutcome === 'CONFLICT') return { outcome: 'CONFLICT', reason: 'fixture Host generation conflict' };
             if (state.hostPolicy.state !== 'available' || state.hostPolicy.value.sessionGeneration !== request.sessionGeneration || state.hostPolicy.value.generation !== request.expectedGeneration) {
                 return { outcome: 'CONFLICT', reason: 'fixture Host generation conflict' };
             }
@@ -159,6 +178,24 @@ export function createTestCapabilities(url: URL) {
             emit({ hostPolicy: available(snapshot) });
             const result: HostApplyOutcome = { outcome: 'APPLIED', sessionGeneration: request.sessionGeneration, generation: snapshot.generation, snapshot };
             return result;
+        },
+        setBusinessEnable: async (request) => {
+            enableCalls.push(clone(request));
+            if (delayNextEnableApply) {
+                delayNextEnableApply = false;
+                return new Promise<EnableApplyOutcome>((resolve) => {
+                    pendingEnableResolve = () => {
+                        pendingEnableResolve = null;
+                        resolve(makeEnableOutcome(request));
+                    };
+                });
+            }
+            if (state.businessEnable.state !== 'available' || state.enableWrite.state !== 'available' || state.enableWrite.value !== true) {
+                return { outcome: 'UNAVAILABLE', reason: 'fixture Enable control unavailable' };
+            }
+            const outcome = makeEnableOutcome(request);
+            if (outcome.outcome === 'APPLIED') emit({ businessEnable: available(outcome.value) });
+            return outcome;
         },
         resetStats: async (request) => {
             resetCalls.push(clone(request));
@@ -177,12 +214,27 @@ export function createTestCapabilities(url: URL) {
     };
 
     const testApi = {
-        getCalls: () => ({ app: appCalls, host: hostCalls, reset: resetCalls }),
+        getCalls: () => ({ app: appCalls, host: hostCalls, enable: enableCalls, reset: resetCalls }),
         getState: () => state,
         getReleasedGrants: () => releasedGrants,
         revokeConfigWrite: () => emit({ configWrite: { state: 'unavailable', reason: 'Fixture permission revoked' } }),
         restoreConfigWrite: () => emit({ configWrite: available(true) }),
         revokeVideo: () => emit({ video: { state: 'unavailable', reason: 'Fixture video permission revoked' } }),
+        grantEnableControl: (value: boolean = false) => emit({
+            businessEnable: available(value),
+            enableWrite: available(true),
+        }),
+        revokeEnableWrite: () => emit({ enableWrite: { state: 'unavailable', reason: 'Fixture Enable permission revoked' } }),
+        restoreEnableWrite: () => emit({ enableWrite: available(true) }),
+        makeBusinessEnableStale: () => {
+            if (state.businessEnable.state !== 'available') return;
+            const old = Date.now() - 11000;
+            emit({ businessEnable: { state: 'available', value: state.businessEnable.value, observedAtMs: old } });
+        },
+        setNextEnableOutcome: (value: typeof nextEnableOutcome) => { nextEnableOutcome = value; },
+        setNextHostOutcome: (value: typeof nextHostOutcome) => { nextHostOutcome = value; },
+        delayNextEnableApply: () => { delayNextEnableApply = true; },
+        resolvePendingEnableApply: () => pendingEnableResolve?.(),
         makeAppStale: () => {
             const snapshot = freshApp();
             const old = Date.now() - 11000;
