@@ -1,0 +1,27 @@
+{
+  "issue": "harryhua-ai/ne30x-app#26 (AC4 native regression)",
+  "boundary": "native v1/v2/v3 pack/verify/spec suites re-run UNCHANGED from this branch; their owned docs/evidence files were pre-checked committed-clean, then restored byte-identical after each run",
+  "source_commit": "28a515408c803ad304cffe3fc8dbc71f968a9995",
+  "suites": {
+    "tests/package/run_package_checks.sh": {
+      "result": "PASS (exit 0)",
+      "log": "tests/sidecar/work/native-v1-suite.log"
+    },
+    "tests/package-v2/run_checks.sh": {
+      "result": "PASS (exit 0)",
+      "log": "tests/sidecar/work/native-v2-suite.log"
+    },
+    "tests/package-v3/run_checks.sh": {
+      "result": "PASS (exit 0)",
+      "note": "internally re-runs the v1 regression, tests/package-v2/run_checks.sh, tests/spec-v2 and tests/spec-v3",
+      "log": "tests/sidecar/work/native-v3-suite.log"
+    },
+    "tests/spec-v2/run_all_tests.py": {
+      "result": "PASS (exit 0, committed evidence byte-identical)"
+    },
+    "tests/spec-v3/run_all_tests.py": {
+      "result": "PASS (exit 0, committed evidence byte-identical)"
+    }
+  },
+  "owned_evidence_restored_byte_identical": true
+}

@@ -1,0 +1,860 @@
+{
+  "issue": "harryhua-ai/ne30x-app#26 (sidecar v1 offline pack/verify/golden)",
+  "protocol_authority": "ne301 issue #79 §12 (frozen Sidecar v1 wire, 2026-10-15)",
+  "boundary": "OFFLINE packaging evidence only; NOT NE301 Host verification/admission/install, NOT device LittleFS free space, RAM, dual-artifact transaction, camera H264, browser trusted loading, or User product acceptance; the §12.2 caps are maximum accepted bundle-INPUT limits, not a device installability promise; signing identities are NON-PRODUCTION test roots (the PUBLIC spec d=1 key and ephemeral test keys) and never device production trust roots",
+  "source_commit": "28a515408c803ad304cffe3fc8dbc71f968a9995",
+  "toolchain": {
+    "python": "3.14.4",
+    "python_cryptography": "48.0.0",
+    "openssl": "OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)",
+    "platform": "macOS-15.6-arm64-arm-64bit-Mach-O"
+  },
+  "golden_consistency": {
+    "pinned_ui_tbs_sha256": "aa8130ea20737d457bb6ace49871daa82e85338c7b2e2da656edcc9b7f3fe02f",
+    "observed_ui_tbs_sha256": "aa8130ea20737d457bb6ace49871daa82e85338c7b2e2da656edcc9b7f3fe02f",
+    "pinned_bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+    "observed_bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+    "bundle_len": 968,
+    "tbs_len": 896,
+    "der_len": 72,
+    "byte_identical": true,
+    "der_note": "the packer signs with cryptography RFC-6979 deterministic signing; the committed golden DER is reproducible with the pinned toolchain and any other valid DER over the same TBS keeps the same ui_tbs_sha256 identity",
+    "spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+    "native_binding": {
+      "native_package": "docs/evidence/spec-v3/golden.neapp.v3",
+      "native_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+      "native_publisher_id": "test-publisher",
+      "native_app_id": "line-crossing",
+      "native_offline_verified_before_binding": true
+    },
+    "fixture_files": {
+      "assets/data.txt": "0425d207cfc5a2d2803468154454a886bb61c4d77e4f315bd3f192722fe79613",
+      "css/style.css": "11e342847acb42e55786baccd45fb98ff096b1907994731693eb69d87159cadd",
+      "index.html": "6d3ffad90906331b584082c8d72761f7761e9c18fafd383aaa4a79e8e8bafc68",
+      "js/app.js": "8e429026a9b1a783359d418892700aec53d5c715dbeddfc7e2b76078d9470846"
+    }
+  },
+  "case_suite": {
+    "cases_total": 90,
+    "by_expected": {
+      "BAD_PACKAGE": 56,
+      "PASS": 13,
+      "PUBLISHER_UNTRUSTED": 2,
+      "SIGNATURE_INVALID": 5,
+      "packer exit 2 (fail-closed, no bundle emitted)": 14
+    },
+    "cases": [
+      {
+        "case": "fixture_digest_pins",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "generated base fixture files match the pinned per-file SHA-256 values (deterministic non-production fixture; not the real counting UI)",
+        "files": {
+          "assets/data.txt": "0425d207cfc5a2d2803468154454a886bb61c4d77e4f315bd3f192722fe79613",
+          "css/style.css": "11e342847acb42e55786baccd45fb98ff096b1907994731693eb69d87159cadd",
+          "index.html": "6d3ffad90906331b584082c8d72761f7761e9c18fafd383aaa4a79e8e8bafc68",
+          "js/app.js": "8e429026a9b1a783359d418892700aec53d5c715dbeddfc7e2b76078d9470846"
+        }
+      },
+      {
+        "case": "golden_replica_byte_identical",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "neui_pack_v1 with the PUBLIC d=1 identity over the deterministic base fixture reproduces the committed sidecar golden byte-for-byte: TBS == golden-tbs.bin, DER == golden-sig.der, bundle == golden.neui",
+        "pinned_ui_tbs_sha256": "aa8130ea20737d457bb6ace49871daa82e85338c7b2e2da656edcc9b7f3fe02f",
+        "observed_ui_tbs_sha256": "aa8130ea20737d457bb6ace49871daa82e85338c7b2e2da656edcc9b7f3fe02f",
+        "pinned_bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+        "observed_bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+        "bundle_len": 968
+      },
+      {
+        "case": "golden_bundle_accept",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+        "detail": null,
+        "note": "committed sidecar golden through the independent verifier"
+      },
+      {
+        "case": "golden_native_binding_accept",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "committed golden bundle verifies PASS with the native-binding cross-check against the committed #19 native v3 golden: publisher_id/app_id/publisher_key_sha256/native_tbs_sha256 all match the verified native TBS d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "native_tbs_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+        "file_count": 4,
+        "sidecar_version": "1.0.0",
+        "asset_payload_len": 553,
+        "manifest_len": 327,
+        "signature_len": 72
+      },
+      {
+        "case": "idempotent_repack_same_identity",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "packing the same fixture + metadata twice reproduces the identical TBS and, under RFC-6979, the identical bundle bytes: idempotent content identity (ui_tbs_sha256 stable, legal DER nondeterminism tolerated by design)",
+        "ui_tbs_sha256": "aa8130ea20737d457bb6ace49871daa82e85338c7b2e2da656edcc9b7f3fe02f"
+      },
+      {
+        "case": "low_s_variant_same_identity",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "bundle_sha256": "38d6932efe35056098d678cde81c41b363e91120e93d7cf45123d27a13397594",
+        "detail": null,
+        "note": "same golden TBS with re-encoded low-S DER: different valid DER, same ui_tbs_sha256 content identity (no low-S assumption)",
+        "der_len_original": 72,
+        "der_len_low_s": 71
+      },
+      {
+        "case": "classify_idempotent",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "same native identity + same ui_tbs (low-S DER variant) classifies IDEMPOTENT: a different valid DER is not a new content version"
+      },
+      {
+        "case": "classify_upgrade",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "same native identity, higher semantic version, different ui_tbs classifies UPGRADE",
+        "installed_version": "1.0.0",
+        "candidate_version": "1.1.0"
+      },
+      {
+        "case": "classify_content_conflict",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "same native identity, same semantic version, different ui_tbs classifies CONTENT_CONFLICT (§12.1: same-version different-content is a reject)",
+        "ui_tbs_1.0.0_base": "aa8130ea20737d457bb6ace49871daa82e85338c7b2e2da656edcc9b7f3fe02f",
+        "ui_tbs_1.0.0_alt": "ad5a83976e3df04267e06bd2c6ff1a1e6740e7dfd685477bb570b3fc6558e8b3"
+      },
+      {
+        "case": "classify_downgrade",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "same native identity, lower semantic version classifies DOWNGRADE (not an ordinary update; authorized crash rollback is separate #83 behavior)",
+        "installed_version": "1.1.0",
+        "candidate_version": "1.0.0"
+      },
+      {
+        "case": "classify_native_rebind",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "a new native TBS never inherits the old Sidecar: classifies NATIVE_REBIND and requires separate admission for the new native identity",
+        "native_tbs_golden": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+        "native_tbs_alt": "2cc7d91030e32c395e8998820a7393dbcc90c7fdc7be62a0b127f2f79ab40f81"
+      },
+      {
+        "case": "classify_fresh_install",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "no installed predecessor classifies FRESH_INSTALL"
+      },
+      {
+        "case": "wrong_native_identity",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "9ec5e44616e197dfa0b3d16a5f9b0f280b523883be2c1cddf4f363126e8f79d4",
+        "detail": "native_tbs_sha256 d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e does not match the native package TBS digest 2cc7d91030e32c395e8998820a7393dbcc90c7fdc7be62a0b127f2f79ab40f81",
+        "note": "bundle bound to the golden native TBS, cross-checked against a different valid native package"
+      },
+      {
+        "case": "cross_app_app_id_mismatch",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "99f6ca9f3f1a24c76545264033e8d04add2994811a768369c96fe09bb3bb44b9",
+        "detail": "sidecar app_id 'other-app' does not match the native package app_id 'line-crossing' (cross-App binding)",
+        "note": "sidecar app_id != native app_id (re-signed, signature valid) is a cross-App binding reject under the native cross-check"
+      },
+      {
+        "case": "tamper_payload_byte",
+        "category": "sidecar",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "bundle_sha256": "d2c2ea1debc21c64c66314f17340a76711943a2536805daae854416c55798029",
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "one asset byte flipped inside the signed region; DER untouched"
+      },
+      {
+        "case": "tamper_manifest_version",
+        "category": "sidecar",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "bundle_sha256": "ee9161116cd571cc33662be3427d3192770aacad62866d6089ef5c9958165c27",
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "signed sidecar version_minor flipped in place (the version_major field is structurally checked before signature, so the flip there is BAD_PACKAGE by design: tamper_manifest_major_structural)"
+      },
+      {
+        "case": "tamper_manifest_major_structural",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "79951d00f97c9532a1833828f22ed8aa45801068d474bce213a95703d37881ba",
+        "detail": "sidecar_version_major 0 must be >= 1",
+        "note": "version_major flipped to 0 in place: the structural manifest check fires before signature verification (normative order)"
+      },
+      {
+        "case": "tamper_manifest_native_tbs",
+        "category": "sidecar",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "bundle_sha256": "0d18de1d1d9edc8a92e319e4a920d188149090da08899613e4ccad93f5864fcc",
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "signed native_tbs_sha256 flipped in place: the native binding cannot be re-pointed without invalidating the signature"
+      },
+      {
+        "case": "tamper_der_byte",
+        "category": "sidecar",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "bundle_sha256": "70ad8480c011512e156fa9c1e5b3a7ceb493f0ff53b456a06d0efdf58621b5c6",
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "DER byte corrupted (TBS untouched)"
+      },
+      {
+        "case": "wrong_signer_key",
+        "category": "sidecar",
+        "expected": "SIGNATURE_INVALID",
+        "observed": "SIGNATURE_INVALID",
+        "bundle_sha256": "3c7b40bf2850bc6856c0af7f3c8407fc154c4b45a578ab88e72007e60bb2312e",
+        "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "TBS signed by an ephemeral non-trusted key; manifest fingerprint still names the trusted d=1 key"
+      },
+      {
+        "case": "unknown_publisher",
+        "category": "sidecar",
+        "expected": "PUBLISHER_UNTRUSTED",
+        "observed": "PUBLISHER_UNTRUSTED",
+        "bundle_sha256": "ea7d997baa9fef1c7fb11ef43abf779c2f43fea8f5f9aae4c0a455d1feeffdfa",
+        "detail": "publisher_id 'other-pub' is not in the local trust mapping",
+        "note": "publisher_id absent from the Host trust mapping; the bundle-carried fingerprint cannot self-trust"
+      },
+      {
+        "case": "publisher_fingerprint_mismatch",
+        "category": "sidecar",
+        "expected": "PUBLISHER_UNTRUSTED",
+        "observed": "PUBLISHER_UNTRUSTED",
+        "bundle_sha256": "cef7b23689d6e486da43efd10a48756a120000b2cb7f5b2ec241354692be7cd8",
+        "detail": "manifest publisher_key_sha256 does not match the trusted key for publisher_id 'test-publisher'",
+        "note": "manifest publisher_key_sha256 no longer matches the trusted store entry (re-signed)"
+      },
+      {
+        "case": "magic_major2",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "f69f3fb5c539f10e97449350d97a7b24cf4c8142f9db13cd74542a2546769c16",
+        "detail": "container magic is not NEUI v1 (4e455549 01 00 00); unknown container versions are rejected, never negotiated",
+        "note": "container major downgraded to 2 (unknown version)"
+      },
+      {
+        "case": "magic_corrupt",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "1a7aaeb67628319fba2e29bcff5722fd45b5fb4aa4260f816ad298564a0344cf",
+        "detail": "container magic is not NEUI v1 (4e455549 01 00 00); unknown container versions are rejected, never negotiated",
+        "note": "magic ASCII corrupted"
+      },
+      {
+        "case": "manifest_len_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "14ea42fd1929c98dc41fa90e49e8cd8e7dc9f6f2ce39e9bf9736f4b0b69585d4",
+        "detail": "manifest_len 0 outside 167..16384",
+        "note": "manifest_len field = 0 (overflow-safe bounded parse)"
+      },
+      {
+        "case": "manifest_len_127",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "e75002224dd52baf1d46c2547547fbf893034ae58fada29e215a4f212d8552f5",
+        "detail": "manifest_len 127 outside 167..16384",
+        "note": "manifest_len field = 127 (overflow-safe bounded parse)"
+      },
+      {
+        "case": "manifest_len_16385",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "5415616fff4d0c0bc78c1539f55e59a3544c00ba1ba697601ba8a8a5200e5055",
+        "detail": "manifest_len 16385 outside 167..16384",
+        "note": "manifest_len field = 16385 (overflow-safe bounded parse)"
+      },
+      {
+        "case": "manifest_len_u32max",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "9c2836fe5ec5df7d4997ec7b67f09cf0f55a933d34c667feddb31a4c39668884",
+        "detail": "manifest_len 4294967295 outside 167..16384",
+        "note": "manifest_len field = 4294967295 (overflow-safe bounded parse)"
+      },
+      {
+        "case": "asset_len_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "8808395eba0e1cdc3de24737a1c532b299c24f514562da012838575260431cb6",
+        "detail": "asset_payload_len 0 outside 1..2097152",
+        "note": "asset_payload_len field = 0"
+      },
+      {
+        "case": "asset_len_2097153",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "afe2c5403ec7027e6662a8592715847a01411d30647b0ab74d9aa82926362c14",
+        "detail": "asset_payload_len 2097153 outside 1..2097152",
+        "note": "asset_payload_len field = 2097153"
+      },
+      {
+        "case": "asset_len_u32max",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "8ae103b15a74976f176e04eead23dd3ef4c47f99ed371061c11a4308716bdf83",
+        "detail": "asset_payload_len 4294967295 outside 1..2097152",
+        "note": "asset_payload_len field = 4294967295"
+      },
+      {
+        "case": "truncate_header",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "1a4b93cc93ce2563db93a597e2c3ca6ce3b007840206d2292705c928bcde0dae",
+        "detail": "file is 10 bytes, shorter than the 16-byte NEUI container header",
+        "note": "file shorter than the 16-byte container header"
+      },
+      {
+        "case": "truncate_body",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "a17a70286b1b12668c2c95771c7452fe9adfecce4c3becef6587eab0eac00180",
+        "detail": "file truncated: 895 bytes < signed region 896",
+        "note": "file truncated below the claimed signed region"
+      },
+      {
+        "case": "truncate_der",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "9e9b7c2eda1557f8ec42dff7525787357d9debaff0654d17373aabad7e68d6f7",
+        "detail": "DER: SEQUENCE length does not consume the signature exactly",
+        "note": "DER truncated by one byte"
+      },
+      {
+        "case": "der_trailing_byte",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "83a7dcaf46bde4e23b054ab3b80dd69f873c3820a08a8fbbee00188c5d963168",
+        "detail": "signature segment is 73 bytes, above the DER maximum 72",
+        "note": "valid DER + one trailing byte (tail must be fully consumed)"
+      },
+      {
+        "case": "der_second_object",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "08e18a477f69dad106e30dbf123c139847e1e69b6d73043f6e97d51777580df2",
+        "detail": "signature segment is 74 bytes, above the DER maximum 72",
+        "note": "second DER object appended"
+      },
+      {
+        "case": "der_r_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "eaa13a41f268b76fbe5cdd6c4c6c38f2e0aabaff05214e346352fac9701b5fdf",
+        "detail": "DER: r outside P-256 range",
+        "note": "DER with r=0 (outside P-256 range)"
+      },
+      {
+        "case": "native_v3_package_on_sidecar_verifier",
+        "category": "domain-separation",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "detail": "container magic is not NEUI v1 (4e455549 01 00 00); unknown container versions are rejected, never negotiated",
+        "note": "the committed #19 native v3 golden never parses as a sidecar; the NEUI signature domain is disjoint from the NEAPP domains"
+      },
+      {
+        "case": "sidecar_bundle_on_v3_verifier",
+        "category": "domain-separation",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "detail": "container magic is not NEAPP v3 (4e45415050 03 00 00); unknown container versions are rejected, never negotiated (§1.3, §10 M2/M3/M4/M5)",
+        "note": "the sidecar golden never parses as a native .neapp v3 package; the frozen v3 verifier is untouched and rejects the foreign magic"
+      },
+      {
+        "case": "host_ui_abi_2",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "30d85740b04dcf113148e7006ba72b47dec808f83fad2053f11e669148777bfd",
+        "detail": "host_ui_abi 2 is not 1",
+        "note": "host_ui_abi=2 (re-signed): only 1 is legal in v1"
+      },
+      {
+        "case": "reserved_nonzero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "6121144576b617a7571535b27fd2a582565f62d9f1394df17fd99aed6e021502",
+        "detail": "manifest reserved_u32 is 0x00000001, must be zero",
+        "note": "reserved_u32 nonzero (re-signed)"
+      },
+      {
+        "case": "version_major_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "32d807f4456e0de4504c66d351b770d67d97df958b4d8862b36e2e7430e7ce27",
+        "detail": "sidecar_version_major 0 must be >= 1",
+        "note": "sidecar_version_major=0 below the frozen minimum 1 (re-signed)"
+      },
+      {
+        "case": "file_count_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "010da30dbfe5335eca688752f22ca256d7ff71df591191ceadd66936a715f490",
+        "detail": "file_count 0 outside 1..64",
+        "note": "file_count=0 (re-signed)"
+      },
+      {
+        "case": "publisher_uppercase",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "b74366bf3869673e84f6ae12ecb016473e88fd0bcc927ae4f98ba4726882f2ca",
+        "detail": "publisher_id: character outside [a-z0-9-]",
+        "note": "publisher_id outside the v3 lower-ASCII identifier charset (re-signed)"
+      },
+      {
+        "case": "app_id_bad_padding",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "e17a4941891ccf6edea13b58d2280491dd9122171328a15484b3b3d8ecdeaa06",
+        "detail": "app_id: character outside [a-z0-9-]",
+        "note": "app_id outside the v3 identifier charset (re-signed)"
+      },
+      {
+        "case": "file_count_65",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "73b732a433ed28acd80fec1142d200dce38e2716ec360cae608fd2846c979fcf",
+        "detail": "file_count 65 outside 1..64",
+        "note": "file_count=65 above the 1..64 cap (re-signed)"
+      },
+      {
+        "case": "path_len_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "7330e121238f3801d82bd077c482a4c2dc74c26d35f84ea4e3b7d6875c71cd06",
+        "detail": "record 0 path_len 0 outside 1..160",
+        "note": "record path_len=0 (re-signed)"
+      },
+      {
+        "case": "path_len_161",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "beb0ac74ee933b7dfbb2f8313389710dfd2d6216a73a628874298b0195857db5",
+        "detail": "record 0 path_len 161 outside 1..160",
+        "note": "record path_len=161 above the 160-byte cap (re-signed)"
+      },
+      {
+        "case": "file_len_zero",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "5969a10a920307824a2553175bf014eb943bc705ffa61bd93b4c6fd223b981b6",
+        "detail": "record 0 file_len 0 outside 1..1048576",
+        "note": "record file_len=0 below the frozen minimum 1 (re-signed)"
+      },
+      {
+        "case": "file_len_over_cap",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "7bf3b59e55865f6ed33e86cf56d34e9a991fb6c2a260b80205c67777a0045237",
+        "detail": "record 0 file_len 1048577 outside 1..1048576",
+        "note": "single file above the 1,048,576-byte cap (re-signed)"
+      },
+      {
+        "case": "record_sha_mismatch",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "0a997c2c0c2950b182d8442fe6052c767aa154db04e111e8c683ef921c1bb112",
+        "detail": "asset 'index.html' sha256 2e5b55d07760774da144729aad232f19b80928155adfd9e1d0b6d2c869bde799 does not match the manifest record 0000000000000000000000000000000000000000000000000000000000000000",
+        "note": "record sha256 zeroed (re-signed): per-asset digest must match"
+      },
+      {
+        "case": "records_unsorted",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "bacedd28afca5cb7eb0ca8ba4ef88629377c5e8d5da931649151c45baa847af2",
+        "detail": "records 0..1 are not in strict ascending raw-ASCII path order",
+        "note": "records in descending order (re-signed)"
+      },
+      {
+        "case": "duplicate_paths",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "725ec97188a32e15c1ecdc436ec8d38915b3b71f31acfd38a7c81dfe202eef08",
+        "detail": "duplicate asset path 'a.txt' (records must be strictly ascending)",
+        "note": "two records with the same path (re-signed)"
+      },
+      {
+        "case": "casefold_collision",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "b339cefe9a2eb60437c087b5dac573bb1bd9a23d0c269ac9609f258a9d93ecc7",
+        "detail": "asset path 'aaa.txt' collides with an earlier path under ASCII case folding",
+        "note": "paths colliding under ASCII case folding (re-signed)"
+      },
+      {
+        "case": "missing_index",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "ffd717d6e0b24d303034746bb676f6a36fb040cfcffe2d0bb4be287bfa26a4d8",
+        "detail": "exactly one 'index.html' entry is required, found 0",
+        "note": "no index.html entry (re-signed)"
+      },
+      {
+        "case": "nested_index_only",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "4b716a0d390aa1306517b51c2b5767e473e56d59bc0f8a5c8c086e1b39020bfd",
+        "detail": "exactly one 'index.html' entry is required, found 0",
+        "note": "only a nested foo/index.html and no root index.html (re-signed)"
+      },
+      {
+        "case": "nested_second_index",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "189be63e22f519061c2dffef90cbb6d6cc3c23b6d498191ad1afe04742ded0b5",
+        "detail": "nested 'index.html' entries are not allowed: ['foo/index.html']",
+        "note": "root index.html plus a nested foo/index.html (re-signed)"
+      },
+      {
+        "case": "manifest_extra_bytes",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "99403ce574ab0f8c5ab4238f255888e0a9559ffa80944d204ad5d55de70b70ed",
+        "detail": "manifest has 1 extra bytes after the last record",
+        "note": "manifest longer than its records consume (re-signed)"
+      },
+      {
+        "case": "manifest_truncated_record",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "e575952cb71f56f6f40e6dbe3ae8688dd36537e5470b5fba2b875ba13dc8bc52",
+        "detail": "manifest truncated inside record 1",
+        "note": "file_count=2 with only one record present (re-signed)"
+      },
+      {
+        "case": "path_leading_slash",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "40ca69bedff3632d690edb08acbd83ec5c931d873f79218ddaa1f1107ffbf247",
+        "detail": "asset path is absolute (leading '/')",
+        "note": "absolute path (re-signed)"
+      },
+      {
+        "case": "path_trailing_slash",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "4840b74a7c28093193d706b944053f2cbaca9b2d44859ff1e6847368fea5eeea",
+        "detail": "asset path ends with '/'",
+        "note": "trailing slash path (re-signed)"
+      },
+      {
+        "case": "path_dotdot_segment",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "c529ad3e3c87e2396701ee76d1f56790fcea66c295b698c27695444567992f2c",
+        "detail": "asset path contains the dot segment '..'",
+        "note": "parent-directory traversal (re-signed)"
+      },
+      {
+        "case": "path_dot_segment",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "fa895a4cfbbf4761ab3f5bb67a311a9fdcd35ee5e1f94b35cfad83282d48e5b2",
+        "detail": "asset path contains the dot segment '.'",
+        "note": "dot segment fails the canonical path rules (re-signed)"
+      },
+      {
+        "case": "path_backslash",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "6f9daeca02b88510a930a8a2eb2533a644f119e259664ed5366ef0e45a6fc0d7",
+        "detail": "asset path contains a backslash separator",
+        "note": "backslash separator"
+      },
+      {
+        "case": "path_percent",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "7307978314efc4fd9cf8fe813ad1e1ba1719d4a74dbfba6812879539938591db",
+        "detail": "asset path contains a percent escape",
+        "note": "percent escape"
+      },
+      {
+        "case": "path_colon",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "3656be80018d51f3245967104c4f23c364df9ebce35a24e2dd6650feac5a33d0",
+        "detail": "asset path contains a colon",
+        "note": "colon in path"
+      },
+      {
+        "case": "path_query",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "812a82965e82b2dfd7ed7ad8faa99328383894f700e9289a9485883134da483b",
+        "detail": "asset path contains a query separator",
+        "note": "query suffix"
+      },
+      {
+        "case": "path_fragment",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "f6a568eb93aec350254b8f84400f515c6d19dfd580b7de3e35e5e3038e775bf8",
+        "detail": "asset path contains a fragment separator",
+        "note": "fragment suffix"
+      },
+      {
+        "case": "path_non_ascii",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "6c52abfd51f529fefdba0e2acff5068e4d9a942d5fa56db0ab6f88e60aa304a7",
+        "detail": "asset path byte 0xe9 at offset 3 is non-ASCII or a control byte",
+        "note": "non-ASCII byte in path"
+      },
+      {
+        "case": "path_empty_segment",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "1c07ce3c7b759de1b0ed3f8c1595c38a7794fb4b93791d0da68143e5854d0d4a",
+        "detail": "asset path contains an empty segment ('//')",
+        "note": "double slash"
+      },
+      {
+        "case": "path_hidden_dotfile",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "56d7cb99809fa70e70b8f8d6a677c50c693fd580111e48bfe069377ee7af99dd",
+        "detail": "asset path segment '.hidden.html' does not start with [A-Za-z0-9]",
+        "note": "dotfile fails the segment charset (re-signed)"
+      },
+      {
+        "case": "path_nul",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "ba9733c7c7fdb510a932c8bb32853443fa45a6f316b589cbd2d829dda86804e6",
+        "detail": "asset path contains a NUL byte at offset 5",
+        "note": "NUL byte in path (re-signed)"
+      },
+      {
+        "case": "payload_sum_mismatch",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "a94b57d12278b182ebc4b99e958edd1c9d7f756c0a7aea71777bc5dfa1f05347",
+        "detail": "asset_payload_len 552 != sum of record file_len 553",
+        "note": "asset_payload_len one byte below the record sum (re-signed)"
+      },
+      {
+        "case": "payload_wrong_order",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "56db11b8dbc98ff7d8c6ca0d919fbe12cb1d691c4515eac9b1e658d00181e794",
+        "detail": "asset 'a.txt' sha256 81cc5b17018674b401b42f35ba07bb79e211239c23bffe658da1577e3e646877 does not match the manifest record 61be55a8e2f6b4e172338bddf184d6dbee29c98853e0a0485ecee7f27b9af0b4",
+        "note": "payload bytes not in record order: sorted records, swapped content"
+      },
+      {
+        "case": "total_payload_over_cap",
+        "category": "sidecar",
+        "expected": "BAD_PACKAGE",
+        "observed": "BAD_PACKAGE",
+        "bundle_sha256": "fbdadf507ede8e80f5f383c8bf45ba1f8cd6f3528e63ade346d4e3faa9fc7166",
+        "detail": "records 1..2 sum to more than the 2097152-byte asset payload cap",
+        "note": "record file_len sum 3,145,727 above the 2,097,152-byte payload cap (re-signed)"
+      },
+      {
+        "case": "pack_refusal_missing_index",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: exactly one root 'index.html' is required, found 0",
+        "note": "pack_refusal_missing_index"
+      },
+      {
+        "case": "pack_refusal_second_index",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: nested 'index.html' entries are not allowed: ['sub/index.html']",
+        "note": "pack_refusal_second_index"
+      },
+      {
+        "case": "pack_refusal_empty_file",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: asset 'index.html' is 0 bytes, outside 1..1048576",
+        "note": "pack_refusal_empty_file"
+      },
+      {
+        "case": "pack_refusal_oversize_file",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: asset 'index.html' is 1048577 bytes, outside 1..1048576",
+        "note": "pack_refusal_oversize_file"
+      },
+      {
+        "case": "pack_refusal_total_over_cap",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: assets sum to more than the 2097152-byte payload cap",
+        "note": "pack_refusal_total_over_cap"
+      },
+      {
+        "case": "pack_refusal_too_many_files",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: 65 assets exceed the file_count cap 64",
+        "note": "pack_refusal_too_many_files"
+      },
+      {
+        "case": "pack_refusal_symlink_file",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: asset root rejected: symbolic-link asset is not packable: /tmp/neui-final/trees/symlink-file/link.txt",
+        "note": "pack_refusal_symlink_file"
+      },
+      {
+        "case": "pack_refusal_symlink_dir_escape",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: asset root rejected: symbolic-link directory is not packable: /tmp/neui-final/trees/symlink-dir/escape",
+        "note": "pack_refusal_symlink_dir_escape"
+      },
+      {
+        "case": "pack_refusal_fifo",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: asset root rejected: non-regular asset is not packable: /tmp/neui-final/trees/fifo/pipe",
+        "note": "pack_refusal_fifo"
+      },
+      {
+        "case": "pack_refusal_version_major_zero",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: sidecar_version_major must be >= 1",
+        "note": "pack_refusal_version_major_zero"
+      },
+      {
+        "case": "pack_refusal_native_not_v3",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: native package rejected: BAD_PACKAGE: native package is not a .neapp v3 container",
+        "note": "pack_refusal_native_not_v3"
+      },
+      {
+        "case": "pack_refusal_native_signature_invalid",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: native package rejected: BAD_PACKAGE: native package failed offline v3 verification: SIGNATURE_INVALID: ECDSA P-256/SHA-256 verification failed over the exact TBS",
+        "note": "pack_refusal_native_signature_invalid"
+      },
+      {
+        "case": "pack_refusal_publisher_mismatch",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: publisher_id 'dev-publisher' != native package publisher_id 'test-publisher'",
+        "note": "pack_refusal_publisher_mismatch"
+      },
+      {
+        "case": "pack_refusal_app_mismatch",
+        "category": "packer-refusal",
+        "expected": "packer exit 2 (fail-closed, no bundle emitted)",
+        "observed": "packer exit 2",
+        "detail": "ERROR: app_id 'other-app' != native package app_id 'line-crossing'",
+        "note": "pack_refusal_app_mismatch"
+      },
+      {
+        "case": "pack_provenance_traceable",
+        "category": "sidecar",
+        "expected": "PASS",
+        "observed": "PASS",
+        "note": "provenance sidecar records the format authority, NON-PRODUCTION trust-root notice, generator, source commit, ui_tbs_sha256, signer SPKI fingerprint, the native binding (verified native TBS; whole-file native digest labelled traceability-only) and the full per-file digest list",
+        "generator": "neui_pack_v1.py 1.0.0",
+        "source_commit": "28a515408c803ad304cffe3fc8dbc71f968a9995"
+      }
+    ]
+  },
+  "key_discipline": {
+    "private_keys_committed": false,
+    "private_key_locations": [
+      "tests/sidecar/work/keys/d1-test-signer.pem (PUBLIC spec §12 scalar, gitignored)",
+      "ephemeral negative-test keys (in-memory only)"
+    ],
+    "trust_roots": "NON-PRODUCTION test identities only; no production key material; the d=1 identity is the PUBLIC spec test scalar and never a device production trust root"
+  }
+}

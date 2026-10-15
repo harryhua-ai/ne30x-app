@@ -75,10 +75,6 @@ PATH_REST = PATH_FIRST | {0x2E, 0x5F, 0x2D}
 ERROR_CLASSES = (fmt.BadPackage, fmt.SignatureInvalid, fmt.PublisherUntrusted)
 
 
-class SidecarError(ValueError):
-    pass
-
-
 @dataclass
 class AssetRecord:
     path: str
