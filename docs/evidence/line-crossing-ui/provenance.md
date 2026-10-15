@@ -1,0 +1,53 @@
+# Line Crossing UI provenance
+
+Pinned source checkout: `ne301` branch `counting`, commit `de25a6f1f431a631a37ff1cda87f616e293e8836`.
+Each identifier below is the Git blob SHA returned by `git rev-parse de25a6f1f431a631a37ff1cda87f616e293e8836:<source-path>`. The target column accounts for every file under `apps/line-crossing/ui/`.
+
+**Counts:** 33 upstream-backed target files (including adapted files and the two locale subsets); 3 new App-owned entry/adapter files (`src/i18n.ts`, `src/lib/MSE/streamLog.ts`, `src/main.tsx`). Vendor FileSaver/JMuxer are upstream assets with licenses preserved. Non-vendor source comments were removed per the Issue boundary.
+
+| Target | Upstream source blob(s) | Adaptation / inheritance note |
+|---|---|---|
+| `apps/line-crossing/ui/index.html` | `Web/index.html` `363579a32429c9354aa86af2e064eec6983236d1` | Source document shell; Vite production rewrites the entry to bundle-relative assets. |
+| `apps/line-crossing/ui/public/assets/jmuxer.min.js` | `Web/public/libs/jmuxer.min.js` `8a5a54eff9d7aa25c5ad828a18cce219263519c9` | Vendor asset copied into the App bundle asset folder with trailing whitespace normalized; worker resolves it relative to its emitted URL. |
+| `apps/line-crossing/ui/src/LineCountingModule.tsx` | `Web/src/pages/applicationManagement/line-counting-module.tsx` `8c8cddd50764d9433ed8fd833799d6bb18630b3a` | Source page behavior retained; legacy endpoint/deviceTool calls replaced by the typed capability boundary, session/config generation fencing, and explicit unavailable states. |
+| `apps/line-crossing/ui/src/components/android-UI/device-detector.ts` | `Web/src/components/android-UI/device-detector.ts` `f87545de86425dfbc72376be1c38253e60e53313` | Source utility retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/android-UI/simple-android-switch.tsx` | `Web/src/components/android-UI/simple-android-switch.tsx` `f93a6ecc9d3aa27c18a4f25f131eb03e62d804ea` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/ui/button.tsx` | `Web/src/components/ui/button.tsx` `0661dd2776c6b06f983c3274233370f04b088ad0` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/ui/card.tsx` | `Web/src/components/ui/card.tsx` `d0d85601217113ba70100691c8a717926cf68312` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/ui/input.tsx` | `Web/src/components/ui/input.tsx` `f545e027328cecd6b57ae9a84bd5895a64578cb0` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/ui/label.tsx` | `Web/src/components/ui/label.tsx` `ef7133a756e4439308d7db7a3eb9319cb1ebb277` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/ui/select.tsx` | `Web/src/components/ui/select.tsx` `41c1ca09f3b8327d5f5a668f5c1c087fd027cd96` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/components/ui/switch.tsx` | `Web/src/components/ui/switch.tsx` `8df2d7165cba9025b2f8d1c98819f698b282a25f` | Source component retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/i18n.ts` | `Web/src/locales/utils.ts` `446a0f002e149e8c994525d4dbae487648a1afa3`<br>`Web/src/locales/en/sys.json` `ea08175398c5d03a857bbba6a544b25344528553`<br>`Web/src/locales/en/com.json` `a57d11d86e26cc33e1c45f07b7c84758df28a7ff`<br>`Web/src/locales/zh/sys.json` `5dbbdd3072cd3f3795453b8bcd38ffb67a184c64`<br>`Web/src/locales/zh/com.json` `48c5f219d9bbe4ee949cc18076a3987bcff7d9ff` | New App-owned Lingui activation and two small App-specific catalogs; Host language/storage coupling is omitted. |
+| `apps/line-crossing/ui/src/lib/MSE/FileSaver.min.js` | `Web/public/libs/FileSaver.min.js` `0187572292e9ba0daff6140136fbd2229f28c61d` | Vendor asset copied into the App source asset path; MIT license banner retained and the nonfunctional @ts-nocheck directive removed. |
+| `apps/line-crossing/ui/src/lib/MSE/constant.ts` | `Web/src/lib/MSE/constant.ts` `5eed70fb12b60f5bee88111c3d27dbfd65d4fff7` | Source constants retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/lib/MSE/h264Player.ts` | `Web/src/lib/MSE/h264Player.ts` `bce95f0d41d24771ec5bd903f7a6159150213803`<br>`Web/public/libs/FileSaver.min.js` `0187572292e9ba0daff6140136fbd2229f28c61d` | Source H264/MSE/WebSocket recovery retained; FileSaver uses a Vite URL import, request-service logging is replaced by a local diagnostic event, and worker failures report unavailable. |
+| `apps/line-crossing/ui/src/lib/MSE/jittater-buffer.ts` | `Web/src/lib/MSE/jittater-buffer.ts` `0ddc97f255a857f98de0c136aef8c9b7f9fee17c` | Source buffer utility retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/lib/MSE/media.ts` | `Web/src/lib/MSE/media.ts` `1c326ef88575d6bcbf1a132c4f25e943947f7d7c`<br>`Web/src/services/request.ts` `7ef0c8407acd6bce4f0c8369eedf58265f9da2f0` | Source MSE pipeline retained; its request-service logger is replaced by a local diagnostic event. |
+| `apps/line-crossing/ui/src/lib/MSE/streamLog.ts` | `Web/src/services/request.ts` `7ef0c8407acd6bce4f0c8369eedf58265f9da2f0`<br>`Web/src/lib/MSE/h264Player.ts` `bce95f0d41d24771ec5bd903f7a6159150213803` | New local-only event adapter replaces the source request logger; no stream URL or device/admin request is emitted. |
+| `apps/line-crossing/ui/src/lib/MSE/utils/binary.ts` | `Web/src/lib/MSE/utils/binary.ts` `0cf954abf8f05a283c38ab232e5c8005d5177bc5` | Source utility retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/lib/MSE/utils/myBrowser.ts` | `Web/src/lib/MSE/utils/myBrowser.ts` `2d9d9fd96dcc1a9c54027549537bd351800852bd` | Source utility retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/lib/MSE/videoWorker.ts` | `Web/src/lib/MSE/videoWorker.ts` `7ee5a1b2021ea949b31f9f8e912277a7be5eff7b`<br>`Web/public/libs/jmuxer.min.js` `8a5a54eff9d7aa25c5ad828a18cce219263519c9` | Source decoder worker retained; root /libs importScripts path is replaced with a worker-relative JMuxer URL. |
+| `apps/line-crossing/ui/src/lib/MSE/websocket-init.ts` | `Web/src/lib/MSE/websocket-init.ts` `6c5956455f26d6b3ea3e345859041d87259028ec` | Source reconnect worker retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/lib/utils.ts` | `Web/src/lib/utils.ts` `d084ccade0d8b5bd77fd5174993bcef7b57644c9` | Source utility retained; explanatory comments removed. |
+| `apps/line-crossing/ui/src/lineCounting/AdvancedPage.tsx` | `Web/src/pages/applicationManagement/lineCounting/AdvancedPage.tsx` `3a31f750a3a730e6c229c617d6b74ab5ba7d6bd7` | Source controls retained and split into independently saved App-owned and Host-owned groups; unavailable Host values remain read-only. |
+| `apps/line-crossing/ui/src/lineCounting/ConfigPage.tsx` | `Web/src/pages/applicationManagement/lineCounting/ConfigPage.tsx` `6b9c90d0bbe658f860d1f831e55346baf5930ce7` | Source form retained; business Enable is observation-only and unavailable/stale App capability disables writes. |
+| `apps/line-crossing/ui/src/lineCounting/LineToolbar.tsx` | `Web/src/pages/applicationManagement/lineCounting/LineToolbar.tsx` `46e740a0dad2fb12406a1e8d8d4a0cb86b358eb8` | Source toolbar retained; edit actions are permission-gated. |
+| `apps/line-crossing/ui/src/lineCounting/StatsAndEvents.tsx` | `Web/src/pages/applicationManagement/lineCounting/StatsAndEvents.tsx` `1dcecc6f0a3b730635faeeb1ffc2fc5abc978509` | Source display retained; unavailable/stale data is rendered explicitly instead of zero or empty-event placeholders. |
+| `apps/line-crossing/ui/src/lineCounting/VideoPreview.tsx` | `Web/src/pages/applicationManagement/lineCounting/VideoPreview.tsx` `f5187298a1dcca6787e726b11142e4238e473dcf`<br>`Web/src/lib/MSE/h264Player.ts` `bce95f0d41d24771ec5bd903f7a6159150213803` | Source preview and overlays retained; endpoint pointer dragging, grant expiry/session binding and Live/Reconnecting/Unavailable status are implemented. |
+| `apps/line-crossing/ui/src/lineCounting/fields.tsx` | `Web/src/pages/applicationManagement/lineCounting/fields.tsx` `aae0997365a87392accacac2e42ddf949c60b1f5` | Source form fields retained; permission-aware disabled states and test selectors added. |
+| `apps/line-crossing/ui/src/locales/en/messages.json` | `Web/src/locales/en/sys.json` `ea08175398c5d03a857bbba6a544b25344528553`<br>`Web/src/locales/en/com.json` `a57d11d86e26cc33e1c45f07b7c84758df28a7ff` | Generated subset for the migrated UI; unused application-management strings are omitted. |
+| `apps/line-crossing/ui/src/locales/zh/messages.json` | `Web/src/locales/zh/sys.json` `5dbbdd3072cd3f3795453b8bcd38ffb67a184c64`<br>`Web/src/locales/zh/com.json` `48c5f219d9bbe4ee949cc18076a3987bcff7d9ff` | Generated subset for the migrated UI; unused application-management strings are omitted. |
+| `apps/line-crossing/ui/src/main.tsx` | `Web/src/main.tsx` `953daa2902f72cc302ef2a0f3cf686f4b079a198` | New minimal App entry mounts the migrated screen, Lingui and notifications without the source router, deviceTool or Host application shell. |
+| `apps/line-crossing/ui/src/services/api/line-counting.ts` | `Web/src/services/api/line-counting.ts` `5f6ec8a9d3f142deaa198661b064fc88de5d92d5` | Legacy JSON/deviceTool adapter is replaced with typed capability contracts and semantic v3 candidate mapping; Host strategy fields are excluded. |
+| `apps/line-crossing/ui/src/styles/globals.css` | `Web/src/styles/globals.css` `d97f6dc6ab3bf6e79cd52f3fdc01f911c24d707a` | Source styles retained; CSS comments removed. |
+| `apps/line-crossing/ui/src/styles/index.css` | `Web/src/styles/index.css` `89ea74ffba2d3f61c6f7fab7998227edcb347b04` | Source Tailwind theme retained; App source discovery is scoped locally and unused tw-animate-css import is removed. |
+| `apps/line-crossing/ui/src/utils/sleep.ts` | `Web/src/utils/index.ts` `2847bdf60a04b85797b6b464791ee128bc43feb3` | One helper extracted from the source utility module to avoid importing unrelated route/storage helpers. |
+
+## Reviewed but not ported tests
+
+These source tests bind to legacy API/router/deviceTool seams and are superseded by the App-owned capability/browser tests. Their pinned blobs were reviewed:
+
+- `Web/src/test/lineCountingApi.test.ts` — `2b00ee77d8795908edb3ea7c4c77624eea39e716`
+- `Web/src/test/lineCountingNavigation.test.tsx` — `40581b650a3d7efc599c009f80dcc60447c8d384`
+- `Web/src/test/lineCountingPage.test.tsx` — `248e4f63bd5fceaaa433bc13fc86ef59d808c021`
