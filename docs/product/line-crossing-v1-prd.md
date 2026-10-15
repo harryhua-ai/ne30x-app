@@ -29,7 +29,7 @@
 | **APP-03** | Realtime 在真实业务会话中显示**活动 tracks/有限 points**和按时间/track/cursor 排序的穿线 IN/OUT 事件；继续呈现真实累计和窗口统计；新事件/轨迹过期、丢失或无权限时显示 stale/gap/unavailable。原页面每 2 秒获取的体验目标不代表 App 必须每 2 秒产生新轨迹。窗口关闭才生成的 `window report tracks[]` 不得冒充 live。 | [App #27](https://github.com/harryhua-ai/ne30x-app/issues/27)、Host [#91](https://github.com/harryhua-ai/ne301/issues/91) |
 | **APP-04** | 两次点击确定检测线后，支持实际鼠标**和触摸**拖动任一端点微调；保持视频可见区自然长宽比、0..1000 permille 线/方向和 IN/OUT；拖拽/翻转仅改草稿，显式 Save 经真正 `APPLIED` 才生效，取消恢复当前受信配置。 | [App #25](https://github.com/harryhua-ai/ne30x-app/issues/25)、[#79 §10](https://github.com/harryhua-ai/ne301/issues/79) |
 | **APP-05** | 视频实际播放 MSE/H264/WS，独立展示 `Live / Reconnecting / Unavailable`，与 `App: Running` 和统计 fresh/stale 状态独立；断流/持续错误/恢复与失权清理有真实场景证明，冻结帧不得称 Live。 | [App #25](https://github.com/harryhua-ai/ne30x-app/issues/25)、Host [#84](https://github.com/harryhua-ai/ne301/issues/84) |
-| **APP-06** | Config 能编辑线/方向、目标类、阈值、关联/历史/漏检/确认等追踪参数；统计窗口属于 Advanced 的 App-owned 组（APP-07）；候选由 App 自身验证、Host 经当前会话 v3 `CONFIG_APPLY`（144B config-only）提交、generation CAS，`APPLIED` 才可显示生效；目标类更换/独立计数重置遵守确认与原生持久语义，失败不覆盖原值。 | [App #21](https://github.com/harryhua-ai/ne30x-app/issues/21)、[#25](https://github.com/harryhua-ai/ne30x-app/issues/25) |
+| **APP-06** | Config 保留独立的“启用越线统计” Enable 业务开关：关闭只暂停生成新的越线计数，不停止/卸载原生 App，不清除累计 IN/OUT，关闭当前统计窗口与跟踪态；重新启用开始新的统计窗口并恢复跟踪。统计暂停与 App 运行、视频播放是不同状态。Config 仍能编辑线/方向、目标类、阈值、关联/历史/漏检/确认等追踪参数；统计窗口属于 Advanced 的 App-owned 组（APP-07）。可受审的现有 v3 配置仍经 `CONFIG_APPLY`（144B config-only）、generation CAS，实际 `APPLIED` 后才算生效；**旧 Enable 不在已冻结的 v3 配置中，须另行设计有授权、有回读、失败不假成功的业务启停能力，不能偷映射成 Host App start/stop，也不能修改原 v3 144B wire**。目标类更换/独立计数重置遵守确认与原生持久语义，失败不覆盖原值。 | [App #21](https://github.com/harryhua-ai/ne30x-app/issues/21)、[#25](https://github.com/harryhua-ai/ne30x-app/issues/25) |
 | **APP-07** | Advanced **同页两组独立草稿与 Save**：App-owned 的 Window/Tracks Report/Heat Grid；Host-owned 当前 App 专属 MQTT/Webhook/Backlog Capacity。单边失败/UNKNOWN 不影响另一组已确认保存。真实策略能力未就绪时显示暂不可用而非假成功；绝不偷偷修改全设备账号/topic/url。 | [App #25](https://github.com/harryhua-ai/ne30x-app/issues/25)、Host [#88](https://github.com/harryhua-ai/ne301/issues/88) |
 | **APP-08** | 按配置窗口生成真实 `line_counting` 报告和可选 track/heat 历史，交由受信 Host report_submit 统一发送 MQTT/Webhook；App 不自己建第二套网络栈，Host 上行 status≠已成功持久策略。刷新实时视图不污染队列/report_seq。 | [App #21](https://github.com/harryhua-ai/ne30x-app/issues/21)、Host [#75](https://github.com/harryhua-ai/ne301/issues/75) |
 | **APP-09** | App/模型、媒体、业务快照、Host 报告结果和权限分别表达；未授权、模型不支持、会话失效、版本错配、容量不足、配置信息过期等错误不能伪称正常。旧 iframe/新 native 身份不匹配时拒绝旧操作。 | [App #25](https://github.com/harryhua-ai/ne30x-app/issues/25)、Host [#84](https://github.com/harryhua-ai/ne301/issues/84) |
@@ -50,7 +50,7 @@
 
 **尚未能视为已批准 DONE：**
 
-- 旧 UI 的 `enable` 是单独的业务启停意图；现行 native v3 配置与 Host `app_running` 没有同义字段/动作。必须先由 A 提议可审用户行为，交 User 决定保留方式，不能假映射成启动/停止整个 native 会话。
+**User 已确认（2026-10-15，A06）**：保留旧 Line Crossing 独立 `Enable` 业务开关。关闭＝只暂停越线计数，保留累计结果，不停止整个 App；再次开启＝恢复计数并开始新的窗口；App 状态与视频三态仍单独显示。旧 `counting@de25a6f1...` 源码的禁用路径还会结束窗口、清理临时 tracker，这是继承/验收依据。**现有 v3 config-only 144B 不支持该字段**；与 Host start/stop 不等价，实施接口、持久/回读及异常结果仍待 A 冻结，不能写成已实现。
 - Backlog Capacity 旧输入为 **1..256**，现有 Host 只具 **8 个易失 6240B 槽**；[#89](https://github.com/harryhua-ai/ne301/issues/89) 尚需实证资源/恢复。**保留可编辑用途为产品目标**；目前不能承诺 256 真机可用或静默 clamp 到 8；如需缩减可见范围，必须重新经 User 产品选择。
 - 新版本受信实时轨迹/事件 ABI 与真实帧率、fresh/gap 阈值、Sidecar 可安装的 RAM/FS 预算仍未知；不能用技术假设决定产品已完成。
 - 安装/卸载/换包/权限变化时的新增导航、空态/异常提示如果构成重大 UX 改变，需按 A 规则提交可审示意并获得 User 明确确认。
