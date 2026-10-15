@@ -1,15 +1,24 @@
+Already up to date
+Done in 178ms using pnpm v11.5.2
+
+added 192 packages, and audited 193 packages in 1s
+
+25 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
 vite v7.3.7 building client environment for production...
 transforming...
 ✓ 1755 modules transformed.
 rendering chunks...
 computing gzip size...
-../../../tests/line-crossing-ui/.build/production/index.html                           0.40 kB │ gzip:  0.27 kB
+../../../tests/line-crossing-ui/.build/production/index.html                           0.40 kB │ gzip:  0.26 kB
 ../../../tests/line-crossing-ui/.build/production/assets/videoWorker-CwSEKqUk.js       0.68 kB
 ../../../tests/line-crossing-ui/.build/production/assets/websocket-init-yiJ-u6et.js    2.00 kB
 ../../../tests/line-crossing-ui/.build/production/assets/FileSaver.min-D428eXCv.js     6.94 kB
 ../../../tests/line-crossing-ui/.build/production/assets/index-D-isHcyK.css           41.61 kB │ gzip:  8.24 kB
-../../../tests/line-crossing-ui/.build/production/assets/index-BS_63_JL.js           268.10 kB │ gzip: 85.21 kB
-✓ built in 1.13s
+../../../tests/line-crossing-ui/.build/production/assets/index-CfTnTFvt.js           269.84 kB │ gzip: 85.62 kB
+✓ built in 1.14s
 vite v7.3.7 building client environment for production...
 transforming...
 ✓ 1756 modules transformed.
@@ -20,45 +29,81 @@ computing gzip size...
 .build/browser/assets/websocket-init-yiJ-u6et.js    2.00 kB
 .build/browser/assets/FileSaver.min-D428eXCv.js     6.94 kB
 .build/browser/assets/index-D-isHcyK.css           41.61 kB │ gzip:  8.24 kB
-.build/browser/assets/index-BlQjvRVU.js           273.03 kB │ gzip: 86.65 kB
-✓ built in 773ms
+.build/browser/assets/index-DAbcqojp.js           276.53 kB │ gzip: 87.39 kB
+✓ built in 738ms
 TAP version 13
 # Subtest: production entry reports unavailable capabilities without placeholder data or writes
 ok 1 - production entry reports unavailable capabilities without placeholder data or writes
   ---
-  duration_ms: 562.082625
+  duration_ms: 874.8395
   type: 'test'
   ...
 # Subtest: real H.264 playback, line editing, separate saves, reconnect and revoked video grant work offline
 ok 2 - real H.264 playback, line editing, separate saves, reconnect and revoked video grant work offline
   ---
-  duration_ms: 2850.310584
+  duration_ms: 2845.340125
   type: 'test'
   ...
 # Subtest: unknown outcomes, stale snapshots, session generation changes and worker failures do not replay writes
 ok 3 - unknown outcomes, stale snapshots, session generation changes and worker failures do not replay writes
   ---
-  duration_ms: 695.832083
+  duration_ms: 717.364709
+  type: 'test'
+  ...
+# Subtest: trusted Enable capability toggles with real outcomes while absent, revoked, unknown and stale stay read-only
+ok 4 - trusted Enable capability toggles with real outcomes while absent, revoked, unknown and stale stay read-only
+  ---
+  duration_ms: 395.388375
+  type: 'test'
+  ...
+# Subtest: delayed Enable ACK from a superseded session is rejected while the current session APPLIED commits
+ok 5 - delayed Enable ACK from a superseded session is rejected while the current session APPLIED commits
+  ---
+  duration_ms: 323.482375
+  type: 'test'
+  ...
+# Subtest: independent App and Host saves keep isolated outcomes across partial failures and pending drafts
+ok 6 - independent App and Host saves keep isolated outcomes across partial failures and pending drafts
+  ---
+  duration_ms: 555.553125
+  type: 'test'
+  ...
+# Subtest: touch pointer drags the start endpoint as draft only and authorized APPLIED commits it
+ok 7 - touch pointer drags the start endpoint as draft only and authorized APPLIED commits it
+  ---
+  duration_ms: 341.793709
   type: 'test'
   ...
 # Subtest: production bundle stays inside the NEUI v1 asset envelope
-ok 4 - production bundle stays inside the NEUI v1 asset envelope
+ok 8 - production bundle stays inside the NEUI v1 asset envelope
   ---
-  duration_ms: 1.789917
+  duration_ms: 1.5445
   type: 'test'
   ...
 # Subtest: production source and bundle contain no legacy admin or root media routes
-ok 5 - production source and bundle contain no legacy admin or root media routes
+ok 9 - production source and bundle contain no legacy admin or root media routes
   ---
-  duration_ms: 4.827542
+  duration_ms: 3.87475
   type: 'test'
   ...
-1..5
-# tests 5
+# Subtest: committed signed NEUI bundle verifies offline and equals the rebuilt production bundle
+ok 10 - committed signed NEUI bundle verifies offline and equals the rebuilt production bundle
+  ---
+  duration_ms: 3.092625
+  type: 'test'
+  ...
+# Subtest: signed bundle provenance records the delivered source commit of the packaged UI
+ok 11 - signed bundle provenance records the delivered source commit of the packaged UI
+  ---
+  duration_ms: 39.246
+  type: 'test'
+  ...
+1..11
+# tests 11
 # suites 0
-# pass 5
+# pass 11
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 4545.210375
+# duration_ms 6476.224667

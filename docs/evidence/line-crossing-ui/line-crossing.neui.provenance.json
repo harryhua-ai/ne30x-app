@@ -1,7 +1,7 @@
 {
-  "bundle_len": 421221,
+  "bundle_len": 422963,
   "bundle_path": "docs/evidence/line-crossing-ui/line-crossing.neui",
-  "bundle_sha256": "4ff1f15c91e22308e2aeaa4c8d3adcc161c384b17ca368d77bab3006c5334177",
+  "bundle_sha256": "3cd01519af881eb114c2831d67b4f0542815c98140e06deeba14e597d947771c",
   "files": [
     {
       "file_len": 6939,
@@ -9,9 +9,9 @@
       "sha256": "37ca34e7ab99ebf9a005aaaee56a1004b196411f9410a0cd25c0ebf9024b7aec"
     },
     {
-      "file_len": 268098,
-      "path": "assets/index-BS_63_JL.js",
-      "sha256": "ce01027a8b45a6cf39ac1002ff6fc57833189232b51de1d547471d719ec30271"
+      "file_len": 269841,
+      "path": "assets/index-CfTnTFvt.js",
+      "sha256": "13b3071920115f597295e6f1002dae43b9d43797b3bafb4aedc7c619ead3737e"
     },
     {
       "file_len": 41608,
@@ -36,7 +36,7 @@
     {
       "file_len": 399,
       "path": "index.html",
-      "sha256": "774c23c80e505a2804811ce6d0fffaf304d6dd3136326f5a7cdef85551ad6997"
+      "sha256": "344dc49609dbd519411e098bf9d53ab9f9a08232ba6169e3f069f48d5f091532"
     }
   ],
   "format": "neui-sidecar-v1",
@@ -58,10 +58,10 @@
   },
   "non_production_trust_root": "signing key is a NON-PRODUCTION dev/test identity; not a production trust anchor and never a device production root",
   "signature": "ECDSA over secp256r1 (P-256), SHA-256, strict DER",
-  "signature_len": 72,
+  "signature_len": 71,
   "signer_spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
-  "source_commit": "81ed4c4dd02f5190ec4131a72da35ca0fd11e234",
+  "source_commit": "21bbceed78e7e84be8fa0f0e63726201e547777c",
   "spec_authority": "ne301 issue #79 \u00a712 (frozen Sidecar v1 wire, 2026-10-15)",
-  "tbs_len": 421149,
-  "ui_tbs_sha256": "b5f0334b1cd92645606a8f5c2485cec354cb23471d65508a304dd68d6352673e"
+  "tbs_len": 422892,
+  "ui_tbs_sha256": "59f695608f3caa2a06ffae486e6288b3e3052c277a87c5a8a0a3cfb3a049e7a6"
 }
