@@ -12,7 +12,42 @@
  "heartbeat_at": "2026-10-17T06:43:09Z",
  "supersedes": null,
  "contract_digest": "8014564bc26f5750a1bcb23ff6fed2a5f818a6b53662b2f46da375f03144f692",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/32/1b2dddc1",
+  "sha": "b814a22c1be66c58b9de1148302adb4abc29fee6",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "apps/line-crossing/ui/src/main.tsx": "ALLOWED",
+    "apps/line-crossing/ui/src/runtime/bridgeProtocol.ts": "ALLOWED",
+    "apps/line-crossing/ui/src/runtime/bridgeSession.ts": "ALLOWED",
+    "apps/line-crossing/ui/src/runtime/runtimeCapabilities.ts": "ALLOWED",
+    "apps/line-crossing/ui/src/runtime/windowBridge.ts": "ALLOWED",
+    "docs/evidence/line-crossing-runtime/runtime-fixture-evidence.json": "ALLOWED",
+    "docs/evidence/line-crossing-ui/line-crossing.neui": "ALLOWED",
+    "docs/evidence/line-crossing-ui/line-crossing.neui.provenance.json": "ALLOWED",
+    "docs/evidence/line-crossing-ui/neui-verification.json": "ALLOWED",
+    "docs/line-crossing-runtime-bridge.md": "ALLOWED",
+    "tests/line-crossing-runtime/browser.test.mjs": "ALLOWED",
+    "tests/line-crossing-runtime/contract.test.mjs": "ALLOWED",
+    "tests/line-crossing-runtime/fixture/attack.html": "ALLOWED",
+    "tests/line-crossing-runtime/fixture/attack.js": "ALLOWED",
+    "tests/line-crossing-runtime/fixture/host-broker.js": "ALLOWED",
+    "tests/line-crossing-runtime/fixture/host.html": "ALLOWED",
+    "tests/line-crossing-runtime/package.json": "ALLOWED",
+    "tests/line-crossing-runtime/run.sh": "ALLOWED",
+    "tests/line-crossing-ui/run.sh": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 19,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-17T06:44:09Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
