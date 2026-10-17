@@ -1,7 +1,7 @@
 {
-  "bundle_len": 422963,
+  "bundle_len": 450282,
   "bundle_path": "docs/evidence/line-crossing-ui/line-crossing.neui",
-  "bundle_sha256": "3cd01519af881eb114c2831d67b4f0542815c98140e06deeba14e597d947771c",
+  "bundle_sha256": "984cb37c02934e3ddeb0902bfad89180648cc93757408df79da40f603de8e061",
   "files": [
     {
       "file_len": 6939,
@@ -9,14 +9,14 @@
       "sha256": "37ca34e7ab99ebf9a005aaaee56a1004b196411f9410a0cd25c0ebf9024b7aec"
     },
     {
-      "file_len": 269841,
-      "path": "assets/index-CfTnTFvt.js",
-      "sha256": "13b3071920115f597295e6f1002dae43b9d43797b3bafb4aedc7c619ead3737e"
-    },
-    {
       "file_len": 41608,
       "path": "assets/index-D-isHcyK.css",
       "sha256": "caa915f0cbaf7e9b499bebc8b7232cc85b96c359c8a3230040dee379794021f1"
+    },
+    {
+      "file_len": 297161,
+      "path": "assets/index-WrvCzYo2.js",
+      "sha256": "3117d326687a84a7d280653e0e5ad17726b351d11c58d7a7153a7c343d6f6e98"
     },
     {
       "file_len": 100839,
@@ -36,7 +36,7 @@
     {
       "file_len": 399,
       "path": "index.html",
-      "sha256": "344dc49609dbd519411e098bf9d53ab9f9a08232ba6169e3f069f48d5f091532"
+      "sha256": "ec77a41c1a1ae9baa7d79ef9ed0ccebd41b507a7dc084ffd1722d55b988c3135"
     }
   ],
   "format": "neui-sidecar-v1",
@@ -58,10 +58,10 @@
   },
   "non_production_trust_root": "signing key is a NON-PRODUCTION dev/test identity; not a production trust anchor and never a device production root",
   "signature": "ECDSA over secp256r1 (P-256), SHA-256, strict DER",
-  "signature_len": 71,
+  "signature_len": 70,
   "signer_spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
-  "source_commit": "21bbceed78e7e84be8fa0f0e63726201e547777c",
+  "source_commit": "0216336ca02e3208217b71fdc512c7526b196b2d",
   "spec_authority": "ne301 issue #79 \u00a712 (frozen Sidecar v1 wire, 2026-10-15)",
-  "tbs_len": 422892,
-  "ui_tbs_sha256": "59f695608f3caa2a06ffae486e6288b3e3052c277a87c5a8a0a3cfb3a049e7a6"
+  "tbs_len": 450212,
+  "ui_tbs_sha256": "13f2fd23927dda1cd30c1a41d9c9f6761e4ad7a4951641c1b0c202e28b581596"
 }
