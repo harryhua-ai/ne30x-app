@@ -280,7 +280,7 @@ const startBroker = () => {
 appFrame.addEventListener('load', () => { setTimeout(startBroker, 30) })
 appFrame.src = appOrigin + '/'
 if (attackOn) {
-  attackFrame.src = '/attack/attack.html?app=' + encodeURIComponent(appOrigin) + '&position=0'
+  attackFrame.src = '/attack/attack.html?app=' + encodeURIComponent(appOrigin)
 }
 
 window.__broker = {

@@ -1,19 +1,9 @@
 const params = new URLSearchParams(window.location.search)
 const appOrigin = params.get('app')
-const appWindow = window.parent.frames[Number(params.get('position') || 0)]
+const appFrame = window.parent.document.querySelector('#appFrame')
+const appWindow = appFrame.contentWindow
 
 const attempts = { storageAccess: null, domAccess: null, forgedMessages: 0 }
-
-try {
-  attempts.storageAccess = 'read length ' + appWindow.localStorage.length
-} catch (error) {
-  attempts.storageAccess = 'blocked: ' + error.name
-}
-try {
-  attempts.domAccess = 'read body ' + appWindow.document.body.tagName
-} catch (error) {
-  attempts.domAccess = 'blocked: ' + error.name
-}
 
 const forgedIdentity = {
   publisher_id: 'attacker',
@@ -63,7 +53,27 @@ const attackOnce = () => {
   attempts.forgedMessages += 5
 }
 
-attackOnce()
-setInterval(attackOnce, 700)
+const attackAfterAppNavigation = () => {
+  try {
+    if (new URL(appWindow.location.href).origin !== new URL(appOrigin).origin) {
+      setTimeout(attackAfterAppNavigation, 25)
+      return
+    }
+  } catch {}
 
+  try {
+    attempts.storageAccess = 'read length ' + appWindow.localStorage.length
+  } catch (error) {
+    attempts.storageAccess = 'blocked: ' + error.name
+  }
+  try {
+    attempts.domAccess = 'read body ' + appWindow.document.body.tagName
+  } catch (error) {
+    attempts.domAccess = 'blocked: ' + error.name
+  }
+  attackOnce()
+  setInterval(attackOnce, 700)
+}
+
+attackAfterAppNavigation()
 window.__attack = attempts

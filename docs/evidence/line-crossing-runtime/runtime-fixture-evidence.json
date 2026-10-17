@@ -1,11 +1,19 @@
 {
-  "app_entry": "apps/line-crossing/ui/src/main.tsx (production build served on a distinct origin)",
+  "app_entry": "apps/line-crossing/ui/src/main.tsx (production build served from the committed signed NEUI-equivalent asset set)",
+  "signed_bundle": {
+    "bundle_path": "docs/evidence/line-crossing-ui/line-crossing.neui",
+    "bundle_sha256": "a9117afcfeae8f3295352a00531c46284a9120799d41a825cd6d307eb4af77bc",
+    "ui_tbs_sha256": "fc8bd17703aec3a9b6f0e2875e99731fcbe59be4e68efee6083c6e5553ecb92e",
+    "source_commit": "539af692b998c7f27b15501a0c2f8fd1217a22cd",
+    "signer_spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+    "production_asset_equality": "tests/line-crossing-ui/contract.test.mjs compares every committed signed NEUI file path, length, and SHA-256 with the rebuilt production output served by this browser fixture."
+  },
   "bridge_limits": {
     "max_message_bytes": 16384,
     "max_pending_requests": 4,
     "request_deadline_ms": 10000
   },
-  "browser": "Google Chrome driven by Playwright chromium.launch (offline localhost fixture)",
+  "browser": "Google Chrome with local resolver rules mapping host.example.test and app.other.test to 127.0.0.1",
   "cases": [
     {
       "id": "authorized-session",
@@ -31,15 +39,43 @@
       "id": "sibling-forgery",
       "title": "a hostile sibling iframe cannot forge bridge traffic or reach App storage",
       "outcome": "pass"
+    },
+    {
+      "id": "cross-site-isolation",
+      "title": "the cross-site signed App cannot read Host DOM or storage or perform a cookie-authenticated admin write",
+      "outcome": "pass"
+    },
+    {
+      "id": "same-origin-relaxation",
+      "title": "the same-origin control exposes Host DOM and storage to the signed App",
+      "outcome": "negative-control"
+    },
+    {
+      "id": "same-site-port-cookie-leak",
+      "title": "the same-site port-only control sends the Host cookie with an App admin write",
+      "outcome": "negative-control"
     }
   ],
-  "isolation": "app iframe sandbox=\"allow-scripts allow-same-origin\" on a cross-origin (distinct TCP port) fixture; this layout does NOT isolate Host admin cookies across sites and must not be read as cross-site isolation",
+  "origin_topology": {
+    "host": "http://host.example.test:<ephemeral-port>",
+    "app": "http://app.other.test:<ephemeral-port>",
+    "relation": "independent sites mapped to loopback by Chrome --host-resolver-rules; no device DNS",
+    "same_site_port_control": "http://host.example.test:<app-port> embeds under http://host.example.test:<host-port>"
+  },
+  "isolation": {
+    "ac4_lab_status": "PASS",
+    "app_sandbox": "allow-scripts allow-same-origin",
+    "cross_site": "Host HttpOnly SameSite=Strict cookie exists in the top-level Host context; the signed App receives SecurityError for parent DOM/storage, and a credentialed admin POST reaches the Host without the cookie and does not mutate admin state.",
+    "same_origin_control": "Expected negative control: the same signed App served at the Host origin can read the parent marker and Host localStorage.",
+    "same_site_port_control": "Expected negative control: the same Host hostname on a different TCP port remains same-site; the Strict cookie is sent and the fixture admin write succeeds."
+  },
   "not_run": [
-    "real cross-site App origin vs Host admin origin (deployment DNS/TLS/site topology)",
-    "Host admin cookie/storage isolation across real sites",
+    "target deployment App/Host DNS, TLS, and site topology; the .test hostnames are local browser resolver aliases only",
+    "target Host admin cookie/storage policy and admin API behavior beyond this isolated fixture endpoint",
     "opaque-origin App positive Worker/importScripts/H264 operation (opaque origin fail-closed is exercised instead)",
     "real device media grant, camera stream and target-board integration",
     "Host #88 policy engine, App #30 native Enable producer, Host #91/App #27 live producers (fixture answers UNAVAILABLE)"
   ],
+  "recording_download": "NOT_RUN; signed FileSaver saveAs failure and the anchor fallback Host-token requirement remain open limitations.",
   "protocol": "ne301.sidecar.bridge.v1"
 }

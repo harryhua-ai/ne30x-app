@@ -1,9 +1,9 @@
 {
   "app_id": "line-crossing",
-  "asset_payload_len": 449628,
-  "boundary": "offline verification only: not NE301 Host admission/install, LittleFS free space, RAM fit, dual-artifact transaction, camera H264, browser trusted loading, or User product acceptance; native_binding_trusted=false means the --native-package bytes were only structurally parsed and identity-compared, never signature-verified (no trusted native admission)",
-  "bundle_len": 450282,
-  "bundle_sha256": "984cb37c02934e3ddeb0902bfad89180648cc93757408df79da40f603de8e061",
+  "asset_payload_len": 450739,
+  "boundary": "offline verification only: not NE301 Host admission/install, LittleFS free space, RAM fit, dual-artifact transaction, camera H264, browser trusted loading, or User product acceptance",
+  "bundle_len": 451394,
+  "bundle_sha256": "a9117afcfeae8f3295352a00531c46284a9120799d41a825cd6d307eb4af77bc",
   "file_count": 7,
   "files": [
     {
@@ -12,14 +12,14 @@
       "sha256": "37ca34e7ab99ebf9a005aaaee56a1004b196411f9410a0cd25c0ebf9024b7aec"
     },
     {
+      "file_len": 298272,
+      "path": "assets/index-B-RCOpzx.js",
+      "sha256": "55d0ea2399a427eaeeb30413f1dcbb369af9112dd838cd1d56018ca029432b68"
+    },
+    {
       "file_len": 41608,
       "path": "assets/index-D-isHcyK.css",
       "sha256": "caa915f0cbaf7e9b499bebc8b7232cc85b96c359c8a3230040dee379794021f1"
-    },
-    {
-      "file_len": 297161,
-      "path": "assets/index-WrvCzYo2.js",
-      "sha256": "3117d326687a84a7d280653e0e5ad17726b351d11c58d7a7153a7c343d6f6e98"
     },
     {
       "file_len": 100839,
@@ -39,7 +39,7 @@
     {
       "file_len": 399,
       "path": "index.html",
-      "sha256": "ec77a41c1a1ae9baa7d79ef9ed0ccebd41b507a7dc084ffd1722d55b988c3135"
+      "sha256": "528d4dd3100fc736641b8e58441e3df9239f6bbcc28e74bfd35512618feb8086"
     }
   ],
   "format": "neui-sidecar-v1",
@@ -52,7 +52,7 @@
   "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
   "result": "PASS",
   "sidecar_version": "1.0.0",
-  "signature_len": 70,
-  "tbs_len": 450212,
-  "ui_tbs_sha256": "13f2fd23927dda1cd30c1a41d9c9f6761e4ad7a4951641c1b0c202e28b581596"
+  "signature_len": 71,
+  "tbs_len": 451323,
+  "ui_tbs_sha256": "fc8bd17703aec3a9b6f0e2875e99731fcbe59be4e68efee6083c6e5553ecb92e"
 }
