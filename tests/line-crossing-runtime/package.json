@@ -1,0 +1,8 @@
+{
+  "name": "line-crossing-runtime-bridge-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bash run.sh"
+  }
+}

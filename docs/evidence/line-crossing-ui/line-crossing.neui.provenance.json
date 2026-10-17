@@ -1,7 +1,7 @@
 {
-  "bundle_len": 422963,
+  "bundle_len": 451394,
   "bundle_path": "docs/evidence/line-crossing-ui/line-crossing.neui",
-  "bundle_sha256": "3cd01519af881eb114c2831d67b4f0542815c98140e06deeba14e597d947771c",
+  "bundle_sha256": "a9117afcfeae8f3295352a00531c46284a9120799d41a825cd6d307eb4af77bc",
   "files": [
     {
       "file_len": 6939,
@@ -9,9 +9,9 @@
       "sha256": "37ca34e7ab99ebf9a005aaaee56a1004b196411f9410a0cd25c0ebf9024b7aec"
     },
     {
-      "file_len": 269841,
-      "path": "assets/index-CfTnTFvt.js",
-      "sha256": "13b3071920115f597295e6f1002dae43b9d43797b3bafb4aedc7c619ead3737e"
+      "file_len": 298272,
+      "path": "assets/index-B-RCOpzx.js",
+      "sha256": "55d0ea2399a427eaeeb30413f1dcbb369af9112dd838cd1d56018ca029432b68"
     },
     {
       "file_len": 41608,
@@ -36,7 +36,7 @@
     {
       "file_len": 399,
       "path": "index.html",
-      "sha256": "344dc49609dbd519411e098bf9d53ab9f9a08232ba6169e3f069f48d5f091532"
+      "sha256": "528d4dd3100fc736641b8e58441e3df9239f6bbcc28e74bfd35512618feb8086"
     }
   ],
   "format": "neui-sidecar-v1",
@@ -60,8 +60,8 @@
   "signature": "ECDSA over secp256r1 (P-256), SHA-256, strict DER",
   "signature_len": 71,
   "signer_spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
-  "source_commit": "21bbceed78e7e84be8fa0f0e63726201e547777c",
+  "source_commit": "539af692b998c7f27b15501a0c2f8fd1217a22cd",
   "spec_authority": "ne301 issue #79 \u00a712 (frozen Sidecar v1 wire, 2026-10-15)",
-  "tbs_len": 422892,
-  "ui_tbs_sha256": "59f695608f3caa2a06ffae486e6288b3e3052c277a87c5a8a0a3cfb3a049e7a6"
+  "tbs_len": 451323,
+  "ui_tbs_sha256": "fc8bd17703aec3a9b6f0e2875e99731fcbe59be4e68efee6083c6e5553ecb92e"
 }
