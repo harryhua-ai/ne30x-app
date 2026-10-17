@@ -1,29 +1,19 @@
 const PROTOCOL = 'ne301.sidecar.bridge.v1'
-const hexOf = char => char.repeat(64)
-const IDENTITY = {
-  publisher_id: 'test-publisher',
-  app_id: 'line-crossing',
-  publisher_key_sha256: hexOf('a'),
-  native_tbs_sha256: hexOf('b'),
-  ui_tbs_sha256: hexOf('c'),
-  build_id: 'runtime-fixture-build',
-  host_boot_generation: 3,
-  native_session_generation: 11,
-  ui_generation: 1,
-  sidecar_service_generation: 2,
-}
+const params = new URLSearchParams(window.location.search)
+const IDENTITY = JSON.parse(params.get('identity') || 'null')
 const ALL_OPS = [
   'snapshot.read', 'config.read', 'config.apply', 'counters.reset',
   'report-policy.read', 'report-policy.apply', 'video.open', 'video.close',
   'enable.read', 'enable.apply', 'live.subscribe', 'live.unsubscribe',
 ]
-const params = new URLSearchParams(window.location.search)
 const appOrigin = params.get('app')
 const scenario = params.get('scenario') || 'normal'
 const enableMode = params.get('enable') || 'unavailable'
 const liveMode = params.get('live') || 'unavailable'
 const attackOn = (params.get('attack') || 'on') === 'on'
 const opaque = scenario === 'opaque'
+
+window.localStorage.setItem('host-admin-fixture', 'fixture-secret')
 
 const appFrame = document.getElementById('appFrame')
 const attackFrame = document.getElementById('attackFrame')

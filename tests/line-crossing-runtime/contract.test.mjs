@@ -375,6 +375,110 @@ test('grant refresh with the same identity updates expiry and ops without breaki
   assert.equal(notifications.filter(notification => notification.kind === 'grant').length, 1)
 })
 
+test('an already-expired GRANT never authorizes a request', async () => {
+  const clock = { now: 100 }
+  const { session, port } = connect({ nowFn: () => clock.now })
+  port.emit(makeGrant({
+    seq: 2,
+    expires_at_ms: 99,
+    ops: ['snapshot.read', 'config.apply'],
+  }))
+
+  const outcome = await session.request('config.apply', { candidate: { counter_name: 'Expired' } })
+  assert.equal(outcome.outcome, 'UNAVAILABLE')
+  assert.equal(port.sent.length, 0)
+  assert.equal(session.getPhase(), 'awaiting-grant')
+  assert.equal(session.getGrant(), null)
+})
+
+test('a REQUEST whose grant expires before transport send is refused unsent', async () => {
+  const clock = { now: 100 }
+  const { session, port } = connect({ nowFn: () => clock.now })
+  port.emit(makeGrant({ seq: 2, expires_at_ms: 110, ops: ['config.apply'] }))
+  const payload = {}
+  Object.defineProperty(payload, 'candidate', {
+    enumerable: true,
+    get: () => {
+      clock.now = 110
+      return { counter_name: 'Expired while preparing request' }
+    },
+  })
+
+  const outcome = await session.request('config.apply', payload)
+  assert.equal(outcome.outcome, 'UNAVAILABLE')
+  assert.equal(port.sent.length, 0)
+  assert.equal(session.getGrant(), null)
+})
+
+test('a RESULT processed at GRANT expiry resolves UNKNOWN instead of APPLIED', async () => {
+  const clock = { now: 100 }
+  const { session, port } = connect({ nowFn: () => clock.now })
+  port.emit(makeGrant({ seq: 2, expires_at_ms: 110, ops: ['snapshot.read', 'config.apply'] }))
+  const pending = session.request('config.apply', { candidate: { counter_name: 'At expiry' } })
+  await flushMicrotasks()
+  assert.equal(port.sent.length, 1)
+
+  clock.now = 110
+  port.emit({
+    protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 3, grant_id: 'G'.repeat(24),
+    identity: makeIdentity(), request_id: 1, op: 'config.apply', outcome: 'APPLIED',
+    payload: { session_generation: 8, config_generation: 13 },
+  })
+
+  const outcome = await pending
+  assert.equal(outcome.outcome, 'UNKNOWN')
+  assert.equal(session.getPhase(), 'awaiting-grant')
+  assert.equal(session.getGrant(), null)
+})
+
+test('an EVENT processed at GRANT expiry is dropped before it reaches subscribers', () => {
+  const clock = { now: 100 }
+  const { session, port } = connect({ nowFn: () => clock.now })
+  port.emit(makeGrant({ seq: 2, expires_at_ms: 110, ops: ['snapshot.read'] }))
+  const notifications = []
+  session.subscribe(notification => notifications.push(notification))
+
+  clock.now = 110
+  port.emit({
+    protocol: 'ne301.sidecar.bridge.v1', type: 'EVENT', seq: 3, grant_id: 'G'.repeat(24),
+    identity: makeIdentity(), payload: { stream: 'live', stream_seq: 1, data: { server_now_ms: 5 } },
+  })
+
+  assert.equal(notifications.some(notification => notification.kind === 'event'), false)
+  assert.equal(session.getPhase(), 'awaiting-grant')
+  assert.equal(session.getGrant(), null)
+})
+
+test('a fresh same-identity GRANT restores authorization while stale seq and changed identity stay rejected', async () => {
+  const clock = { now: 100 }
+  const { session, port } = connect({ nowFn: () => clock.now })
+  port.emit(makeGrant({ seq: 2, expires_at_ms: 110, ops: ['snapshot.read'] }))
+
+  clock.now = 110
+  const expiredRequest = await session.request('snapshot.read')
+  assert.equal(expiredRequest.outcome, 'UNAVAILABLE')
+  assert.equal(session.getPhase(), 'awaiting-grant')
+
+  port.emit(makeGrant({ seq: 3, expires_at_ms: 200, ops: ['snapshot.read', 'config.apply'] }))
+  assert.equal(session.getPhase(), 'authorized')
+  const sentBefore = port.sent.length
+  const refreshedRequest = session.request('config.apply')
+  await flushMicrotasks()
+  assert.equal(port.sent.length, sentBefore + 1)
+
+  port.emit(makeGrant({ seq: 2, expires_at_ms: 300, ops: ['snapshot.read'] }))
+  assert.equal(session.getPhase(), 'authorized')
+  assert.deepEqual(session.getGrant().ops, ['snapshot.read', 'config.apply'])
+
+  port.emit(makeGrant({ seq: 4, identity: makeIdentity({ ui_tbs_sha256: 'b'.repeat(64) }), expires_at_ms: 300 }))
+  assert.equal(session.getPhase(), 'revoked')
+  assert.equal(session.getGrant(), null)
+  assert.equal((await session.request('snapshot.read')).outcome, 'UNAVAILABLE')
+  assert.equal(port.sent.length, sentBefore + 1)
+  port.close()
+  await refreshedRequest
+})
+
 test('oversized inbound messages revoke the session; oversized outbound requests are refused unsent', async () => {
   const oversized = authorized({ ops: ['snapshot.read'] })
   oversized.port.emit({
@@ -771,6 +875,23 @@ test('revocation clears every capability and blocks subsequent writes', async ()
   assert.equal(await settleUntil(() => controller.getState().video.state === 'unavailable' && /revoked/.test(controller.getState().app.reason || '')), true)
   const outcome = await controller.capabilities.applyConfig({ sessionGeneration: 8, expectedConfigGeneration: 12, candidate: bridgeSnapshot().config })
   assert.equal(outcome.outcome, 'UNAVAILABLE')
+})
+
+test('grant expiry notification clears stale capabilities and prevents direct writes', async () => {
+  const { session, controller } = makeController(op => (op === 'snapshot.read' ? { outcome: 'APPLIED', payload: bridgeSnapshot() } : { outcome: 'UNAVAILABLE' }))
+  await waitAuthored(controller)
+  session.emit({ kind: 'grant-expired', reason: 'Bridge grant has expired' })
+
+  const state = controller.getState()
+  assert.ok(capabilityStates(state).every(capability => capability.state === 'unavailable'))
+  assert.match(state.app.reason, /grant has expired/)
+  const outcome = await controller.capabilities.applyConfig({
+    sessionGeneration: 8,
+    expectedConfigGeneration: 12,
+    candidate: bridgeSnapshot().config,
+  })
+  assert.equal(outcome.outcome, 'UNAVAILABLE')
+  assert.equal(session.requests.some(request => request.op === 'config.apply'), false)
 })
 
 test('an expired grant stops fetches and marks capabilities unavailable', async () => {

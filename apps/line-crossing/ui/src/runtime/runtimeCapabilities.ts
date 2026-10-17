@@ -367,7 +367,7 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             markAllUnavailable('Bridge session is not authorized');
             return ui;
         }
-        if (Date.now() > grantExpiresAtMs) {
+        if (Date.now() >= grantExpiresAtMs) {
             markAllUnavailable('Bridge grant has expired');
             return ui;
         }
@@ -440,7 +440,13 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             onLiveEvent(notification.event);
             return;
         }
-        markAllUnavailable('Bridge session revoked');
+        if (notification.kind === 'hello') return;
+        ops.clear();
+        grantExpiresAtMs = 0;
+        livePhase = 'idle';
+        lastStreamSeq = -1;
+        liveReason = notification.reason;
+        markAllUnavailable(notification.reason);
     };
 
     const adoptGrant = (grant: BridgeGrant) => {

@@ -30,6 +30,7 @@ export type BridgeNotification =
     | { kind: 'hello'; grantId: string }
     | { kind: 'grant'; grant: BridgeGrant }
     | { kind: 'event'; event: BridgeEvent }
+    | { kind: 'grant-expired'; reason: string }
     | { kind: 'revoked'; reason: string };
 
 export interface RequestOutcome {
@@ -40,6 +41,7 @@ export interface RequestOutcome {
 
 export interface BridgeSessionOptions {
     deadlineMs?: number;
+    nowFn?: () => number;
     setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
     clearTimeoutFn?: (handle: unknown) => void;
 }
@@ -65,21 +67,25 @@ export class BridgeSession {
     private readonly pending = new Map<number, PendingRequest>();
     private readonly listeners = new Set<(notification: BridgeNotification) => void>();
     private readonly deadlineMs: number;
+    private readonly nowFn: () => number;
     private readonly setTimeoutFn: (handler: () => void, timeout: number) => unknown;
     private readonly clearTimeoutFn: (handle: unknown) => void;
     private droppedInbound = 0;
 
     constructor(options: BridgeSessionOptions = {}) {
         this.deadlineMs = options.deadlineMs ?? REQUEST_DEADLINE_MS;
+        this.nowFn = options.nowFn ?? (() => Date.now());
         this.setTimeoutFn = options.setTimeoutFn ?? ((handler, timeout) => setTimeout(handler, timeout));
         this.clearTimeoutFn = options.clearTimeoutFn ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
     }
 
     getPhase(): BridgePhase {
+        this.expireGrantIfNeeded();
         return this.phase;
     }
 
     getGrant(): BridgeGrant | null {
+        this.expireGrantIfNeeded();
         return this.grant;
     }
 
@@ -119,8 +125,9 @@ export class BridgeSession {
     }
 
     request(op: BridgeOp, payload: Record<string, unknown> = {}): Promise<RequestOutcome> {
+        const grantExpired = this.expireGrantIfNeeded();
         if (this.phase !== 'authorized') {
-            return Promise.resolve({ outcome: 'UNAVAILABLE', reason: 'Bridge session is not authorized' });
+            return Promise.resolve({ outcome: 'UNAVAILABLE', reason: grantExpired ? 'Bridge grant has expired' : 'Bridge session is not authorized' });
         }
         const grant = this.grant;
         if (!grant || !this.identity || !this.grantId) {
@@ -166,6 +173,16 @@ export class BridgeSession {
                 finish({ outcome: 'UNKNOWN', reason: 'Bridge request timed out before a RESULT arrived' });
             }, this.deadlineMs);
             this.pending.set(requestId, { op, resolve: finish });
+            const expiredBeforeSend = this.nowFn() >= grant.expires_at_ms;
+            if (expiredBeforeSend || this.phase !== 'authorized' || this.grant !== grant) {
+                this.pending.delete(requestId);
+                finish({
+                    outcome: 'UNAVAILABLE',
+                    reason: expiredBeforeSend ? 'Bridge grant has expired' : 'Bridge session is not authorized',
+                });
+                if (expiredBeforeSend && this.phase === 'authorized') this.expireGrant();
+                return;
+            }
             port.postMessage(message);
         });
     }
@@ -173,7 +190,8 @@ export class BridgeSession {
     revoke(reason: string): void {
         if (this.phase === 'revoked') return;
         this.phase = 'revoked';
-        this.flushPending('Bridge session revoked');
+        this.grant = null;
+        this.flushPending('UNAVAILABLE', 'Bridge session revoked');
         this.closePort();
         this.notify({ kind: 'revoked', reason });
     }
@@ -183,9 +201,23 @@ export class BridgeSession {
         this.listeners.clear();
     }
 
-    private flushPending(reason: string): void {
-        for (const pending of this.pending.values()) pending.resolve({ outcome: 'UNAVAILABLE', reason });
+    private flushPending(outcome: BridgeOutcome, reason: string): void {
+        for (const pending of this.pending.values()) pending.resolve({ outcome, reason });
         this.pending.clear();
+    }
+
+    private expireGrant(reason = 'Bridge grant has expired'): void {
+        if (this.phase === 'revoked') return;
+        this.phase = 'awaiting-grant';
+        this.grant = null;
+        this.flushPending('UNKNOWN', reason);
+        this.notify({ kind: 'grant-expired', reason });
+    }
+
+    private expireGrantIfNeeded(): boolean {
+        if (this.phase !== 'authorized' || !this.grant || this.nowFn() < this.grant.expires_at_ms) return false;
+        this.expireGrant();
+        return true;
     }
 
     private closePort(): void {
@@ -249,6 +281,12 @@ export class BridgeSession {
             return;
         }
         if (this.phase === 'revoked') return;
+        const currentExpired = this.expireGrantIfNeeded();
+        if (grant.expires_at_ms <= this.nowFn()) {
+            if (!currentExpired && this.phase === 'authorized') this.expireGrant('Host sent an expired GRANT');
+            this.droppedInbound += 1;
+            return;
+        }
         this.grant = grant;
         this.phase = 'authorized';
         this.notify({ kind: 'grant', grant });
@@ -264,6 +302,10 @@ export class BridgeSession {
         if (!this.consumeSeq(result.seq)) return;
         if (!this.matchesSession(result.grant_id, result.identity)) {
             this.revoke('RESULT identity does not match the session handshake');
+            return;
+        }
+        if (this.expireGrantIfNeeded() || this.phase !== 'authorized') {
+            this.droppedInbound += 1;
             return;
         }
         const pending = this.pending.get(result.request_id);
@@ -292,7 +334,7 @@ export class BridgeSession {
             this.revoke('EVENT identity does not match the session handshake');
             return;
         }
-        if (this.phase !== 'authorized') {
+        if (this.expireGrantIfNeeded() || this.phase !== 'authorized') {
             this.droppedInbound += 1;
             return;
         }

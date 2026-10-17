@@ -15,7 +15,23 @@ const productionRoot = path.join(buildRoot, 'production')
 const h264Path = path.join(buildRoot, 'line-crossing-runtime.h264')
 const fixtureRoot = path.join(testRoot, 'fixture')
 const evidencePath = path.join(repoRoot, 'docs/evidence/line-crossing-runtime/runtime-fixture-evidence.json')
+const signedProvenancePath = path.join(repoRoot, 'docs/evidence/line-crossing-ui/line-crossing.neui.provenance.json')
+const signedProvenance = JSON.parse(readFileSync(signedProvenancePath, 'utf8'))
 const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const HOST_HOSTNAME = 'host.example.test'
+const APP_HOSTNAME = 'app.other.test'
+const SIGNED_IDENTITY = {
+  publisher_id: signedProvenance.manifest.publisher_id,
+  app_id: signedProvenance.manifest.app_id,
+  publisher_key_sha256: signedProvenance.signer_spki_sha256,
+  native_tbs_sha256: signedProvenance.native_binding.native_tbs_sha256,
+  ui_tbs_sha256: signedProvenance.ui_tbs_sha256,
+  build_id: signedProvenance.source_commit,
+  host_boot_generation: 3,
+  native_session_generation: 11,
+  ui_generation: 1,
+  sidecar_service_generation: 2,
+}
 
 const CASES = [
   { id: 'authorized-session', title: 'authorized bridge session drives the real counting UI with real H264 workers and generation-checked writes', outcome: 'pass' },
@@ -23,21 +39,45 @@ const CASES = [
   { id: 'negative-traffic', title: 'rolled back, oversized, late and cross-generation results never pollute the bridge session', outcome: 'pass' },
   { id: 'enable-round-trip', title: 'a granted Enable capability round-trips real outcomes while absent stays read-only', outcome: 'pass' },
   { id: 'sibling-forgery', title: 'a hostile sibling iframe cannot forge bridge traffic or reach App storage', outcome: 'pass' },
+  { id: 'cross-site-isolation', title: 'the cross-site signed App cannot read Host DOM or storage or perform a cookie-authenticated admin write', outcome: 'pass' },
+  { id: 'same-origin-relaxation', title: 'the same-origin control exposes Host DOM and storage to the signed App', outcome: 'negative-control' },
+  { id: 'same-site-port-cookie-leak', title: 'the same-site port-only control sends the Host cookie with an App admin write', outcome: 'negative-control' },
 ]
 
 const EVIDENCE = {
-  app_entry: 'apps/line-crossing/ui/src/main.tsx (production build served on a distinct origin)',
+  app_entry: 'apps/line-crossing/ui/src/main.tsx (production build served from the committed signed NEUI-equivalent asset set)',
+  signed_bundle: {
+    bundle_path: signedProvenance.bundle_path,
+    bundle_sha256: signedProvenance.bundle_sha256,
+    ui_tbs_sha256: signedProvenance.ui_tbs_sha256,
+    source_commit: signedProvenance.source_commit,
+    signer_spki_sha256: signedProvenance.signer_spki_sha256,
+    production_asset_equality: 'tests/line-crossing-ui/contract.test.mjs compares every committed signed NEUI file path, length, and SHA-256 with the rebuilt production output served by this browser fixture.',
+  },
   bridge_limits: { max_message_bytes: 16384, max_pending_requests: 4, request_deadline_ms: 10000 },
-  browser: 'Google Chrome driven by Playwright chromium.launch (offline localhost fixture)',
+  browser: 'Google Chrome with local resolver rules mapping host.example.test and app.other.test to 127.0.0.1',
   cases: CASES,
-  isolation: 'app iframe sandbox="allow-scripts allow-same-origin" on a cross-origin (distinct TCP port) fixture; this layout does NOT isolate Host admin cookies across sites and must not be read as cross-site isolation',
+  origin_topology: {
+    host: 'http://host.example.test:<ephemeral-port>',
+    app: 'http://app.other.test:<ephemeral-port>',
+    relation: 'independent sites mapped to loopback by Chrome --host-resolver-rules; no device DNS',
+    same_site_port_control: 'http://host.example.test:<app-port> embeds under http://host.example.test:<host-port>',
+  },
+  isolation: {
+    ac4_lab_status: 'PASS',
+    app_sandbox: 'allow-scripts allow-same-origin',
+    cross_site: 'Host HttpOnly SameSite=Strict cookie exists in the top-level Host context; the signed App receives SecurityError for parent DOM/storage, and a credentialed admin POST reaches the Host without the cookie and does not mutate admin state.',
+    same_origin_control: 'Expected negative control: the same signed App served at the Host origin can read the parent marker and Host localStorage.',
+    same_site_port_control: 'Expected negative control: the same Host hostname on a different TCP port remains same-site; the Strict cookie is sent and the fixture admin write succeeds.',
+  },
   not_run: [
-    'real cross-site App origin vs Host admin origin (deployment DNS/TLS/site topology)',
-    'Host admin cookie/storage isolation across real sites',
+    'target deployment App/Host DNS, TLS, and site topology; the .test hostnames are local browser resolver aliases only',
+    'target Host admin cookie/storage policy and admin API behavior beyond this isolated fixture endpoint',
     'opaque-origin App positive Worker/importScripts/H264 operation (opaque origin fail-closed is exercised instead)',
     'real device media grant, camera stream and target-board integration',
     'Host #88 policy engine, App #30 native Enable producer, Host #91/App #27 live producers (fixture answers UNAVAILABLE)',
   ],
+  recording_download: 'NOT_RUN; signed FileSaver saveAs failure and the anchor fallback Host-token requirement remain open limitations.',
   protocol: 'ne301.sidecar.bridge.v1',
 }
 
@@ -49,6 +89,8 @@ let hostUrl
 let streamEnabled = true
 let frameUnits = []
 let activeSockets = 0
+let adminRequests = []
+let adminWriteCount = 0
 const streams = new Set()
 
 const locateAccessUnits = bytes => {
@@ -158,7 +200,7 @@ before(async () => {
 
   appServer = createServer((request, response) => {
     response.setHeader('Cache-Control', 'no-store')
-    response.setHeader('Content-Security-Policy', `default-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://127.0.0.1:${appServer.address()?.port}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'`)
+    response.setHeader('Content-Security-Policy', `default-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws://${APP_HOSTNAME}:${appServer.address()?.port} ${hostUrl}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'`)
     serveAsset(request, response, productionRoot, ['/'])
   })
   appServer.on('upgrade', (request, socket) => {
@@ -192,19 +234,55 @@ before(async () => {
   })
   hostServer = createServer((request, response) => {
     response.setHeader('Cache-Control', 'no-store')
-    response.setHeader('Content-Security-Policy', `default-src 'none'; script-src 'self'; style-src 'self'; frame-src http://127.0.0.1:* http://localhost:*; connect-src 'none'; base-uri 'none'`)
+    const requestUrl = new URL(request.url || '/', `http://${HOST_HOSTNAME}`)
+    if (requestUrl.pathname === '/admin/write') {
+      const cookie = request.headers.cookie || ''
+      const authenticated = /(?:^|;\s*)host_admin=fixture-secret(?:;|$)/.test(cookie)
+      const statusCode = authenticated ? 200 : 401
+      adminRequests.push({
+        origin: request.headers.origin || null,
+        cookie_present: authenticated,
+        host: request.headers.host,
+        method: request.method,
+        status: statusCode,
+      })
+      if (request.headers.origin === `http://${request.headers.host}`) {
+        response.setHeader('Access-Control-Allow-Origin', request.headers.origin)
+        response.setHeader('Access-Control-Allow-Credentials', 'true')
+      }
+      response.setHeader('Content-Type', 'application/json')
+      response.statusCode = statusCode
+      if (authenticated) adminWriteCount += 1
+      response.end(JSON.stringify({ written: authenticated }))
+      return
+    }
+    if (requestUrl.pathname === '/signed-app' || requestUrl.pathname.startsWith('/signed-app/')) {
+      const origin = `http://${request.headers.host}`
+      response.setHeader('Content-Security-Policy', `default-src 'self' blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ${origin.replace(/^http/, 'ws')}; worker-src 'self' blob:; object-src 'none'; base-uri 'none'`)
+      request.url = requestUrl.pathname.slice('/signed-app'.length) || '/'
+      serveAsset(request, response, productionRoot, ['/'])
+      return
+    }
+    response.setHeader('Content-Security-Policy', `default-src 'none'; script-src 'self'; style-src 'self'; frame-src http://${APP_HOSTNAME}:* http://${HOST_HOSTNAME}:*; connect-src 'none'; base-uri 'none'`)
+    if (requestUrl.pathname === '/host' || requestUrl.pathname.startsWith('/host/')) {
+      response.setHeader('Set-Cookie', 'host_admin=fixture-secret; Path=/; SameSite=Strict; HttpOnly')
+    }
     serveAsset(request, response, fixtureRoot, ['/host', '/attack'])
   })
   await Promise.all([
     new Promise((resolve, reject) => { appServer.once('error', reject); appServer.listen(0, '127.0.0.1', resolve) }),
     new Promise((resolve, reject) => { hostServer.once('error', reject); hostServer.listen(0, '127.0.0.1', resolve) }),
   ])
-  appUrl = `http://127.0.0.1:${appServer.address().port}`
-  hostUrl = `http://127.0.0.1:${hostServer.address().port}`
+  appUrl = `http://${APP_HOSTNAME}:${appServer.address().port}`
+  hostUrl = `http://${HOST_HOSTNAME}:${hostServer.address().port}`
   browser = await chromium.launch({
     executablePath: chromePath,
     headless: true,
-    args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'],
+    args: [
+      '--no-sandbox',
+      '--autoplay-policy=no-user-gesture-required',
+      `--host-resolver-rules=MAP ${HOST_HOSTNAME} 127.0.0.1,MAP ${APP_HOSTNAME} 127.0.0.1`,
+    ],
   })
 })
 
@@ -215,18 +293,59 @@ after(async () => {
   await new Promise(resolve => hostServer?.close(() => resolve()))
 })
 
-const openHostPage = async (query, browserContext = null) => {
+const openHostPage = async (query, browserContext = null, origins = {}) => {
   const page = await (browserContext ? browserContext.newPage() : browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' }))
-  await page.goto(`${hostUrl}/host/?app=${encodeURIComponent(appUrl)}&${query}`, { waitUntil: 'load' })
+  const workers = []
+  page.on('worker', worker => workers.push(worker.url()))
+  const targetHostUrl = origins.hostUrl || hostUrl
+  const targetAppUrl = origins.appUrl || appUrl
+  const params = new URLSearchParams(query)
+  params.set('app', targetAppUrl)
+  params.set('identity', JSON.stringify(SIGNED_IDENTITY))
+  await page.goto(`${targetHostUrl}/host/?${params}`, { waitUntil: 'load' })
   const frame = page.frameLocator('#appFrame')
-  return { page, frame }
+  return { page, frame, workers, targetAppUrl }
 }
 
 const authorize = async query => {
-  const { page, frame } = await openHostPage(query)
+  const { page, frame, workers, targetAppUrl } = await openHostPage(query)
   await waitFrameState(frame, 'lc-app-state', 'available')
-  return { page, frame }
+  return { page, frame, workers, targetAppUrl }
 }
+
+const locateAppBrowserFrame = (page, targetAppUrl) => {
+  const origin = new URL(targetAppUrl).origin
+  return page.frames().find(candidate => candidate.parentFrame() === page.mainFrame() && candidate.url().startsWith(origin))
+}
+
+const probeHostBoundary = (appFrame, adminUrl) => appFrame.evaluate(async target => {
+  let parentDom
+  let parentStorage
+  try {
+    parentDom = `accessible: ${window.parent.document.querySelector('#host-admin-marker')?.textContent.trim() || 'marker missing'}`
+  } catch (error) {
+    parentDom = `blocked: ${error.name}`
+  }
+  try {
+    parentStorage = `accessible: ${window.parent.localStorage.getItem('host-admin-fixture')}`
+  } catch (error) {
+    parentStorage = `blocked: ${error.name}`
+  }
+  let adminWrite
+  try {
+    const response = await fetch(`${target}/admin/write`, {
+      method: 'POST',
+      mode: 'cors',
+      credentials: 'include',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'fixture-write',
+    })
+    adminWrite = { result: 'resolved', status: response.status, body: await response.json() }
+  } catch (error) {
+    adminWrite = { result: 'rejected', name: error.name }
+  }
+  return { parentDom, parentStorage, adminWrite }
+}, adminUrl)
 
 const prepareDraft = async (frame, name) => {
   await frame.getByTestId('lc-tab-config').click()
@@ -240,7 +359,8 @@ const saveCounterName = async (frame, name) => {
 }
 
 test(CASES[0].title, async () => {
-  const { page, frame } = await authorize('scenario=normal&enable=unavailable&live=unavailable')
+  const { page, frame, workers, targetAppUrl } = await authorize('scenario=normal&enable=unavailable&live=unavailable')
+  assert.deepEqual(await page.evaluate(() => window.__broker.identity), SIGNED_IDENTITY)
   await frame.getByTestId('lc-tab-config').click()
   await frame.getByTestId('lc-page-config').waitFor()
   assert.equal(await frame.getByTestId('lc-counter-name').inputValue(), 'Counter Bridge')
@@ -256,6 +376,11 @@ test(CASES[0].title, async () => {
   await waitFrameState(frame, 'lc-video-state', 'unavailable')
   await frame.getByTestId('lc-video-retry').click()
   await waitFrameState(frame, 'lc-video-state', 'live', 30000)
+  await waitFor(async () => workers.length >= 2, 10000, 'the signed App did not start both video workers')
+  const workerUrls = workers.map(workerUrl => new URL(workerUrl))
+  assert.equal(workerUrls.some(workerUrl => workerUrl.pathname.includes('websocket-init')), true)
+  assert.equal(workerUrls.some(workerUrl => workerUrl.pathname.includes('videoWorker')), true)
+  assert.equal(workerUrls.every(workerUrl => workerUrl.origin === new URL(targetAppUrl).origin), true)
   const playback = await frame.locator('#lcVideoPlayer').evaluate(video => ({ width: video.videoWidth, height: video.videoHeight, time: video.currentTime }))
   assert.deepEqual([playback.width, playback.height], [320, 180])
   assert.ok(playback.time > 0)
@@ -442,6 +567,75 @@ test(CASES[4].title, async () => {
   await page.close()
 })
 
+test('cross-site App cannot read Host DOM or storage or perform a cookie-authenticated admin write', async () => {
+  const { page, frame, targetAppUrl } = await openHostPage('scenario=normal&attack=off')
+  await waitFrameState(frame, 'lc-app-state', 'available')
+  assert.equal(new URL(hostUrl).hostname, HOST_HOSTNAME)
+  assert.equal(new URL(targetAppUrl).hostname, APP_HOSTNAME)
+  const hostCookie = (await page.context().cookies(hostUrl)).find(cookie => cookie.name === 'host_admin')
+  assert.ok(hostCookie, 'the Host top-level context did not retain its admin cookie')
+  assert.equal(hostCookie.httpOnly, true)
+  assert.equal(hostCookie.sameSite, 'Strict')
+
+  adminRequests = []
+  adminWriteCount = 0
+  const appFrame = locateAppBrowserFrame(page, targetAppUrl)
+  assert.ok(appFrame, 'the signed App frame did not load on app.other.test')
+  const probe = await probeHostBoundary(appFrame, hostUrl)
+  assert.match(probe.parentDom, /^blocked: SecurityError/)
+  assert.match(probe.parentStorage, /^blocked: SecurityError/)
+  assert.deepEqual(probe.adminWrite, { result: 'rejected', name: 'TypeError' })
+  await waitFor(async () => adminRequests.length === 1, 10000, 'the cross-site credentialed admin request never reached the Host fixture')
+  assert.equal(adminRequests[0].origin, targetAppUrl)
+  assert.equal(adminRequests[0].cookie_present, false)
+  assert.equal(adminRequests[0].status, 401)
+  assert.equal(adminWriteCount, 0)
+  completeCase('cross-site-isolation')
+  await page.close()
+})
+
+test('same-origin control allows the signed App to read Host DOM and storage', async () => {
+  const sameOriginAppUrl = `${hostUrl}/signed-app`
+  const { page, frame, targetAppUrl } = await openHostPage('scenario=normal&attack=off', null, { appUrl: sameOriginAppUrl })
+  await waitFrameState(frame, 'lc-app-state', 'available')
+  adminRequests = []
+  adminWriteCount = 0
+  const appFrame = locateAppBrowserFrame(page, targetAppUrl)
+  assert.ok(appFrame, 'the same-origin signed App frame did not load')
+  const probe = await probeHostBoundary(appFrame, hostUrl)
+  assert.match(probe.parentDom, /^accessible: Host administration fixture/)
+  assert.equal(probe.parentStorage, 'accessible: fixture-secret')
+  assert.deepEqual(probe.adminWrite, { result: 'resolved', status: 200, body: { written: true } })
+  assert.equal(adminRequests.length, 1)
+  assert.equal(adminRequests[0].cookie_present, true)
+  assert.equal(adminRequests[0].status, 200)
+  assert.equal(adminWriteCount, 1)
+  completeCase('same-origin-relaxation')
+  await page.close()
+})
+
+test('same-site port-only control leaks the Host cookie to a cross-origin App', async () => {
+  const portOnlyAppUrl = `http://${HOST_HOSTNAME}:${appServer.address().port}`
+  const { page, frame, targetAppUrl } = await openHostPage('scenario=normal&attack=off', null, { appUrl: portOnlyAppUrl })
+  await waitFrameState(frame, 'lc-app-state', 'available')
+  assert.notEqual(new URL(targetAppUrl).origin, new URL(hostUrl).origin)
+  assert.equal(new URL(targetAppUrl).hostname, new URL(hostUrl).hostname)
+  adminRequests = []
+  adminWriteCount = 0
+  const appFrame = locateAppBrowserFrame(page, targetAppUrl)
+  assert.ok(appFrame, 'the port-only App frame did not load')
+  const probe = await probeHostBoundary(appFrame, hostUrl)
+  assert.match(probe.parentDom, /^blocked: SecurityError/)
+  assert.match(probe.parentStorage, /^blocked: SecurityError/)
+  assert.deepEqual(probe.adminWrite, { result: 'rejected', name: 'TypeError' })
+  await waitFor(async () => adminRequests.length === 1, 10000, 'the port-only admin request never reached the Host fixture')
+  assert.equal(adminRequests[0].cookie_present, true)
+  assert.equal(adminRequests[0].status, 200)
+  assert.equal(adminWriteCount, 1)
+  completeCase('same-site-port-cookie-leak')
+  await page.close()
+})
+
 test('committed runtime fixture evidence matches the executed browser cases', async () => {
   assert.deepEqual(completedCaseIds.sort(), CASES.map(item => item.id).sort(), 'not every fixture case completed; evidence would be misleading')
   if (process.env.WRITE_EVIDENCE) {
@@ -451,7 +645,11 @@ test('committed runtime fixture evidence matches the executed browser cases', as
   }
   const committed = JSON.parse(readFileSync(evidencePath, 'utf8'))
   assert.deepEqual(committed.cases, CASES)
+  assert.deepEqual(committed.signed_bundle, EVIDENCE.signed_bundle)
   assert.equal(committed.protocol, EVIDENCE.protocol)
   assert.deepEqual(committed.bridge_limits, EVIDENCE.bridge_limits)
+  assert.deepEqual(committed.origin_topology, EVIDENCE.origin_topology)
+  assert.deepEqual(committed.isolation, EVIDENCE.isolation)
   assert.deepEqual(committed.not_run, EVIDENCE.not_run)
+  assert.equal(committed.recording_download, EVIDENCE.recording_download)
 })

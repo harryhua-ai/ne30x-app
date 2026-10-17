@@ -50,8 +50,15 @@ the production build output.
   `GAP/STALE/REVOKE` status; a sequence rollback or gap marks live
   capabilities unavailable until a Host resync; live data is bounded
   (<= 100 events / 100 tracks / 64 points per track) and strictly validated.
-- Grant lifecycle: `expires_at_ms` expiry marks everything unavailable;
-  grant refresh requires the same identity; identity change revokes.
+- Grant lifecycle: a GRANT with `expires_at_ms <= Date.now()` is rejected.
+  The active grant is checked again immediately before a REQUEST is sent and
+  when each RESULT or EVENT is consumed. An expired request is not sent and
+  returns `UNAVAILABLE`; a pending request whose RESULT arrives after expiry
+  resolves `UNKNOWN`; an EVENT after expiry is dropped. Expiry clears the
+  active grant, resolves other pending requests as `UNKNOWN`, and marks the UI
+  unavailable while keeping the channel ready for a fresh GRANT. A fresh GRANT
+  with the same handshake identity and a newer sequence can restore
+  authorization; stale sequences are dropped and identity changes revoke.
 
 ## App-side payload schemas
 
@@ -78,15 +85,23 @@ that capability instead of partial rendering:
 ## Isolation position (software-verifiable part)
 
 The runtime browser fixture embeds the production build in
-`sandbox="allow-scripts allow-same-origin"` on a distinct origin (distinct TCP
-port). Per the #84 freeze this combination is only admissible when the App
-document is truly cross-origin and cross-site from the Host admin origin; the
-fixture satisfies cross-origin but NOT cross-site, so it proves bridge
-semantics, workers, MSE/H264 and resource loading — it does NOT prove Host
-cookie/storage isolation. Opaque-origin embedding fails closed (and in this
-fixture the app asset CSP `script-src 'self'` blocks scripts outright).
-Real cross-site deployment, DNS/TLS and the production App-site origin set
-remain Host #84/#40/#48/#58 work and are NOT_RUN here.
+`sandbox="allow-scripts allow-same-origin"` with Host at
+`host.example.test:<port>` and App at `app.other.test:<port>`. Chrome maps both
+`.test` names to loopback with `--host-resolver-rules`; the sites are distinct
+without relying on device DNS. The cross-site case runs the bridge v1 flow,
+both App-origin Workers and MSE/H264 playback. It also verifies that the
+HttpOnly `SameSite=Strict` Host cookie is absent from the App's credentialed
+admin POST, the write is not committed, and parent DOM/storage access raises
+`SecurityError`. A same-origin control confirms that DOM/storage are exposed
+when the sandbox is widened to the Host origin. A same-site, different-port
+control confirms that the Host cookie is sent and the admin write succeeds;
+TCP port separation is not cookie isolation.
+
+These are software lab results for the fixture's cookie and admin endpoint,
+not claims about target Host policy. The UI contract test verifies the
+committed signed NEUI asset paths, lengths and hashes against the rebuilt
+production files served by the browser fixture. Opaque-origin embedding still
+fails closed (the App asset CSP blocks scripts there).
 
 ## Evidence and reproduction
 
@@ -104,11 +119,12 @@ builds, the UI offline browser suite (Google Chrome via Playwright,
   adapter tests (validation, seq/replay, pending cap, deadlines, revocation,
   payload fail-closed, generation cross-checks);
 - `tests/line-crossing-runtime/browser.test.mjs` — real-Chrome fixture with a
-  Host broker page, the production build in the sandboxed cross-origin iframe
-  and a hostile sibling iframe; covers authorized end-to-end use (writes,
+  Host broker page, the signed-equivalent production build in the sandboxed
+  App iframe and a hostile sibling iframe; covers authorized use (writes,
   counters reset, media open/close under revocation), absent/wrong/limited
   grants, opaque origin, seq rollback, oversize, late-ACK after revoke,
-  stale-session echo and sibling forgery attempts.
+  stale-session echo, sibling forgery, cross-site cookie/DOM/storage/admin
+  denial, same-origin widening and the same-site port-only cookie leak.
 
 `docs/evidence/line-crossing-runtime/runtime-fixture-evidence.json` pins the
 executed case list; the suite re-verifies it on every run (`WRITE_EVIDENCE=1`
@@ -141,8 +157,8 @@ chromium.launch), ffmpeg-generated baseline H264 fixture.
   never faked as available.
 - Real camera/stream, target-board memory/network/flash/integration, device
   acceptance, production signing keys, production downloads/recording export
-  (FileSaver anchor fallback stays as delivered by App #25; its gated
-  `allow-downloads` path is not exercised here).
-- Cross-site App origin vs Host admin origin, Host admin cookie isolation,
-  opaque-origin positive operation (Worker/importScripts/H264 under opaque
-  origin).
+  (signed FileSaver `saveAs` remains failed; the anchor fallback requires a
+  Host download token, and no recording download PASS is claimed).
+- Target deployment DNS/TLS, camera and Host site topology; the `.test` resolver
+  mapping is local to this Chrome fixture. Opaque-origin positive operation
+  (Worker/importScripts/H264 under opaque origin).
