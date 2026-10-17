@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+TEST_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$TEST_DIR"
+pnpm install --offline --frozen-lockfile --ignore-scripts
+npm --prefix browser-runner ci --offline --ignore-scripts
+node browser-runner/build.mjs
+node --test contract.test.mjs browser.test.mjs

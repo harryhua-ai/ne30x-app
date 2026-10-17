@@ -1,0 +1,13 @@
+{
+  "name": "line-crossing-ui-offline-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bash run.sh"
+  },
+  "dependencies": {
+    "@lingui/core": "5.4.0",
+    "@lingui/react": "5.4.0"
+  },
+  "devDependencies": {}
+}

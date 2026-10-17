@@ -1,0 +1,144 @@
+import { useLingui } from '@lingui/react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Capability, LineCountingConfig, LineCountingStatus } from '@/services/api/line-counting';
+import { Group, NumField } from './fields';
+
+export interface ConfigPageProps {
+    config: LineCountingConfig;
+    status: LineCountingStatus;
+    businessEnable: Capability<boolean>;
+    enableInteractive: boolean;
+    enableBusy: boolean;
+    enableFeedback: string | null;
+    writeAllowed: boolean;
+    onChange: (patch: Partial<LineCountingConfig>) => void;
+    onEnableChange: (value: boolean) => void;
+}
+
+export default function ConfigPage({
+    config,
+    status,
+    businessEnable,
+    enableInteractive,
+    enableBusy,
+    enableFeedback,
+    writeAllowed,
+    onChange,
+    onEnableChange,
+}: ConfigPageProps) {
+    const { i18n } = useLingui();
+    const classes = status.model.classes ?? [];
+    const modelLoaded = status.model.name.length > 0;
+    const businessEnabled = businessEnable.state === 'available' ? businessEnable.value : null;
+    const enableLabel = businessEnable.state === 'available'
+        ? businessEnabled ? i18n._('sys.line_counting.state_running') : i18n._('sys.line_counting.state_disabled')
+        : businessEnable.state === 'stale' ? i18n._('lineCrossing.stale') : i18n._('lineCrossing.unavailable');
+
+    return (
+        <div className="space-y-3" data-testid="lc-page-config">
+            <Group title={i18n._('sys.line_counting.base_group')}>
+                <div className="flex items-center justify-between" data-testid="lc-business-enable">
+                    <Label className="text-xs">{i18n._('sys.line_counting.enable')}</Label>
+                    {businessEnabled === null
+                        ? <span data-testid="lc-business-enable-state" title={businessEnable.state === 'unavailable' || businessEnable.state === 'stale' ? businessEnable.reason : undefined}>{enableLabel}</span>
+                        : <div className="flex items-center gap-2">
+                            <Switch
+                                checked={businessEnabled}
+                                disabled={!enableInteractive}
+                                aria-label={i18n._('sys.line_counting.enable')}
+                                data-testid="lc-business-enable-switch"
+                                onCheckedChange={onEnableChange}
+                            />
+                            <span data-testid="lc-business-enable-state">{enableLabel}</span>
+                            {enableBusy && <span data-testid="lc-enable-status">{i18n._('sys.line_counting.saving')}</span>}
+                            {enableFeedback && <span role="status" data-testid="lc-enable-status">{i18n._(enableFeedback)}</span>}
+                        </div>}
+                </div>
+                <div className="space-y-1">
+                    <Label className="text-xs">{i18n._('sys.line_counting.counter_name')}</Label>
+                    <Input
+                        value={config.counter_name}
+                        data-testid="lc-counter-name"
+                        disabled={!writeAllowed}
+                        onChange={(e) => onChange({ counter_name: (e.target as HTMLInputElement).value })}
+                    />
+                </div>
+                <div className="space-y-1">
+                    <Label className="text-xs">{i18n._('sys.line_counting.target_class')}</Label>
+                    <Select
+                        value={config.target_class}
+                        onValueChange={(value) => onChange({ target_class: value })}
+                        disabled={!writeAllowed}
+                    >
+                        <SelectTrigger className="w-full">
+                            <SelectValue placeholder={config.target_class} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {classes.length === 0 && <SelectItem value={config.target_class}>{config.target_class}</SelectItem>}
+                            {classes.map((item) => <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-gray-400" data-testid="lc-current-model">
+                        {modelLoaded
+                            ? i18n._('sys.line_counting.current_model').replace('{name}', status.model.name)
+                            : i18n._('sys.line_counting.current_model_unknown')}
+                    </p>
+                </div>
+            </Group>
+
+            <Group title={i18n._('sys.line_counting.tracking_group')}>
+                <NumField
+                    label={i18n._('sys.line_counting.conf_threshold')}
+                    value={config.confidence_threshold}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    disabled={!writeAllowed}
+                    onChange={(value) => onChange({ confidence_threshold: value })}
+                />
+                <NumField
+                    label={i18n._('sys.line_counting.assoc_distance')}
+                    value={config.tracking.association_distance}
+                    min={0.05}
+                    max={1}
+                    step={0.05}
+                    disabled={!writeAllowed}
+                    onChange={(value) => onChange({ tracking: { ...config.tracking, association_distance: value } })}
+                />
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <NumField
+                        label={i18n._('sys.line_counting.track_history')}
+                        value={config.tracking.history_length}
+                        min={4}
+                        max={16}
+                        step={1}
+                        disabled={!writeAllowed}
+                        onChange={(value) => onChange({ tracking: { ...config.tracking, history_length: value } })}
+                    />
+                    <NumField
+                        label={i18n._('sys.line_counting.max_missed')}
+                        value={config.tracking.max_missed_frames}
+                        min={1}
+                        max={60}
+                        step={1}
+                        disabled={!writeAllowed}
+                        onChange={(value) => onChange({ tracking: { ...config.tracking, max_missed_frames: value } })}
+                    />
+                    <NumField
+                        label={i18n._('sys.line_counting.confirm_frames')}
+                        value={config.tracking.confirmation_frames}
+                        min={1}
+                        max={16}
+                        step={1}
+                        disabled={!writeAllowed}
+                        onChange={(value) => onChange({ tracking: { ...config.tracking, confirmation_frames: value } })}
+                    />
+                </div>
+            </Group>
+            {!writeAllowed && <p className="text-xs text-gray-500" data-testid="lc-config-readonly">{i18n._('lineCrossing.readOnly')}</p>}
+        </div>
+    );
+}

@@ -1,0 +1,1090 @@
+import {
+    playerStateIdle,
+    specialDuration,
+    previewFrameMs,
+    maxFrameMs,
+} from './constant'
+import browser from './utils/myBrowser.js';
+import MsMediaSource from './media'
+import { sleep } from '@/utils/sleep';
+import { logStreamError } from './streamLog';
+import fileSaverUrl from './FileSaver.min.js?url';
+
+type SaveAsFn = (data: Blob | File | MediaSource | string, filename?: string, options?: any) => void;
+let saveAs: SaveAsFn | null = null;
+
+
+const loadFileSaver = async () => {
+    try {
+        const script = document.createElement('script');
+        script.src = fileSaverUrl;
+        script.async = true;
+        document.head.appendChild(script);
+
+        return new Promise<void>((resolve, reject) => {
+            script.onload = () => {
+
+
+                saveAs = window.saveAs;
+                resolve();
+            };
+            script.onerror = reject;
+        });
+    } catch (err) {
+        console.warn('FileSaver load failed:', err);
+    }
+};
+
+loadFileSaver();
+
+
+interface CallbackEvent {
+    t: 'mseError' | 'startPlay' | 'connectionUnavailable';
+}
+
+type CallbackFunction = (event: CallbackEvent) => void;
+
+interface FrameData {
+    cmd: string;
+    data: Uint8Array;
+    videoTime: number;
+    iChannelId: number;
+
+
+
+
+
+
+
+
+}
+
+interface ReturnResult {
+    e: number;
+    m: string;
+}
+
+interface WsWorkerMessage {
+    type: 'connecting' | 'open' | 'close' | 'error' | 'reconnect' | 'video-data';
+    error?: string;
+    payload?: ArrayBuffer;
+    code?: number;
+    reason?: string;
+}
+
+interface DecWorkerMessage {
+    type: 'ready' | 'error';
+    error?: string;
+}
+
+
+export default class H264Player {
+    private videoPlayer: MsMediaSource | null = null;
+
+    private decodeWorker: Worker | null = null;
+
+    private webSocketWorker: Worker | null = null;
+
+    private decoderWorker: Worker | null = null;
+
+    private firstFrame: number = 0;
+
+    private frameIndex: number = 0;
+
+    private lastVideoTime: number = 0;
+
+    private isPlayback: boolean = false;
+
+    private playSpeed: number = 1;
+
+    private direction: number = 0;
+
+    private cb: CallbackFunction;
+
+    private type: string = 'video';
+
+    private snapshotFlag: number = 0;
+
+    private lastSec: number = 0;
+
+    private videoFrameCnt: number = 0;
+
+    private estimatedPreviewFrameMs: number = previewFrameMs;
+
+    private frameRateWindowStartMs: number = 0;
+
+    private frameRateWindowFrames: number = 0;
+
+    private playerState: number = playerStateIdle;
+
+    private iChannelId: number = 0;
+
+    private videoElement: HTMLVideoElement | null = null;
+
+    private wsRetryCount: number = 3;
+
+    private wsUrl: string = '';
+
+    private isStarted: boolean = false;
+
+    private isConnected: boolean = false;
+
+    private healthCheckTimer: number | null = null;
+
+    private lastValidFrameAt: number = 0;
+
+    private connectionStartedAt: number = 0;
+
+    private lastHealthPlaybackTime: number = 0;
+
+    private playbackStallStartedAt: number = 0;
+
+    private lastDecodedFrames: number = 0;
+
+    private decodedStallStartedAt: number = 0;
+
+    private recoveryInFlight: boolean = false;
+
+    private progressTimer: number | null = null;
+
+
+
+    private waitForKeyframe: boolean = false;
+
+
+    public packetCount: number = 0;
+
+    public packetsPerSecond: number = 0;
+
+    private lastPacketSec: number = 0;
+
+    public currentTime: number = 0;
+
+    public currentFrame: number = 0;
+
+    public totalBytesLoaded: number = 0;
+
+
+    private readonly MAX_BUFFER_ENTRIES: number = 10;
+
+    private bufferTimes: number[] = [];
+
+    private bufferIndex: number = 0;
+
+    private lastJumpTime: number = 0;
+
+    private readonly BUFFERING_COOLDOWN_TIMEOUT: number = 5000;
+
+
+    public latency: number = 0;
+
+
+    private lastBandwidthCheck: number = 0;
+
+    private lastBytesLoaded: number = 0;
+
+    public bandwidth: number = 0;
+
+
+    private captureActive: boolean = false;
+
+    private captureStartMs: number = 0;
+
+    private captureDurationMs: number = 0;
+
+    private captureParts: Uint8Array[] = [];
+
+    private captureTotalBytes: number = 0;
+
+    private getAdaptivePreviewFrameDuration(nowMs: number): number {
+        if (this.frameRateWindowStartMs === 0) {
+            this.frameRateWindowStartMs = nowMs;
+            this.frameRateWindowFrames = 0;
+            return Math.round(this.estimatedPreviewFrameMs);
+        }
+
+        this.frameRateWindowFrames++;
+        const elapsedMs = nowMs - this.frameRateWindowStartMs;
+        if (elapsedMs >= 1000 && this.frameRateWindowFrames >= 10) {
+            const measuredFrameMs = elapsedMs / this.frameRateWindowFrames;
+
+
+            const boundedFrameMs = Math.min(1000 / 15, Math.max(1000 / 60, measuredFrameMs));
+            this.estimatedPreviewFrameMs = this.estimatedPreviewFrameMs * 0.75 + boundedFrameMs * 0.25;
+            this.frameRateWindowStartMs = nowMs;
+            this.frameRateWindowFrames = 0;
+        }
+
+        return Math.round(this.estimatedPreviewFrameMs);
+    }
+
+
+    getCurrentTime(): number {
+        return this.currentTime;
+    }
+
+    constructor(cb: CallbackFunction) {
+        this.cb = cb;
+        this.creatVideoPlayer();
+        this.webSocketWorker = null;
+        this.decodeWorker = null;
+        this.wsRetryCount = 3;
+        this.wsUrl = '';
+        this.isStarted = false;
+        this.isConnected = false;
+
+        this.packetCount = 0;
+        this.packetsPerSecond = 0;
+        this.lastPacketSec = 0;
+        this.currentTime = 0;
+        this.currentFrame = 0;
+        this.totalBytesLoaded = 0;
+        this.bufferTimes = [];
+        this.bufferIndex = 0;
+        this.lastJumpTime = 0;
+        this.latency = 0;
+        this.lastBandwidthCheck = Date.now();
+        this.lastBytesLoaded = 0;
+        this.bandwidth = 0;
+    }
+
+
+    private setupWebSocketWorkerHandler(): void {
+        if (!this.webSocketWorker) return;
+
+        this.webSocketWorker.onmessage = (ev: MessageEvent<WsWorkerMessage>) => {
+            const msg = ev.data;
+            if (!msg || typeof msg !== 'object') return;
+
+            switch (msg.type) {
+                case 'connecting':
+
+                    logStreamError('WS', 'connecting', '', '');
+                    window.dispatchEvent(new CustomEvent('wv_work', { detail: false }));
+                    break;
+                case 'open':
+
+                    logStreamError('WS', 'open', '', 'connected');
+                    window.dispatchEvent(new CustomEvent('wv_work', { detail: true }));
+                    window.dispatchEvent(new CustomEvent('wv_open'));
+                    break;
+                case 'close':
+                    window.dispatchEvent(new CustomEvent('wv_close', {
+                        detail: { code: msg.code, reason: msg.reason }
+                    }));
+                    if (msg.reason === 'Connection replaced') {
+                        logStreamError('WS', 'replaced', String(msg.code ?? ''), msg.reason || '');
+                        this.cb({ t: 'connectionUnavailable' });
+                    }
+                    break;
+                case 'reconnect':
+
+
+                    logStreamError('WS', 'reconnect', String(msg.code ?? ''), msg.reason || 'unexpected close');
+                    break;
+                case 'error':
+                    window.dispatchEvent(new CustomEvent('wv_error', { detail: msg.error }));
+                    logStreamError('WS', 'socket-error', '', msg.error || 'ws error');
+
+                    window.dispatchEvent(new CustomEvent('wv_work', { detail: false }));
+                    this.wsRetryCount -= 1;
+                    if (this.wsRetryCount > 0 && !(typeof document !== 'undefined' && document.hidden)) {
+                        this.resetStartState().start(this.wsUrl);
+                    } else {
+                        this.cb({ t: 'connectionUnavailable' });
+                    }
+                    break;
+                case 'video-data': {
+
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    if (this.lastPacketSec !== nowSec) {
+                        if (this.lastPacketSec > 0) {
+                            this.packetsPerSecond = this.packetCount;
+                        }
+                        this.lastPacketSec = nowSec;
+                        this.packetCount = 0;
+                    }
+
+                    if (msg.payload instanceof ArrayBuffer) {
+                        this.totalBytesLoaded += msg.payload.byteLength;
+
+                        const frameData = this.dealVideoData(msg.payload);
+                        if (frameData) {
+                            this.lastValidFrameAt = Date.now();
+
+
+
+
+                            if (this.waitForKeyframe) {
+                                if (!H264Player.isKeyframe(frameData.data)) break;
+                                this.waitForKeyframe = false;
+                                logStreamError('VIDEO', 'keyframe-resume', '', 'appending resumed at idr');
+                            }
+                            this.packetCount++;
+                            this.decoderWorker?.postMessage(frameData);
+                        }
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        };
+    }
+
+
+    private setupDecoderWorkerHandler(): void {
+        if (!this.decoderWorker) return;
+
+        this.decoderWorker.onmessage = async (ev: MessageEvent<DecWorkerMessage>) => {
+            this.videoMsgCallback(ev as unknown as MessageEvent);
+        };
+    }
+
+
+    initWorkers(): this {
+        const needWsWorker = !this.webSocketWorker;
+        const needDecoderWorker = !this.decoderWorker;
+
+
+        if (!needWsWorker && !needDecoderWorker) {
+            this.setupWebSocketWorkerHandler();
+            this.setupDecoderWorkerHandler();
+            return this;
+        }
+
+
+        window.dispatchEvent(new CustomEvent('wv_work', { detail: false }));
+        if (needWsWorker) {
+            this.webSocketWorker = new Worker(new URL('./websocket-init.ts', import.meta.url), { type: 'module' });
+            this.webSocketWorker.onerror = () => {
+                logStreamError('WORKER', 'load-error', '', 'WebSocket worker unavailable');
+                this.cb({ t: 'connectionUnavailable' });
+            };
+        }
+
+        if (needDecoderWorker) {
+            this.decoderWorker = new Worker(new URL('./videoWorker.ts', import.meta.url));
+            this.decoderWorker.onerror = () => {
+                logStreamError('WORKER', 'load-error', '', 'Video worker unavailable');
+                this.cb({ t: 'connectionUnavailable' });
+            };
+        }
+        this.setupWebSocketWorkerHandler();
+        this.setupDecoderWorkerHandler();
+
+        return this;
+    }
+
+    initPlayer(videoElement: HTMLVideoElement): this {
+        this.videoElement = videoElement;
+        this.videoPlayer = new MsMediaSource((msg: CallbackEvent) => {
+            this.mediaSrcCallback(msg);
+        });
+        this.videoPlayer.setVideoElement(this.videoElement);
+        this.setupProgressHandler();
+        this.startHealthCheck();
+        return this;
+    }
+
+    wsDisconnect(): this {
+
+        this.isConnected = false;
+        this.webSocketWorker?.postMessage({ type: 'disconnect' });
+        return this;
+    }
+
+    wsConnect(url: string): this {
+        this.isConnected = true;
+        this.webSocketWorker?.postMessage({ type: 'connect', url });
+        return this;
+    }
+
+    resetStartState(): this {
+        this.isStarted = false;
+        return this;
+    }
+
+    async start(url: string): Promise<this> {
+        this.wsUrl = url;
+        if (this.isStarted) return this;
+        if (this.isConnected) {
+            this.wsDisconnect();
+            await sleep(500);
+        }
+        this.isStarted = true;
+        this.connectionStartedAt = Date.now();
+        this.lastValidFrameAt = 0;
+        this.playbackStallStartedAt = 0;
+        this.initWorkers();
+        this.wsConnect(url);
+        this.decodeWorker?.postMessage({ type: 'init' });
+        return this;
+    }
+
+    destroy(): void {
+        this.stopPlay();
+        this.stopHealthCheck();
+        if (this.webSocketWorker) {
+            this.wsDisconnect();
+            try {
+                this.webSocketWorker.terminate();
+            } catch (error) {
+                console.error('Error terminating websocket worker', error);
+            }
+            this.webSocketWorker = null;
+        }
+        if (this.decoderWorker) {
+            try {
+                this.decoderWorker.terminate();
+            } catch (error) {
+                console.error('Error terminating decoder worker', error);
+            }
+            this.decoderWorker = null;
+        }
+        if (this.videoPlayer) {
+            this.videoPlayer.uninitMse();
+            this.videoPlayer = null;
+        }
+
+        this.videoElement = null;
+        this.isStarted = false;
+        this.isConnected = false;
+        this.wsUrl = '';
+    }
+
+
+    pause(): void {
+
+        if (this.webSocketWorker) {
+            this.wsDisconnect();
+            setTimeout(() => {
+                this.webSocketWorker?.terminate();
+                this.webSocketWorker = null;
+            }, 100);
+        }
+        this.videoPlayer?.clearBuffer();
+        if (this.videoElement && !this.videoElement.paused) {
+            this.videoElement.pause();
+        }
+        this.isConnected = false;
+        this.isStarted = false;
+    }
+
+    private startHealthCheck(): void {
+        this.stopHealthCheck();
+        this.lastHealthPlaybackTime = this.videoElement?.currentTime ?? 0;
+        this.healthCheckTimer = window.setInterval(() => {
+            if (!this.isStarted || !this.wsUrl || this.recoveryInFlight) return;
+
+            const now = Date.now();
+            if (document.visibilityState === 'hidden') {
+                this.connectionStartedAt = now;
+                this.lastValidFrameAt = this.lastValidFrameAt > 0 ? now : 0;
+                this.playbackStallStartedAt = 0;
+                return;
+            }
+
+            const referenceTime = this.lastValidFrameAt || this.connectionStartedAt;
+            const timeoutMs = this.lastValidFrameAt > 0 ? 5000 : 8000;
+            if (referenceTime > 0 && now - referenceTime >= timeoutMs) {
+                this.triggerRecovery('no-valid-frame');
+                return;
+            }
+
+            const playbackTime = this.videoElement?.currentTime ?? 0;
+            if (this.lastValidFrameAt > 0
+                && Math.abs(playbackTime - this.lastHealthPlaybackTime) < 0.01) {
+                if (this.playbackStallStartedAt === 0) this.playbackStallStartedAt = now;
+                if (now - this.playbackStallStartedAt >= 5000) this.triggerRecovery('playback-stall');
+            } else {
+                this.lastHealthPlaybackTime = playbackTime;
+                this.playbackStallStartedAt = 0;
+            }
+
+
+
+
+
+
+
+            const videoAny = this.videoElement as any;
+            const decoded: number = videoAny?.getVideoPlaybackQuality?.().totalVideoFrames
+                ?? videoAny?.webkitDecodedFrameCount
+                ?? -1;
+            if (decoded >= 0 && this.lastValidFrameAt > 0 && this.videoElement && !this.videoElement.paused) {
+                if (decoded === this.lastDecodedFrames) {
+                    if (this.decodedStallStartedAt === 0) this.decodedStallStartedAt = now;
+                    if (now - this.decodedStallStartedAt >= 5000) this.triggerRecovery('decode-stall');
+                } else {
+                    this.lastDecodedFrames = decoded;
+                    this.decodedStallStartedAt = 0;
+                }
+            } else {
+                if (decoded >= 0) this.lastDecodedFrames = decoded;
+                this.decodedStallStartedAt = 0;
+            }
+        }, 1000);
+    }
+
+    private stopHealthCheck(): void {
+        if (this.healthCheckTimer !== null) {
+            clearInterval(this.healthCheckTimer);
+            this.healthCheckTimer = null;
+        }
+    }
+
+    private triggerRecovery(reason: string): void {
+        if (this.recoveryInFlight) return;
+        if (typeof document !== 'undefined' && document.hidden) return;
+        this.recoveryInFlight = true;
+        logStreamError('VIDEO', 'stall-recover', '', `${reason}; restarting stream`);
+        this.connectionStartedAt = Date.now();
+        this.lastValidFrameAt = 0;
+        this.playbackStallStartedAt = 0;
+        this.hardRestart()
+            .catch((error) => console.error('Video stream recovery failed', error))
+            .finally(() => {
+                this.recoveryInFlight = false;
+            });
+    }
+
+
+    async hardRestart(): Promise<void> {
+        if (!this.wsUrl || !this.videoElement) return;
+
+        this.firstFrame = 0;
+        this.frameIndex = 0;
+        this.lastVideoTime = 0;
+        this.lastSec = 0;
+        this.videoFrameCnt = 0;
+        this.waitForKeyframe = false;
+        this.estimatedPreviewFrameMs = previewFrameMs;
+        this.frameRateWindowStartMs = 0;
+        this.frameRateWindowFrames = 0;
+        this.packetCount = 0;
+        this.packetsPerSecond = 0;
+        this.lastPacketSec = 0;
+        this.wsRetryCount = 3;
+
+        if (this.webSocketWorker) {
+            this.wsDisconnect();
+            await sleep(300);
+            try {
+                this.webSocketWorker.terminate();
+            } catch {
+            }
+            this.webSocketWorker = null;
+        }
+
+        if (this.decoderWorker) {
+            try {
+                this.decoderWorker.postMessage({ cmd: 'stop' });
+            } catch {
+            }
+            await sleep(100);
+            try {
+                this.decoderWorker.terminate();
+            } catch {
+            }
+            this.decoderWorker = null;
+        }
+
+        const video = this.videoElement;
+        if (this.videoPlayer) {
+            this.videoPlayer.resetLivePreview(video);
+        }
+
+
+
+        if (!this.videoElement) return;
+
+        this.isConnected = false;
+        this.isStarted = false;
+        await this.start(this.wsUrl);
+    }
+
+
+    async reStart(): Promise<void> {
+        await this.hardRestart();
+    }
+
+    videoMsgCallback(event: MessageEvent): void {
+        this.videoPlayer?.processMp4VideoData(event, this.snapshotFlag);
+    }
+
+    mediaSrcCallback(msg: CallbackEvent): void {
+        if (msg.t === 'mseError') {
+
+
+
+            this.waitForKeyframe = true;
+            try {
+                this.decoderWorker?.postMessage({ cmd: 'reset' });
+            } catch {
+            }
+            logStreamError('VIDEO', 'mse-error', '', 'media source lost; restarting stream');
+            this.triggerRecovery('mse-error');
+        }
+        this.cb(msg);
+    }
+
+    creatVideoPlayer(): void {
+        this.videoPlayer = new MsMediaSource((msg: CallbackEvent) => {
+            this.mediaSrcCallback(msg);
+        });
+    }
+
+    initDecodeWorker(): void {
+        this.decodeWorker = new Worker(new URL('./videoWorker.ts', import.meta.url));
+        this.decodeWorker.onmessage = (event: MessageEvent) => {
+            this.videoMsgCallback(event);
+        };
+    }
+
+    dealVideoData(frameData: ArrayBuffer): FrameData | false {
+        const headSize = 64;
+        if (frameData.byteLength <= headSize) {
+            return false;
+        }
+
+
+        let timestamp = 0;
+        try {
+            timestamp = new DataView(frameData).getUint32(12, false);
+            this.currentTime = timestamp;
+        } catch (e) {
+            console.error('Error getting timestamp from offset 8:', e);
+        }
+
+        if (timestamp === 0) {
+            timestamp = Math.floor(Date.now() / 1000);
+            this.currentTime = timestamp;
+        }
+
+        const h264Data = new Uint8Array(frameData, headSize);
+        if (!H264Player.checkFrameData(h264Data)) {
+            return false;
+        }
+
+        let duration = 0;
+        const nowMs = Date.now();
+        const timeUsec = nowMs * 1000;
+        const nowSec = (timeUsec / 1000) | 0;
+        if (this.lastSec !== nowSec) {
+            this.lastSec = nowSec;
+            this.videoFrameCnt = 0;
+        }
+        this.videoFrameCnt++;
+
+        if (this.firstFrame === 0) {
+            this.firstFrame = 1;
+            duration = this.getAdaptivePreviewFrameDuration(nowMs);
+        } else if (!this.isPlayback) {
+            duration = this.getAdaptivePreviewFrameDuration(nowMs);
+        } else if (this.direction === 0) {
+            if (this.playSpeed >= 4 || this.playSpeed <= 0.125) {
+                duration = specialDuration * 1000;
+            } else {
+                duration = Math.round((timeUsec - this.lastVideoTime) / 1000);
+                duration = Math.round(duration / this.playSpeed);
+                if (duration <= 0 || duration > maxFrameMs) {
+                    duration = maxFrameMs;
+                }
+            }
+        } else {
+            duration = specialDuration * 1000;
+        }
+
+        this.frameIndex++;
+        this.lastVideoTime = timeUsec;
+
+        if (this.captureActive) {
+            this.appendH264Capture(frameData);
+        }
+
+        return {
+            cmd: 'video',
+            data: h264Data,
+            videoTime: duration,
+            iChannelId: this.iChannelId,
+        };
+    }
+
+
+    public startH264Capture(durationSeconds: number = 20): void {
+        this.captureActive = true;
+        this.captureStartMs = Date.now();
+        this.captureDurationMs = Math.max(1, durationSeconds) * 1000;
+        this.captureParts = [];
+        this.captureTotalBytes = 0;
+    }
+
+
+    public stopAndExportH264Capture(): void {
+        if (!this.captureActive) return;
+        this.exportH264Capture();
+    }
+
+    private appendH264Capture(frameData: ArrayBuffer): void {
+
+        const totalLen = frameData.byteLength;
+        if (totalLen <= 68) return;
+        const dv = new DataView(frameData);
+        const start = 64;
+        const end = totalLen - 4;
+        let pos = -1;
+        for (let i = start; i <= end; i += 1) {
+            if (dv.getUint32(i, false) === 0x00000001) {
+                pos = i;
+                break;
+            }
+        }
+        if (pos === -1) return;
+
+        const raw = new Uint8Array(frameData, pos);
+
+        const copy = new Uint8Array(raw.byteLength);
+        copy.set(raw);
+        this.captureParts.push(copy);
+        this.captureTotalBytes += copy.byteLength;
+
+        if (Date.now() - this.captureStartMs >= this.captureDurationMs) {
+            this.exportH264Capture();
+        }
+    }
+
+    private exportH264Capture(): void {
+
+        const out = new Uint8Array(this.captureTotalBytes);
+        let offset = 0;
+        for (let i = 0; i < this.captureParts.length; i += 1) {
+            const part = this.captureParts[i];
+            out.set(part, offset);
+            offset += part.byteLength;
+        }
+
+        const blob = new Blob([out], { type: 'application/octet-stream' });
+        const filename = `capture_${new Date().toISOString().replace(/[:.]/g, '-')}.h264`;
+        if (saveAs) {
+            saveAs(blob, filename);
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+
+        this.captureActive = false;
+        this.captureStartMs = 0;
+        this.captureDurationMs = 0;
+        this.captureParts = [];
+        this.captureTotalBytes = 0;
+    }
+
+
+    static isKeyframe(data: Uint8Array): boolean {
+        const len = data.byteLength;
+        for (let i = 0; i + 4 < len; i += 1) {
+            if (data[i] === 0 && data[i + 1] === 0) {
+                let hdr = -1;
+                if (data[i + 2] === 1) hdr = i + 3;
+                else if (data[i + 2] === 0 && data[i + 3] === 1) hdr = i + 4;
+                if (hdr >= 0 && (data[hdr] & 0x1F) === 5) return true;
+            }
+        }
+        return false;
+    }
+
+    static checkFrameData(h264Data: Uint8Array): boolean {
+        const len = h264Data.byteLength;
+        if (len < 4) return false;
+
+        if (h264Data[0] === 0 && h264Data[1] === 0) {
+            if (h264Data[2] === 1) return true;
+            if (h264Data[2] === 0 && h264Data[3] === 1) return true;
+        }
+        return false;
+    }
+
+    doSnapshot() {
+        let interval = 0;
+        this.snapshotFlag = 1
+        if (this.snapshotFlag === 0) {
+            return 0;
+        }
+
+        if (this.snapshotFlag === 1) {
+            this.snapshotFlag = 2;
+            const video = this.videoElement as HTMLVideoElement;
+            const canvas = document.createElement("canvas");
+            const canvasCtx = canvas.getContext("2d");
+            if (!canvasCtx) {
+                console.error("Failed to get canvas 2D context");
+                this.snapshotFlag = 0;
+                return 0;
+            }
+            canvas.width = video?.videoWidth || 0;
+            canvas.height = video?.videoHeight || 0;
+            if (browser.isBrowserFirefox()) {
+                const size = canvas.width * canvas.height;
+                if (size >= 3000 * 3000) {
+                    interval = 1500;
+                } else if (size >= 2560 * 2560) {
+                    interval = 1200;
+                } else if (size >= 1920 * 1920) {
+                    interval = 800;
+                } else {
+                    interval = 200;
+                }
+            }
+            window.setTimeout(() => {
+                canvasCtx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.toBlob((blob) => {
+                    this.snapshotFlag = 0;
+                    const snapshotName = `snapshot_${Date.now()}.jpeg`;
+                    if (saveAs) {
+                        saveAs(blob as Blob, snapshotName);
+                    } else {
+
+                        const url = URL.createObjectURL(blob as Blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = snapshotName;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }
+                });
+            }, interval);
+        }
+
+        return 1;
+    }
+
+    stopPlay(): ReturnResult {
+        const ret = {
+            e: 0,
+            m: "Stop h264 Success"
+        };
+
+        this.firstFrame = 0;
+        this.frameIndex = 0;
+        this.lastVideoTime = 0;
+        this.isPlayback = false;
+        this.playSpeed = 1;
+
+        this.direction = 0;
+        this.playerState = playerStateIdle
+        this.snapshotFlag = 0;
+        this.lastSec = 0;
+        this.videoFrameCnt = 0;
+        if (this.progressTimer !== null) {
+            clearInterval(this.progressTimer);
+            this.progressTimer = null;
+        }
+        this.videoPlayer?.uninitMse();
+        this.videoPlayer = null;
+        if (this.type === 'audio') {
+            if (this.videoElement) {
+                document.body.removeChild(this.videoElement);
+                this.videoElement = null;
+            }
+        }
+        this.type = 'video';
+        if (this.decodeWorker !== null) {
+            this.decodeWorker.postMessage({ cmd: 'stop' });
+            this.decodeWorker.terminate();
+            this.decodeWorker = null
+        }
+        return ret;
+    }
+
+    displayLoop(opt: number): void {
+        if (opt && this.playerState !== playerStateIdle) {
+            requestAnimationFrame(this.displayLoop.bind(this));
+        }
+        this.videoPlayer?.updateSourceBuffer();
+    }
+
+
+    setPlayMode(opt: boolean): void {
+        this.isPlayback = opt;
+    }
+
+
+    private getBufferedTime(): number {
+        if (!this.videoElement || this.videoElement.buffered.length === 0) return 0;
+        return this.videoElement.buffered.end(this.videoElement.buffered.length - 1) - this.videoElement.currentTime;
+    }
+
+
+    private calculateAdaptiveBufferThreshold(): number {
+        const filledEntries = this.bufferTimes.length;
+        const sum = this.bufferTimes.reduce((a, b) => a + b, 0);
+        const averageBufferTime = filledEntries ? sum / filledEntries : 0;
+
+
+        const isSafariOrIOS = browser.isBrowserSafari() || /iPad|iPhone|iPod/.test(navigator.userAgent);
+        return averageBufferTime * (isSafariOrIOS ? 3 : 1.5);
+    }
+
+
+    private calculateAdaptivePlaybackRate(bufferTime: number, bufferThreshold: number): number {
+        const alpha = 0.2;
+        const beta = 0.5;
+
+
+
+        if (
+            ((bufferTime <= bufferThreshold && bufferThreshold < 3) || bufferTime < 3)
+            && this.bufferTimes.length <= this.MAX_BUFFER_ENTRIES
+        ) {
+            return 1;
+        }
+
+        const rate = 1 + alpha * Math.exp(beta * (bufferTime - bufferThreshold));
+        return Math.min(rate, 2);
+    }
+
+
+    private jumpToLive(): void {
+        if (!this.videoElement) return;
+
+        const { buffered } = this.videoElement;
+        if (buffered.length > 0) {
+            const liveEdge = buffered.end(buffered.length - 1);
+
+            this.videoElement.currentTime = liveEdge - 0.75;
+            this.lastJumpTime = Date.now();
+        }
+    }
+
+
+    private calculateLatency(): number {
+        if (!this.videoElement) return 0;
+
+        const { seekable } = this.videoElement;
+        if (seekable.length > 0) {
+            return Math.max(0, seekable.end(seekable.length - 1) - this.videoElement.currentTime);
+        }
+
+
+        const { buffered } = this.videoElement;
+        if (buffered.length > 0) {
+            return Math.max(0, buffered.end(buffered.length - 1) - this.videoElement.currentTime);
+        }
+
+        return 0;
+    }
+
+
+    private calculateBandwidth(): void {
+        const now = Date.now();
+        const timeElapsed = (now - this.lastBandwidthCheck) / 1000;
+
+        if (timeElapsed >= 1) {
+            const bytesLoaded = this.totalBytesLoaded;
+            this.bandwidth = (bytesLoaded - this.lastBytesLoaded) / timeElapsed / 1000;
+
+            this.lastBytesLoaded = bytesLoaded;
+            this.lastBandwidthCheck = now;
+        }
+    }
+
+
+    private setupProgressHandler(): void {
+        if (!this.videoElement) return;
+
+        this.videoElement.addEventListener('progress', () => {
+            this.onProgress();
+        });
+
+
+        if (this.progressTimer !== null) {
+            clearInterval(this.progressTimer);
+        }
+
+        this.progressTimer = window.setInterval(() => {
+            this.calculateBandwidth();
+            this.latency = this.calculateLatency();
+            if (!this.isPlayback) {
+                this.videoPlayer?.recoverIfNeeded();
+            }
+        }, 1000);
+    }
+
+
+    private onProgress(): void {
+        if (!this.videoElement) return;
+
+
+        if (!this.isPlayback) {
+            this.latency = this.calculateLatency();
+            return;
+        }
+
+        const bufferTime = this.getBufferedTime();
+
+
+        if (this.videoElement.playbackRate === 1 || bufferTime < 3) {
+            if (this.bufferTimes.length < this.MAX_BUFFER_ENTRIES) {
+                this.bufferTimes.push(bufferTime);
+            } else {
+                this.bufferTimes[this.bufferIndex] = bufferTime;
+                this.bufferIndex = (this.bufferIndex + 1) % this.MAX_BUFFER_ENTRIES;
+            }
+        }
+
+        const bufferThreshold = this.calculateAdaptiveBufferThreshold();
+
+
+        const playbackRate = this.calculateAdaptivePlaybackRate(bufferTime, bufferThreshold);
+
+
+        const isSafariOrIOS = browser.isBrowserSafari() || /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+        if (this.videoElement && !this.videoElement.paused) {
+            if (
+                isSafariOrIOS
+                && bufferTime > 3
+                && Date.now() - this.lastJumpTime > this.BUFFERING_COOLDOWN_TIMEOUT
+            ) {
+
+                this.jumpToLive();
+            } else if (!isSafariOrIOS) {
+
+                if (this.videoElement.playbackRate !== playbackRate) {
+                    this.videoElement.playbackRate = playbackRate;
+                }
+            }
+        }
+
+
+        this.latency = this.calculateLatency();
+    }
+
+
+    public getStats(): {
+        bandwidth: number;
+        latency: number;
+        bufferTime: number;
+        playbackRate: number;
+        packetsPerSecond: number;
+    } {
+        return {
+            bandwidth: this.bandwidth,
+            latency: this.latency,
+            bufferTime: this.getBufferedTime(),
+            playbackRate: this.videoElement?.playbackRate ?? 1,
+            packetsPerSecond: this.packetsPerSecond,
+        };
+    }
+
+}
