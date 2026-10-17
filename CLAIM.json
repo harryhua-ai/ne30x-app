@@ -12,7 +12,29 @@
  "heartbeat_at": "2026-10-17T05:10:34Z",
  "supersedes": null,
  "contract_digest": "31d79662c194722e0281304a63d42dd76af4e612806962df40c895a7ad5d141b",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/33/be45e8d0",
+  "sha": "8df71defc1cb9e6221a2189d2fcf1ca3f33f3eb4",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "docs/enable-persistence-study/decision.md": "ALLOWED",
+    "docs/evidence/enable-persistence-study/results.md": "ALLOWED",
+    "tests/enable-persistence-study/run.sh": "ALLOWED",
+    "tests/enable-persistence-study/study_model.c": "ALLOWED",
+    "tests/enable-persistence-study/study_model.h": "ALLOWED",
+    "tests/enable-persistence-study/test_enable_persistence.c": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 6,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-17T05:11:48Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
