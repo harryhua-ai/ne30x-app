@@ -1,0 +1,45 @@
+{
+  "app_entry": "apps/line-crossing/ui/src/main.tsx (production build served on a distinct origin)",
+  "bridge_limits": {
+    "max_message_bytes": 16384,
+    "max_pending_requests": 4,
+    "request_deadline_ms": 10000
+  },
+  "browser": "Google Chrome driven by Playwright chromium.launch (offline localhost fixture)",
+  "cases": [
+    {
+      "id": "authorized-session",
+      "title": "authorized bridge session drives the real counting UI with real H264 workers and generation-checked writes",
+      "outcome": "pass"
+    },
+    {
+      "id": "fail-closed-variants",
+      "title": "absent grants, wrong app identity, limited whitelists and opaque origins keep the App honest",
+      "outcome": "pass"
+    },
+    {
+      "id": "negative-traffic",
+      "title": "rolled back, oversized, late and cross-generation results never pollute the bridge session",
+      "outcome": "pass"
+    },
+    {
+      "id": "enable-round-trip",
+      "title": "a granted Enable capability round-trips real outcomes while absent stays read-only",
+      "outcome": "pass"
+    },
+    {
+      "id": "sibling-forgery",
+      "title": "a hostile sibling iframe cannot forge bridge traffic or reach App storage",
+      "outcome": "pass"
+    }
+  ],
+  "isolation": "app iframe sandbox=\"allow-scripts allow-same-origin\" on a cross-origin (distinct TCP port) fixture; this layout does NOT isolate Host admin cookies across sites and must not be read as cross-site isolation",
+  "not_run": [
+    "real cross-site App origin vs Host admin origin (deployment DNS/TLS/site topology)",
+    "Host admin cookie/storage isolation across real sites",
+    "opaque-origin App positive Worker/importScripts/H264 operation (opaque origin fail-closed is exercised instead)",
+    "real device media grant, camera stream and target-board integration",
+    "Host #88 policy engine, App #30 native Enable producer, Host #91/App #27 live producers (fixture answers UNAVAILABLE)"
+  ],
+  "protocol": "ne301.sidecar.bridge.v1"
+}

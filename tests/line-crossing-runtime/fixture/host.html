@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ne301 Host admin bridge fixture</title>
+  </head>
+  <body>
+    <iframe id="appFrame" title="Signed counting App under bridge" sandbox="allow-scripts allow-same-origin"></iframe>
+    <iframe id="attackFrame" title="Hostile sibling iframe" src="about:blank"></iframe>
+    <script type="module" src="./host-broker.js"></script>
+  </body>
+</html>
