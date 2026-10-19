@@ -28,8 +28,8 @@ static int read_file(const char *path, uint8_t **data, size_t *len)
         free(buf);
         return -1;
     }
-    *data = buf;
-    *len = (size_t)end;
+    data[0] = buf;
+    len[0] = (size_t)end;
     return 0;
 }
 

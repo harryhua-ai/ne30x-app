@@ -201,8 +201,10 @@ def compile_host_runner(host_root: Path, app_runner: Path, work: Path):
     show(cc + flags + ["-c", str(app_runner), "-o", str(runner_obj)], cwd=source_root)
     library_objects = sorted(path for path in build_dir.glob("*.o") if path != runner_obj)
     parser_objects = [test_dir / "app_admission.o", test_dir / "generic_math.o"]
-    show(cc + flags + ["-o", str(runner_bin), str(runner_obj),
-                       *map(str, parser_objects), *map(str, library_objects)], cwd=source_root)
+    link_command = cc + flags + ["-o", str(runner_bin), str(runner_obj)]
+    link_command += [str(path) for path in parser_objects]
+    link_command += [str(path) for path in library_objects]
+    show(link_command, cwd=source_root)
     return runner_bin
 
 
