@@ -7,3 +7,4 @@
 - golden TBS sha256: 581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095
 - golden signer: PUBLIC d=1 test scalar, SPKI sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3
 - boundary: offline vector evidence only (see report.json)
+
