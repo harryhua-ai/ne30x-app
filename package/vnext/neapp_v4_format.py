@@ -657,40 +657,40 @@ def default_policy() -> DevicePolicyV4:
 
 def build_function_table_v4(pointers: list[int]) -> bytes:
     if len(pointers) != len(V4_FUNCTION_NAMES):
-        raise BadPackage(
+        raise AbiIncompatible(
             f"v4 function table needs exactly {len(V4_FUNCTION_NAMES)} pointers, got {len(pointers)}"
         )
     out = bytearray(V4_TABLE_SIZE)
     struct.pack_into("<II", out, 0, V4_TABLE_SIZE, HOST_ABI_V4)
     for offset, pointer in zip(V4_TABLE_POINTER_OFFSETS, pointers):
         if not 0 <= pointer <= 0xFFFFFFFF:
-            raise BadPackage(f"function pointer {pointer:#x} does not fit u32")
+            raise AbiIncompatible(f"function pointer {pointer:#x} does not fit u32")
         if not pointer & 1:
-            raise BadPackage(f"function pointer {pointer:#x} is not Thumb (bit0 must be 1)")
+            raise AbiIncompatible(f"function pointer {pointer:#x} is not Thumb (bit0 must be 1)")
         struct.pack_into("<I", out, offset, pointer)
     return bytes(out)
 
 
 def parse_function_table_v4(raw: bytes) -> list[int]:
     if len(raw) != V4_TABLE_SIZE:
-        raise BadPackage(
+        raise AbiIncompatible(
             f"v4 function table is {len(raw)} bytes, exactly {V4_TABLE_SIZE} required "
             "(a 60B v3 table is foreign input and must not be reinterpreted)"
         )
     table_size, abi_version = struct.unpack_from("<II", raw, 0)
     if table_size != V4_TABLE_SIZE:
-        raise BadPackage(f"v4 table_size is {table_size}, must be {V4_TABLE_SIZE}")
+        raise AbiIncompatible(f"v4 table_size is {table_size}, must be {V4_TABLE_SIZE}")
     if abi_version != HOST_ABI_V4:
-        raise BadPackage(
+        raise AbiIncompatible(
             f"v4 function table abi_version is {abi_version:#010x}, "
             f"must be {HOST_ABI_V4:#010x}"
         )
     pointers = [struct.unpack_from("<I", raw, off)[0] for off in V4_TABLE_POINTER_OFFSETS]
     for name, pointer in zip(V4_FUNCTION_NAMES, pointers):
         if not pointer:
-            raise BadPackage(f"v4 function table entry {name} is a null pointer")
+            raise AbiIncompatible(f"v4 function table entry {name} is a null pointer")
         if not pointer & 1:
-            raise BadPackage(f"v4 function table entry {name} is not Thumb (bit0 must be 1)")
+            raise AbiIncompatible(f"v4 function table entry {name} is not Thumb (bit0 must be 1)")
     return pointers
 
 

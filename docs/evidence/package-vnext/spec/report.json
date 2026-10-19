@@ -158,9 +158,9 @@
     },
     {
       "name": "manifest.abi_0x00030000_rejected",
-      "expected": "ABI_INCOMPATIBLE",
+      "expected": "BAD_PACKAGE",
       "ok": true,
-      "detail": "required_host_abi 0x00030000 != 0x00040000",
+      "detail": "required_host_abi 0x00030000 != 0x00040000 (format invariant)",
       "evidence": {}
     },
     {
@@ -312,9 +312,9 @@
     },
     {
       "name": "native.native_file_len_over_cap_rejected",
-      "expected": "RESOURCE_LIMIT",
+      "expected": "BAD_PACKAGE",
       "ok": true,
-      "detail": "native_file_len 2097153 over cap",
+      "detail": "native_file_len 2097153 over the v4 cap",
       "evidence": {}
     },
     {
@@ -326,7 +326,7 @@
     },
     {
       "name": "native.abi_0x00030000_rejected",
-      "expected": "ABI_INCOMPATIBLE",
+      "expected": "BAD_PACKAGE",
       "ok": true,
       "detail": "native abi_version 0x00030000 != 0x00040000 (v1/v2/v3 native ABI semantics are never back-filled)",
       "evidence": {}

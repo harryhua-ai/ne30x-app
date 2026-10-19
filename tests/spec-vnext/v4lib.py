@@ -451,7 +451,7 @@ def validate_native_image_v4(image, manifest=None):
         raise SpecViolation("BAD_PACKAGE", "native reserved0 not zero")
     if native["abi_version"] != ABI_V4:
         raise SpecViolation(
-            "ABI_INCOMPATIBLE",
+            "BAD_PACKAGE",
             f"native abi_version {native['abi_version']:#010x} != {ABI_V4:#010x} "
             "(v1/v2/v3 native ABI semantics are never back-filled)")
     if native["image_size"] != len(image) - NATIVE_HEADER_SIZE:
@@ -589,7 +589,7 @@ def parse_manifest_v4(raw):
     abi = struct.unpack_from("<I", raw, 68)[0]
     if abi != ABI_V4:
         raise SpecViolation(
-            "ABI_INCOMPATIBLE", f"required_host_abi {abi:#010x} != {ABI_V4:#010x}")
+            "BAD_PACKAGE", f"required_host_abi {abi:#010x} != {ABI_V4:#010x} (format invariant)")
     _check_identifier_slot("publisher_id", raw[4:20])
     _check_identifier_slot("app_id", raw[20:52])
     (board, psram, _abi, caps, exec_region, file_len, image_size, entry, target) = (
@@ -651,7 +651,7 @@ def verify_package_v4(data, trust, host_caps_provided=None, policy=None):
     if native_len < NATIVE_HEADER_SIZE:
         raise SpecViolation("BAD_PACKAGE", "native_file_len cannot hold the 32B header")
     if native_len > MAX_NATIVE_FILE_LEN:
-        raise SpecViolation("RESOURCE_LIMIT", f"native_file_len {native_len} over cap")
+        raise SpecViolation("BAD_PACKAGE", f"native_file_len {native_len} over the v4 cap")
     signed_len = 224 + native_len
     if len(data) < signed_len:
         raise SpecViolation("BAD_PACKAGE", "file truncated before the signed region")
@@ -659,7 +659,7 @@ def verify_package_v4(data, trust, host_caps_provided=None, policy=None):
     if not DER_SIG_MIN <= len(sig) <= DER_SIG_MAX:
         raise SpecViolation("BAD_PACKAGE", f"signature segment {len(sig)}B outside 8..72")
     if signed_len + len(sig) > MAX_PACKAGE_LEN_V4:
-        raise SpecViolation("RESOURCE_LIMIT", "package over the v4 cap")
+        raise SpecViolation("BAD_PACKAGE", "package over the v4 cap")
     tbs = data[:signed_len]
 
     r, s = decode_strict_der_sig(sig)

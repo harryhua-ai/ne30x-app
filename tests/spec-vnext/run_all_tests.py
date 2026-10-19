@@ -223,7 +223,7 @@ def main():
         raw = bytearray(manifest)
         struct.pack_into("<I", raw, 68, V.ABI_V3)
         V.parse_manifest_v4(bytes(raw))
-    expect_rejection("manifest.abi_0x00030000_rejected", abi_v3_in_manifest, "ABI_INCOMPATIBLE")
+    expect_rejection("manifest.abi_0x00030000_rejected", abi_v3_in_manifest, "BAD_PACKAGE")
 
     def bad_identifier():
         raw = bytearray(manifest)
@@ -386,7 +386,7 @@ def main():
         struct.pack_into("<I", blob, 12, V.MAX_NATIVE_FILE_LEN + 1)
         V.verify_package_v4(bytes(blob) + der, TRUST)
     expect_rejection("native.native_file_len_over_cap_rejected",
-                     native_over_cap, "RESOURCE_LIMIT")
+                     native_over_cap, "BAD_PACKAGE")
 
     def native_crc_flip():
         bad_native = bytearray(native)
@@ -400,7 +400,7 @@ def main():
         struct.pack_into("<I", bad_native, 8, V.ABI_V3)
         blob = V.build_container_prefix_v4(manifest, bytes(bad_native))
         V.verify_package_v4(blob + V.sign_der(D_GOLDEN, blob), TRUST)
-    expect_rejection("native.abi_0x00030000_rejected", native_abi_v3, "ABI_INCOMPATIBLE")
+    expect_rejection("native.abi_0x00030000_rejected", native_abi_v3, "BAD_PACKAGE")
 
     def native_odd_entry():
         bad_native = bytearray(native)

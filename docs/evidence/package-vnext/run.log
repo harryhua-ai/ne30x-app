@@ -1,0 +1,117 @@
+
+== [0/8] preflight
+python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2
+
+== [1/8] frozen vector suites UNCHANGED (spec-v2, spec-v3) + vNext spec suite
+spec-v2 suite: PASS (committed evidence byte-identical)
+spec-v3 suite: PASS (committed evidence byte-identical)
+spec-vnext: 117/117 vectors passed
+spec-vnext suite: PASS (committed evidence byte-identical)
+
+== [2/8] NON-PRODUCTION v4 test identities (PUBLIC d=1 golden signer + d=2)
+d=1 identity materialized (PUBLIC, NON-PRODUCTION): publisher 'test-publisher', SPKI sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3
+d=2 identity materialized (PUBLIC, NON-PRODUCTION): publisher 'dev-publisher', SPKI sha256 dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba
+trust stores -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/trust-d1.json, /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/trust-both.json
+
+== [3/8] legacy package tools zero-degradation reproduction (UNMODIFIED v1/v2/v3)
+v2 test image -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/img/lc-v2-image.bin
+  bytes    36 (32B NEA1 header + 4B payload)
+  abi      0x00020000  target 0x93e00000  entry 0x0  crc32 0xde8e3439
+  sha256   9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095
+v2 replica TBS byte-identical to committed #12 golden (the v2 packer signs with random k; the TBS is the pinned identity)
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/golden-replica.neapp.v2
+v2 golden replica verified PASS (unmodified neapp_verify_v2)
+v3 replica byte-identical to committed #19 golden (packer+verifier zero degradation)
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/golden-replica.neapp.v3
+v3 golden replica verified PASS (unmodified neapp_verify_v3)
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/docs/evidence/spec-v2/v1-golden.neapp
+committed v1 golden verified PASS (unmodified neapp_verify)
+
+== [4/8] controlled v4 native images
+golden image sha256 845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1 (pinned), alt image sha256 6ddb0f16c2fada225fa3504f87d76dae25a333f4b2feb8853ece8c390ef27498
+
+== [5/8] golden replica pack (d=1) — must equal the independent spec-vnext golden
+golden replica: TBS sha 581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095
+golden replica: package sha e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e (394B, byte-identical to the independent stdlib implementation)
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/golden-replica.neapp.v4
+{"app_id": "line-crossing", "app_version": "4.0.0", "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence", "content_identity_sha256": "581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095", "control_max": 256, "event_max": 2048, "format": "neapp-v4", "live_publish_max": 1168, "live_track_max": 8, "native_crc32": "0x990997a2", "native_entry_offset": "0x40", "native_file_len": 100, "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1", "native_image_size": 68, "native_target_addr": "0x93e00000", "package_sha256": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e", "publisher_id": "test-publisher", "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3", "report_max": 6144, "required_exec_region_bytes": 68, "required_host_abi": "0x00040000", "required_host_caps": "0x3ff", "required_psram_mib": 64, "result": "PASS", "run_profile": 3, "signature_len": 70, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 324}
+golden replica verified PASS (independent v4 verifier path)
+
+== [6/8] dev-key v4 packages (d=2 cross-publisher; new-capability shapes)
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/lc-test-app-4.0.0.neapp.v4
+packed+verified lc-test-app-4.0.0.neapp.v4 sha256 92308f4781d5523f09f4902fe363c98b8a22fb63c2df212753b85579f2320b7b
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/lc-test-app-4.1.0.neapp.v4
+packed+verified lc-test-app-4.1.0.neapp.v4 sha256 f0ec52a358468e0c37b17b161a18670a75362d1a1f393b641d654f6e554f6253
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/lc-v4-alt-4.0.0.neapp.v4
+packed+verified lc-v4-alt-4.0.0.neapp.v4 sha256 381131a3f641be80ed882f029f35ec3ee2e481b5437f61df1237729052cff448
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/lc-test-app-enable-4.0.0.neapp.v4
+packed+verified lc-test-app-enable-4.0.0.neapp.v4 sha256 1d6356272535efc854eb968ea23f694144b111ab1830137a81d7dad7461c75a7
+VERIFIED: PASS — /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/lc-test-app-live-4.0.0.neapp.v4
+packed+verified lc-test-app-live-4.0.0.neapp.v4 sha256 ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2
+
+== [7/8] rejection matrix + cross-major fail-closed
+== container/length negatives
+  PASS cross.v3_magic_rejected_by_v4_verifier:
+  PASS container.manifest_len_192_rejected:
+  PASS container.native_file_len_31_rejected:
+  PASS container.native_file_len_over_cap_rejected:
+  PASS container.truncated_rejected:
+  PASS container.trailing_byte_rejected:
+== manifest negatives (re-signed so the rule under test fires)
+  PASS manifest.magic_nmf3_rejected:
+  PASS manifest.reserved_58_59_rejected:
+  PASS manifest.reserved_192_207_rejected:
+  PASS manifest.abi_0x00030000_rejected:
+  PASS manifest.identifier_charset_rejected:
+  PASS manifest.caps_bit10_unknown_rejected:
+  PASS manifest.bit8_without_bit4_rejected:
+  PASS manifest.bit9_live_publish_max_311_rejected:
+  PASS manifest.bit9_live_track_max_0_rejected:
+  PASS manifest.bit9_live_track_max_65_rejected:
+  PASS manifest.bit9_track64_below_9008_closure_rejected:
+  PASS manifest.no_bit9_with_live_publish_max_rejected:
+  PASS manifest.v3_profile_2_rejected:
+  PASS manifest.event_max_without_bit2_rejected:
+  PASS manifest.control_max_31_rejected:
+== native negatives
+  PASS native.crc_mismatch_rejected:
+  PASS native.abi_0x00030000_rejected:
+  PASS native.reserved0_nonzero_rejected:
+  PASS native.format_version_2_rejected:
+  PASS native.header_size_31_rejected:
+  PASS native.odd_thumb_entry_rejected:
+== trust and signature negatives
+  PASS trust.fingerprint_mismatch_rejected:
+  PASS trust.unknown_publisher_rejected:
+  PASS trust.local_trust_mapping_decides:
+  PASS sig.tbs_mutation_without_resign_rejected:
+  PASS sig.signature_flip_rejected:
+== packer fail-closed refusals
+  PASS pack.caps_bit10_refused:
+  PASS pack.bit8_without_bit4_refused:
+  PASS pack.bit9_without_bit5_refused:
+  PASS pack.bit9_track64_below_closure_refused:
+  PASS pack.live_quota_without_bit9_refused:
+  PASS pack.board_override_refused:
+  PASS pack.psram_override_refused:
+  PASS pack.v3_abi_image_refused:
+  PASS pack.wrong_target_image_refused:
+  PASS pack.broken_crc_image_refused:
+  PASS admission.host_without_bit9_refuses_emit:
+  PASS admission.live_capacity_below_declaration_refuses_emit:
+== cross-major matrix (unmodified old tools)
+  PASS old.v1_verifier_rejects_v4_package:
+  PASS old.v2_verifier_rejects_v4_package:
+  PASS old.v3_verifier_rejects_v4_package:
+  PASS new.v4_verifier_rejects_committed_v3_golden:
+  PASS new.v4_verifier_rejects_committed_v2_golden:
+  PASS new.v4_verifier_rejects_committed_v1_golden:
+v4_cases: 50/50 cases passed
+
+== [8/8] structured evidence
+evidence -> /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/docs/evidence/package-vnext/artifacts.json
+
+== ALL PACKAGE-VNEXT CHECKS PASSED
+golden replica /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/pkg/golden-replica.neapp.v4
+  sha256 e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e
+evidence log   /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/docs/evidence/package-vnext/run.log
