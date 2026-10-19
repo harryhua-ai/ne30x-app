@@ -1,0 +1,196 @@
+{
+  "app_base_sha": "71f1850063f022b86f3b027e27eaabb992de60b0",
+  "app_candidate_sha": "76cf1fccd49e8911f4fa385e90e582a44bdd2b29",
+  "goldens": {
+    "enable": {
+      "bytes": 395,
+      "file": "docs/evidence/package-vnext/spec/app-pr37/enable.neapp.v4",
+      "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "package_hex": "4e45415050040000d0000000640000004e4d46346465762d7075626c69736865720000006c632d746573742d617070000000000000000000000000000000000000000000040000000000000010300000400000000000040073010000440000006400000044000000400000000000e093845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba0300000000000000001000000000000000010000000000000000000000000000000000000000000000000000000000004e45413120000100000004000000e093440000004000000000000000a297099940000000000004000100e0930500e0930900e0930d00e0931100e0931500e0931900e0931d00e0932100e0932500e0932900e0932d00e0933100e0933500e0930020704730450220666e8a8da6e80cee93a0b38d5ffa887a3542ea84dd94e0e69b0ad1bb6dad5d7d022100b6b5a1af20ab5c1b1aefb2d38de85ab6922522adb96a2c23dd9aaf3ffe9d3f76",
+      "package_sha256": "1d6356272535efc854eb968ea23f694144b111ab1830137a81d7dad7461c75a7",
+      "publisher_id": "dev-publisher",
+      "publisher_spki_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+      "quotas": {
+        "control_max": 256,
+        "event_max": 0,
+        "live_publish_max": 0,
+        "live_track_max": 0,
+        "report_max": 0,
+        "snapshot_max": 0,
+        "state_quota": 4096
+      },
+      "required_host_caps": "0x173",
+      "run_profile": 3,
+      "signature_len": 71,
+      "tbs_sha256": "26df9606642ae23fe14ca570e8ad5c3b88097a1e8d88a18008dae7e0b40127f4"
+    },
+    "live-only": {
+      "bytes": 394,
+      "file": "docs/evidence/package-vnext/spec/app-pr37/live-only.neapp.v4",
+      "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "package_hex": "4e45415050040000d0000000640000004e4d46346465762d7075626c69736865720000006c632d746573742d617070000000000000000000000000000000000000000000040000000000000010300000400000000000040023020000440000006400000044000000400000000000e093845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba0300000000000000000000000000000000000000000000003023000040000000000000000000000000000000000000004e45413120000100000004000000e093440000004000000000000000a297099940000000000004000100e0930500e0930900e0930d00e0931100e0931500e0931900e0931d00e0932100e0932500e0932900e0932d00e0933100e0933500e09300207047304402201846c00ca561036755ed3d52645e946cb51c576bc058ede8a8a7b79b9a44f3f602205a111b57ce49901379c3acc6ff04790979a7fecda0da04973e923dc451fdf293",
+      "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "publisher_id": "dev-publisher",
+      "publisher_spki_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+      "quotas": {
+        "control_max": 0,
+        "event_max": 0,
+        "live_publish_max": 9008,
+        "live_track_max": 64,
+        "report_max": 0,
+        "snapshot_max": 0,
+        "state_quota": 0
+      },
+      "required_host_caps": "0x223",
+      "run_profile": 3,
+      "signature_len": 70,
+      "tbs_sha256": "5c61a2522b566af23f46d56cdb6ba82db11a663a2ff6bde7c86fc5981e78111c"
+    }
+  },
+  "host_integration_suite": {
+    "checks": 77,
+    "evidence": "pinned Host app_native_vnext suite, with App golden fixtures injected in temporary archive",
+    "failures": 0
+  },
+  "host_parser_sha": "f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1",
+  "host_parser_sources": {
+    "Custom/Services/AppHost/app_admission.c": "1e4a7c995bd0afbb8706847a57035ebd91301554",
+    "Custom/Services/AppHost/app_admission.h": "77ae3e79fb10da205ad4ec689832221f028c25cc",
+    "Custom/Services/AppHost/app_host_session.c": "6fce745425ce594e7b0fdcff4fc3464ceeafc98b",
+    "tests/app_admission/gen_v4_vectors.py": "ca812c28aac8964cad0f1e56d8e44a816a25de5f",
+    "tests/app_host_session/Makefile": "fc581066ed389a5b9791217a91be4ef8c634ee00",
+    "tests/app_host_session/test_app_host_session.c": "53cc4c713f0edd8e81a6bf9de874008ef1a6dc53",
+    "tests/app_native_vnext/Makefile": "cedaa62f19155a20530ddf6459d07ba91602525a",
+    "tests/app_native_vnext/test_app_native_vnext.c": "73ca77a52b08df90c590d1c98c7d3cc3284fb579"
+  },
+  "host_session_suite": {
+    "checks": 592,
+    "evidence": "pinned Host app_host_session C suite",
+    "failures": 0,
+    "runtime_live_publish": "APP_SESSION_ERR_UNAVAILABLE",
+    "source": "Custom/Services/AppHost/app_host_session.c",
+    "source_blob": "6fce745425ce594e7b0fdcff4fc3464ceeafc98b"
+  },
+  "joint_matrix": [
+    {
+      "app_result": "PASS",
+      "case": "live-only",
+      "digest_and_caps_match": true,
+      "expected": "PASS",
+      "host_result": "PASS",
+      "image_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "pass": true,
+      "publisher_spki_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+      "required_host_caps": "0x00000223",
+      "same_category": true,
+      "tbs_sha256": "5c61a2522b566af23f46d56cdb6ba82db11a663a2ff6bde7c86fc5981e78111c"
+    },
+    {
+      "app_result": "PASS",
+      "case": "enable",
+      "digest_and_caps_match": true,
+      "expected": "PASS",
+      "host_result": "PASS",
+      "image_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "package_sha256": "1d6356272535efc854eb968ea23f694144b111ab1830137a81d7dad7461c75a7",
+      "pass": true,
+      "publisher_spki_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+      "required_host_caps": "0x00000173",
+      "same_category": true,
+      "tbs_sha256": "26df9606642ae23fe14ca570e8ad5c3b88097a1e8d88a18008dae7e0b40127f4"
+    },
+    {
+      "app_result": "SIGNATURE_INVALID",
+      "case": "tbs-tamper",
+      "expected": "SIGNATURE_INVALID",
+      "host_result": "SIGNATURE_INVALID",
+      "package_sha256": "665aac288b3cd472c8927026c840880e15e0f6fb98bc1151b9551307a6962bc3",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "SIGNATURE_INVALID",
+      "case": "signature-tamper",
+      "expected": "SIGNATURE_INVALID",
+      "host_result": "SIGNATURE_INVALID",
+      "package_sha256": "de9ceea38eeb8843fec521703e927a8d34552b7bbe2eefaaa4af48797c21890d",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "BAD_PACKAGE",
+      "case": "unsigned",
+      "expected": "BAD_PACKAGE",
+      "host_result": "BAD_PACKAGE",
+      "package_sha256": "5c61a2522b566af23f46d56cdb6ba82db11a663a2ff6bde7c86fc5981e78111c",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "BAD_PACKAGE",
+      "case": "cross-major",
+      "expected": "BAD_PACKAGE",
+      "host_result": "BAD_PACKAGE",
+      "package_sha256": "75fdf7dd79453c589798c6c1201b54ae7241ba04bcb1036eaf40643474140e81",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "PUBLISHER_UNTRUSTED",
+      "case": "wrong-spki",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "host_result": "PUBLISHER_UNTRUSTED",
+      "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "PUBLISHER_UNTRUSTED",
+      "case": "wrong-owner",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "host_result": "PUBLISHER_UNTRUSTED",
+      "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "BAD_PACKAGE",
+      "case": "enable-missing-bit6",
+      "expected": "BAD_PACKAGE",
+      "host_result": "BAD_PACKAGE",
+      "package_sha256": "68a51c75de2c09cb27a64bfa248fe9888be23ed5d8c958fe1eae18d4188fe1a4",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "RESOURCE_LIMIT",
+      "case": "live-closure",
+      "expected": "RESOURCE_LIMIT",
+      "host_result": "RESOURCE_LIMIT",
+      "package_sha256": "4e9884953165d2eb17387796e708f6e596faf65301c6112242f6a4e9502a4a47",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "ABI_INCOMPATIBLE",
+      "case": "host-live-capability-denied",
+      "expected": "ABI_INCOMPATIBLE",
+      "host_result": "ABI_INCOMPATIBLE",
+      "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "pass": true,
+      "same_category": true
+    },
+    {
+      "app_result": "RESOURCE_LIMIT",
+      "case": "exec-region-floor",
+      "expected": "RESOURCE_LIMIT",
+      "host_result": "RESOURCE_LIMIT",
+      "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "pass": true,
+      "same_category": true
+    }
+  ],
+  "production_keys_device_arm_install_network": "NOT_RUN",
+  "runtime_live_authorization": "APP_SESSION_ERR_UNAVAILABLE; Host #91 producer-ingest is not implemented"
+}
