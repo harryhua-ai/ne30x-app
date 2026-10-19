@@ -7,7 +7,7 @@
  "claimed_at": "2026-10-19T05:13:39Z",
  "lease_expires_at": "2026-10-19T07:01:09Z",
  "execution_base": "1f48bdd5a78e789e2a2bd62a3ce460eda9292a10",
- "status": "active",
+ "status": "delivered",
  "branch": "agent/30/cab8a664",
  "heartbeat_at": "2026-10-19T06:55:09Z",
  "supersedes": null,
@@ -59,5 +59,12 @@
   "sha": "85e3d4a46b8b4c53a63fac3405b91efb084a3f8a",
   "note": "r2 continuation of prior reviewed Candidate 1a8323a5cc14ddedb1f0ba015600390814feea2e (REQUEST_CHANGES, PR#38 comment 2026-10-19T06:09:25Z) -> current Candidate 85e3d4a46b8b4c53a63fac3405b91efb084a3f8a. Adds the source-pinned cross-owner AC4 matrix: Host dc0948c1e12e954612fbfa9769434bf01e449c3c floor/installer/control sources linked with App schema3/CAS/receipt. Four classes: (1) current-session Paused floor-before-write + ENR1 APPLIED component PASS; (2) Host precommit failure characterized, exact source gap reported with post-merge A-owned gate request; (3) App CAS conflict/torn/lost reply: no optimistic APPLIED, no partial report; (4) changed signer/TBS/generation, persisted-floor v3 rollback DOWNGRADE_REFUSED, confirmed-uninstall retirement via pinned Host suites (77+592 checks). Full production Host-to-App interlock remains NOT_RUN pending A classification; no mock floor, no relaxed semantics.",
   "delivered_at": "2026-10-19T06:56:14Z"
+ },
+ "completed": {
+  "pr": 38,
+  "merge_commit": "a1b93322ae010356a6293421a137564fc0e23664",
+  "candidate_sha": "85e3d4a46b8b4c53a63fac3405b91efb084a3f8a",
+  "completed_by": "ght-complete-workflow",
+  "completed_at": "2026-10-19T07:10:02Z"
  }
 }
