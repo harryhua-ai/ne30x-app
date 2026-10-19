@@ -1,0 +1,839 @@
+{
+  "suite": "tests/spec-vnext/run_all_tests.py",
+  "issue": "harryhua-ai/ne30x-app#36",
+  "spec_authority": [
+    "harryhua-ai/ne301#104 comment 6258534821 (F1-F4)",
+    "harryhua-ai/ne301#104 comment 6258601629 (F5-F7)",
+    "harryhua-ai/ne301#104 comment 6258637748 (F8-F10)"
+  ],
+  "vectors_total": 117,
+  "vectors_passed": 117,
+  "vectors_failed": 0,
+  "independence": "v4lib.py shares no code with package/ (v1/v2/v3/v4 tooling) or tests/spec-v2//tests/spec-v3/; P-256/RFC-6979/DER implemented from scratch",
+  "signer": {
+    "scalar": "d=1 (PUBLIC non-production test key, never a production trust root)",
+    "spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3"
+  },
+  "boundary": "offline vector evidence only: NOT Host admission, native runtime admission, device capacity, floor/Enable semantics, live delivery, or ARM build proof",
+  "vectors": [
+    {
+      "name": "golden.spki_sha256",
+      "expected": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+      "ok": true,
+      "detail": "PUBLIC non-production d=1 test signer (same scalar as the v1/v2/v3 goldens)",
+      "evidence": {}
+    },
+    {
+      "name": "golden.native_sha256",
+      "expected": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "ok": true,
+      "detail": "100B controlled v4 image (64B function table + Thumb stub)",
+      "evidence": {}
+    },
+    {
+      "name": "golden.native_crc32",
+      "expected": "0x990997a2",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "golden.tbs_sha256",
+      "expected": "581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095",
+      "ok": true,
+      "detail": "TBS = file[0:324] (224 + native_file_len); key-independent",
+      "evidence": {}
+    },
+    {
+      "name": "golden.der",
+      "expected": "3044022072d7b4a00660b66c7df38bff0c1dcab29c877462ed66d34ce18f7dda6a2f5d9302205ef31b0cad9d64bbef71df47e53177de80f69218834e0971b496b8b1eb593aae",
+      "ok": true,
+      "detail": "strict-DER RFC-6979 d=1 over SHA-256(TBS), 70B",
+      "evidence": {}
+    },
+    {
+      "name": "golden.package_sha256",
+      "expected": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e",
+      "ok": true,
+      "detail": "394B = 324B TBS + 70B DER",
+      "evidence": {}
+    },
+    {
+      "name": "golden.verify_accept",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "golden.openssl_cross_verify",
+      "expected": "Verified OK",
+      "ok": true,
+      "detail": "OpenSSL CLI verifies the pure-Python RFC-6979 signature over the exact TBS",
+      "evidence": {}
+    },
+    {
+      "name": "cross.rfc6979_cryptography_der_identity",
+      "expected": "3044022072d7b4a00660b66c7df38bff0c1dcab29c877462ed66d34ce18f7dda6a2f5d9302205ef31b0cad9d64bbef71df47e53177de80f69218834e0971b496b8b1eb593aae",
+      "ok": true,
+      "detail": "the cryptography-library deterministic signer and the pure-Python RFC-6979 produce the same k and therefore byte-identical DER for d=1",
+      "evidence": {}
+    },
+    {
+      "name": "sig.tbs_flip_rejected",
+      "expected": "SIGNATURE_INVALID",
+      "ok": true,
+      "detail": "signature does not verify over a flipped TBS byte",
+      "evidence": {}
+    },
+    {
+      "name": "sig.wrong_key_rejected",
+      "expected": "SIGNATURE_INVALID",
+      "ok": true,
+      "detail": "ECDSA P-256/SHA-256 failed over the exact TBS",
+      "evidence": {}
+    },
+    {
+      "name": "container.v3_magic_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic is not NEAPP v4; v1/v2/v3 majors are foreign input",
+      "evidence": {}
+    },
+    {
+      "name": "container.v2_magic_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic is not NEAPP v4; v1/v2/v3 majors are foreign input",
+      "evidence": {}
+    },
+    {
+      "name": "container.v1_magic_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic is not NEAPP v4; v1/v2/v3 majors are foreign input",
+      "evidence": {}
+    },
+    {
+      "name": "container.random_magic_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "container magic is not NEAPP v4; v1/v2/v3 majors are foreign input",
+      "evidence": {}
+    },
+    {
+      "name": "container.committed_v3_golden_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "committed #19 v3 golden (314B) is foreign input to v4",
+      "evidence": {}
+    },
+    {
+      "name": "container.manifest_len_192_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest_len 192 != 208",
+      "evidence": {}
+    },
+    {
+      "name": "manifest.nmf3_in_v4_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest magic b'NMF3' != NMF4 (a v3 NMF3 manifest is foreign input)",
+      "evidence": {}
+    },
+    {
+      "name": "manifest.reserved_58_59_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "reserved [58..59] not zero",
+      "evidence": {}
+    },
+    {
+      "name": "manifest.reserved_192_207_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "reserved [192..207] not zero",
+      "evidence": {}
+    },
+    {
+      "name": "manifest.abi_0x00030000_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "required_host_abi 0x00030000 != 0x00040000",
+      "evidence": {}
+    },
+    {
+      "name": "manifest.identifier_charset_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "publisher_id: identifier charset: 'Aest-publisher'",
+      "evidence": {}
+    },
+    {
+      "name": "manifest.identifier_embedded_nul_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "manifest is 232B, exactly 208 required",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit10_unknown_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "unknown capability bits 0x400",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit8_without_bit4_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "state_quota set without app_state (bit4)",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit9_without_bit5_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "v4 profile 3 requires session_lifecycle (bit5)",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit9_live_publish_max_311_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "live_publish_max 311 < 312",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit9_live_track_max_0_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live_track_max 0 outside 1..64",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit9_live_track_max_65_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live_track_max 65 outside 1..64",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit9_track64_needs_9008_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "live_track_max=64 requires live_publish_max >= 9008 (F9 closure)",
+      "evidence": {}
+    },
+    {
+      "name": "caps.bit9_track64_9008_accepted",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "live_track_max=64 with exactly the 9008B closure bound passes",
+      "evidence": {}
+    },
+    {
+      "name": "caps.no_bit9_live_quotas_must_be_zero_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live quotas must be 0 without LIVE_PUBLISH (bit9)",
+      "evidence": {}
+    },
+    {
+      "name": "profile.v3_profile_2_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "unknown run_profile 2 (v4 pins 3)",
+      "evidence": {}
+    },
+    {
+      "name": "quota.event_max_without_bit2_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "event_max set without ai_events (bit2)",
+      "evidence": {}
+    },
+    {
+      "name": "quota.control_max_31_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "control_max 31 below the generic 32B control-wire minimum",
+      "evidence": {}
+    },
+    {
+      "name": "trust.unknown_publisher_rejected",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "ok": true,
+      "detail": "publisher 'test-publisher' not in the local trust mapping (package keys never self-trust)",
+      "evidence": {}
+    },
+    {
+      "name": "trust.fingerprint_mismatch_rejected",
+      "expected": "PUBLISHER_UNTRUSTED",
+      "ok": true,
+      "detail": "package-carried/foreign key never self-trusts via the manifest field",
+      "evidence": {}
+    },
+    {
+      "name": "der.trailing_byte_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "DER SEQUENCE length not minimal/exact",
+      "evidence": {}
+    },
+    {
+      "name": "der.truncated_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "DER SEQUENCE length not minimal/exact",
+      "evidence": {}
+    },
+    {
+      "name": "der.nonminimal_integer_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "DER INTEGER not minimal",
+      "evidence": {}
+    },
+    {
+      "name": "der.negative_integer_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "DER INTEGER negative",
+      "evidence": {}
+    },
+    {
+      "name": "native.native_file_len_31_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "native_file_len cannot hold the 32B header",
+      "evidence": {}
+    },
+    {
+      "name": "native.native_file_len_over_cap_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "native_file_len 2097153 over cap",
+      "evidence": {}
+    },
+    {
+      "name": "native.crc_mismatch_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "native payload CRC-32 mismatch",
+      "evidence": {}
+    },
+    {
+      "name": "native.abi_0x00030000_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "native abi_version 0x00030000 != 0x00040000 (v1/v2/v3 native ABI semantics are never back-filled)",
+      "evidence": {}
+    },
+    {
+      "name": "native.odd_entry_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "native reserved0 not zero",
+      "evidence": {}
+    },
+    {
+      "name": "table.default_14_thumb_pointers",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "table.v3_60B_table_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "a 60B v3 table (or any non-64B table) is foreign input",
+      "evidence": {}
+    },
+    {
+      "name": "table.abi_0x00030000_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "table abi_version 0x00030000 != 0x00040000",
+      "evidence": {}
+    },
+    {
+      "name": "table.non_thumb_live_publish_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "live_publish pointer not Thumb",
+      "evidence": {}
+    },
+    {
+      "name": "table.null_pointer_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "null pointer for log",
+      "evidence": {}
+    },
+    {
+      "name": "admission.full_caps_accepted",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "admission.host_without_bit9_rejected",
+      "expected": "ABI_INCOMPATIBLE",
+      "ok": true,
+      "detail": "missing Host implementation means UNAVAILABLE, never downgraded",
+      "evidence": {}
+    },
+    {
+      "name": "admission.live_capacity_refused_whole",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "live_publish_max over Host live capacity; the capability is refused whole rather than degraded",
+      "evidence": {}
+    },
+    {
+      "name": "admission.board_mismatch_rejected",
+      "expected": "TARGET_INCOMPATIBLE",
+      "ok": true,
+      "detail": "board mismatch",
+      "evidence": {}
+    },
+    {
+      "name": "intrinsic.tier_no_policy_accepted",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "the intrinsic tier alone never claims Host admission",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_sha256",
+      "expected": "ce0976a6f3ce0ce0e3e55592b08d57c3b1e0701d43e31af00a539c8f87d49a98",
+      "ok": true,
+      "detail": "48B ENABLE_SET: 32B NFC4 header + ENB1 payload (desired Enabled, expected rev 5)",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_roundtrip",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_receipt_sha256",
+      "expected": "63db6108b97b719f833cc55c76b8e4eff1a7ce929598823a2c57604f1bc341ed",
+      "ok": true,
+      "detail": "48B ENR1 receipt: status APPLIED, readback revision == header state_revision",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_receipt_roundtrip",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.nfc3_magic_rejected_in_v4_parser",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "a v3 NFC3 message is foreign input and must never be reinterpreted as v4",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_47B_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "total_len 48 != 47",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_zero_session_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "session_generation must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_zero_config_generation_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "config_generation must be the active nonzero generation",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_state_revision_nonzero_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "state_revision must be 0 for ENABLE_SET",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_flags_nonzero_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "flags must be 0 for ENABLE_SET",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_bad_enb1_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "payload magic b'ENB2' != ENB1",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_desired_0_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "desired_state 0 not in (1,2)",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_desired_3_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "desired_state 3 not in (1,2)",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.enable_set_reserved_nonzero_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "payload reserved must be 0",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.receipt_bad_enr1_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "48B receipt payload magic b'ENR2' != ENR1",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.receipt_readback_revision_mismatch_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "readback_state_revision must equal the header state_revision (F5)",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.receipt_effective_state_0_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "effective_state 0 not in (1,2,3)",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.receipt_status_8_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "status 8 outside the known 0..7",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.48B_receipt_without_enr1_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "non-enable receipts are exactly 32B; a 48B receipt must be a valid ENR1",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.dedup_first_execution",
+      "expected": "EXECUTED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.dedup_identical_cached",
+      "expected": "CACHED",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "nfc4.dedup_same_id_different_payload_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "same request_id with a different envelope/payload must be refused",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.event_batch_16_sha256",
+      "expected": "555096fc4935d5cd89ebc5d81cee1a92a30f0312d9d86d7fa4b4a2ccbed360c3",
+      "ok": true,
+      "detail": "max EVENT_BATCH: 48 + 16*16 = 304B (within live_publish_min 312)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.event_batch_roundtrip",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.tracks_snapshot_sha256",
+      "expected": "85bb6baa722e4766b9b9c95e13fe90fbee79e673376a4cd97a90f2cc54ffc6d6",
+      "ok": true,
+      "detail": "ACTIVE_TRACKS_SNAPSHOT: 48 + (12+3*8) + (12+1*8) = 104B, exact closure",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.tracks_snapshot_roundtrip",
+      "expected": "ACCEPT",
+      "ok": true,
+      "detail": "",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.wrong_magic_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live magic b'LVN3' != LVN4",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.kind_3_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live kind 3 not in (1,2)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.total_len_mismatch_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "total_len 303 != 304",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.packet_seq_0_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "packet_seq must be session-nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.reserved_nonzero_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live header reserved must be 0",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.flags_bit3_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "live flags 0x8 use reserved bits 3..31",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.17_events_over_bound_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "17 events over the 16-record bound",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.event_seq_not_strictly_increasing_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "event_seq values must strictly increase within a packet",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.event_seq_over_through_seq_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "event_seq 6 exceeds event_through_seq 5",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.direction_0_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "direction 0 not in (1,2)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.direction_3_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "direction 3 not in (1,2)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.event_flags_reserved_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "event flags use reserved bits",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.packet_over_live_publish_max_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "packet 304B over the signed live_publish_max 303",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.duplicate_track_id_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "duplicate track_id 7",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.track_id_0_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "track_id must be nonzero",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.point_count_17_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "point_count 17 outside 0..16",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.track_state_2_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "track state 2 != 1 (ACTIVE)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.track_flags_nonzero_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "track flags 1 reserved (must be 0)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.trailing_byte_after_records_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "kind2 records must parse to exactly the packet tail",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.tracks_over_signed_max_rejected",
+      "expected": "RESOURCE_LIMIT",
+      "ok": true,
+      "detail": "2 tracks over the bound 1",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.session_first_packet",
+      "expected": "OK",
+      "ok": true,
+      "detail": "an empty batch still carries the watermarks (record_count=0 is not 'no loss')",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.session_packet_replay_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "packet_seq 1 must be exactly 2 in this session (no reuse/wrap)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.session_packet_gap_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "packet_seq 3 must be exactly 2 in this session (no reuse/wrap)",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.session_gap_conservation",
+      "expected": "OK",
+      "ok": true,
+      "detail": "cumulative_source_gap 1 -> 3 and event_total 3 -> 5 move forward monotonically",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.u32_exhaustion_requires_resync_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "u32 cumulative near exhaustion requires explicit RESYNC_REQUIRED, never a silent wrap",
+      "evidence": {}
+    },
+    {
+      "name": "lvn4.unknown_loss_not_precise_gap_rejected",
+      "expected": "BAD_PACKAGE",
+      "ok": true,
+      "detail": "SOURCE_LOSS_UNKNOWN must never be presented as a precise unchanged gap",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-native.bin_pinned",
+      "expected": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "ok": true,
+      "detail": "100B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-tbs.bin_pinned",
+      "expected": "581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095",
+      "ok": true,
+      "detail": "324B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-sig.der_pinned",
+      "expected": "2d6193078887c7eb04e60c19d675b8c3a3370c17754c59edd115e0be6a8ac344",
+      "ok": true,
+      "detail": "70B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden.neapp.v4_pinned",
+      "expected": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e",
+      "ok": true,
+      "detail": "394B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.test-publisher.spki.der_pinned",
+      "expected": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+      "ok": true,
+      "detail": "91B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-nfc4-enable-set.bin_pinned",
+      "expected": "ce0976a6f3ce0ce0e3e55592b08d57c3b1e0701d43e31af00a539c8f87d49a98",
+      "ok": true,
+      "detail": "48B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-nfc4-enable-receipt.bin_pinned",
+      "expected": "63db6108b97b719f833cc55c76b8e4eff1a7ce929598823a2c57604f1bc341ed",
+      "ok": true,
+      "detail": "48B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-lvn4-event-batch.bin_pinned",
+      "expected": "555096fc4935d5cd89ebc5d81cee1a92a30f0312d9d86d7fa4b4a2ccbed360c3",
+      "ok": true,
+      "detail": "304B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    },
+    {
+      "name": "evidence.golden-lvn4-tracks-snapshot.bin_pinned",
+      "expected": "85bb6baa722e4766b9b9c95e13fe90fbee79e673376a4cd97a90f2cc54ffc6d6",
+      "ok": true,
+      "detail": "104B committed artifact reproduces its pinned SHA-256",
+      "evidence": {}
+    }
+  ]
+}
