@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include "lc_app_abi_v3.h"
+#include "lc_app_abi_v4.h"
 #include "lc_bus.h"
 
 #define LC_CTRL_APP_STATE_RUNNING    0u
@@ -25,6 +26,7 @@ typedef struct lc_ctrl_dedup_slot {
     uint32_t result_status;
     uint32_t result_generation;
     uint32_t result_revision;
+    uint32_t result_enable_state;
 } lc_ctrl_dedup_slot_t;
 
 typedef struct lc_ctrl_stats {
@@ -50,15 +52,20 @@ typedef struct lc_ctrl {
     lc_app_fn_control_next_t control_next;
     lc_app_fn_control_reply_t control_reply;
     lc_app_fn_snapshot_publish_t snapshot_publish;
+    uint32_t session_generation;
     uint32_t last_snapshot_ms;
     uint8_t  last_snapshot_valid;
     uint8_t  snapshot_forced;
+    uint8_t  protocol_major;
+    uint8_t  session_generation_valid;
     uint32_t dedup_cursor;
     lc_ctrl_dedup_slot_t dedup[LC_CTRL_DEDUP_SLOTS];
     lc_ctrl_stats_t st;
 } lc_ctrl_t;
 
 void lc_ctrl_init(lc_ctrl_t *c, lcbus_t *bus, const lc_app_api_v3_t *api);
+
+void lc_ctrl_init_v4(lc_ctrl_t *c, lcbus_t *bus, const lc_app_api_v4_t *api);
 
 void lc_ctrl_poll(lc_ctrl_t *c);
 
