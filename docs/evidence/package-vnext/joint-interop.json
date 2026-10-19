@@ -1,6 +1,6 @@
 {
   "app_base_sha": "71f1850063f022b86f3b027e27eaabb992de60b0",
-  "app_candidate_sha": "7b84c49c576b1cd9bc597e9434526a1cbe405e70",
+  "app_candidate_sha": "76cf1fccd49e8911f4fa385e90e582a44bdd2b29",
   "goldens": {
     "enable": {
       "bytes": 395,
