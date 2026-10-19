@@ -256,6 +256,7 @@ void lc_tracker_check_line_crossings(lc_tracker_t* t, lc_line_cross_t* lc, uint3
             e->track_id  = trk->id;
             e->ts_ms     = now_ms;
             e->direction = (ev == LC_CROSS_IN) ? LC_CROSS_IN : LC_CROSS_OUT;
+            e->pos       = trk->last_pos;
         }
     }
 }
@@ -265,5 +266,13 @@ void lc_tracker_for_each_stable(const lc_tracker_t* t, lc_track_visitor_t fn, vo
     for (uint16_t i = 0; i < LC_MAX_TRACKS; ++i) {
         const lc_track_t* trk = &t->tracks[i];
         if (trk->id != 0 && trk->age >= t->cfg.k_confirm) fn(trk, user);
+    }
+}
+
+void lc_tracker_for_each_active(const lc_tracker_t* t, lc_track_visitor_t fn, void* user) {
+    if (!t || !fn) return;
+    for (uint16_t i = 0; i < LC_MAX_TRACKS; ++i) {
+        const lc_track_t* trk = &t->tracks[i];
+        if (trk->id != 0) fn(trk, user);
     }
 }

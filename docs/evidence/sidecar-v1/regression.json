@@ -1,7 +1,7 @@
 {
   "issue": "harryhua-ai/ne30x-app#26 (AC4 native regression)",
   "boundary": "native v1/v2/v3 pack/verify/spec suites re-run UNCHANGED from this branch; their owned docs/evidence files were pre-checked committed-clean, then restored byte-identical after each run",
-  "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46",
+  "source_commit": "1f48bdd5a78e789e2a2bd62a3ce460eda9292a10",
   "suites": {
     "tests/package/run_package_checks.sh": {
       "result": "PASS (exit 0)",

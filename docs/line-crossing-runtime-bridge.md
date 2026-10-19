@@ -162,3 +162,121 @@ chromium.launch), ffmpeg-generated baseline H264 fixture.
 - Target deployment DNS/TLS, camera and Host site topology; the `.test` resolver
   mapping is local to this Chrome fixture. Opaque-origin positive operation
   (Worker/importScripts/H264 under opaque origin).
+
+## App #27 — LVN4 native live producer (line crossing tracks/events)
+
+Scope of this section: the App-native producer side of Host #104 F8–F10
+([freeze comment 6258637748](https://github.com/harryhua-ai/ne301/issues/104#issuecomment-6258637748),
+the only wire authority; F1–F4/F5–F7 remain the container/capability and
+control/floor context). The producer converts the real `lc_tracker`/`lc_bus`
+crossing facts into ordered `live_publish` packets and preserves
+source-accurate GAP accounting; it does not re-freeze any wire bytes, does not
+implement the Host consumer, and does not touch the v3 window report, business
+totals, `report_seq`, or the queued MQTT/Webhook history.
+
+### Production path (App-owned files)
+
+- `apps/line-crossing/include/lc_tracker.h`, `src/lc_tracker.c` — `lc_cross_evt_t`
+  gained the observed crossing position (`pos`), and `lc_tracker_for_each_active`
+  enumerates the full active-track set for kind2 snapshots. Golden-trace-neutral:
+  the equivalence harness prints only id/ts/direction.
+- `apps/line-crossing/app/lc_bus.{h,c}` — minimal orthogonal seam for the
+  shared source: one additive `lcbus_live_facts_t` observer
+  (`lcbus_set_live_observer`) notified once per valid bus event with the exact
+  per-frame crossing delta (`frame_in+frame_out`), the encoded `evts[16]`
+  records, frame-complete/dropped flags and GAP/lost-unknown markers. No
+  business flow is altered; this is the single observation point of the real
+  crossing facts (`lc_line_cross_check` mutates track dedupe state, so facts
+  cannot be re-derived outside `process_frame`).
+- `apps/line-crossing/app/lc_lvn4.{h,c}` — the producer core: strict F8 48B
+  header (LE, no padding, magic `4c 56 4e 34`, header_version 1, kinds 1/2,
+  packet_seq nonzero monotonic +1, watermark triple
+  `event_through_seq`/`cumulative_event_total`/`cumulative_source_gap`,
+  nonzero `config_generation`, flags bit0/bit1/bit2 only, reserved 0), F9 kind1
+  16B event records (seq strictly increasing and <= through_seq, direction
+  1/2, flags bit0-only, x/y q8 visualization-only from the observed crossing
+  position) and F9 kind2 full-replacement track records (12B header + 8B per
+  point, unique nonzero track ids, point_count 0..16, class from the trusted
+  binding or 0xFFFF, state 1, flags 0, points ordered oldest→newest q16).
+- Conservation per F10: `delta = Δ(win_in+win_out)` per frame;
+  `evts[16]` truncation and publish failures advance `through_seq` and add
+  exactly to `cumulative_source_gap` (never re-sent as new crossings); GAP or
+  dropped-frame stretches latch `SOURCE_LOSS_UNKNOWN` instead of pretending a
+  precise zero; 0-track snapshots are legal full clears; u32 exhaustion,
+  packet_seq exhaustion and active-tracks > granted `live_track_max` fail
+  closed into explicit unavailable states with no silent wrap and no partial
+  "complete" snapshot.
+- Authority gate (AC1/AC3): packets exist only while armed with a validated
+  grant (session nonzero, `live_publish_max >= 312` AND >= the kind2 closure
+  `48 + live_track_max × 140` in u64, `live_track_max` 1..64, publish fn
+  present) and the gate is OPEN. `LC_LVN4_GATE_PAUSED`/`GATE_UNKNOWN` stop all
+  publishing; crossings observed despite a closed gate are still accounted
+  (total/through/gap) so nothing silently disappears, and the gate re-open
+  marks the next packet `RESYNC_REQUIRED` so a resumed cursor is never treated
+  as continuous across the break. Session identity reuse is rejected; a new
+  session generation restarts all watermarks at zero per F8.
+
+### Parallel-line coordination (App #30)
+
+The #30 branch (NFC4 Enable/Paused) owns `lc_ctrl`/`lc_stateblob` and its
+`lc_bus` integration points; its in-flight branch `agent/30/cab8a664` was
+admission-checked before touching shared hunks (branch tip still at base
+`1f48bdd`; its worktree carries uncommitted modifications to `lc_bus.{c,h}`,
+`lc_ctrl.*`, `lc_stateblob.*`, `lc_app_abi_v4.*`, `app/Makefile`,
+`tests/line-crossing-app/host_stub.*`, `tests/line-crossing-enable/`). The #27
+change deliberately avoids every file in that set: the only shared-file
+increment is the additive `lcbus_live_facts_t` observer described above (two
+new struct fields appended at the end of `lcbus_t`, one setter, one
+notification call in `lcbus_on_event`, one out-param in `process_frame`), which
+is semantically orthogonal to the Enable/Paused state machine and renamed
+nothing. File-name collision with #30's `lc_app_abi_v4.h`/`lc_app_entry_v4.*`
+was avoided by placing the producer in `lc_lvn4.{h,c}`. The joint assertion
+"trusted Paused state blocks new live facts" is implemented at the producer
+gate and exercised directly; the end-to-end joint test with #30's real v4
+Enable path remains NOT_RUN until that branch lands (see matrix).
+
+### Verification matrix (executed on this branch)
+
+Reproduction (from the repo root, offline):
+
+```sh
+bash tests/line-crossing-live/run_tests.sh   # LVN4 producer suites
+bash tests/line-crossing/run_tests.sh        # core equivalence + golden trace
+bash tests/line-crossing-app/run_tests.sh    # v2 unit/business/contract + image
+bash tests/line-crossing-v3/run_tests.sh     # v3 unit/ctrl/snapshot + image
+bash tests/sidecar/run_checks.sh             # NEUI sidecar v1
+bash tests/line-crossing-runtime/run.sh      # runtime bridge contract+browser
+```
+
+| Check | Result |
+| --- | --- |
+| `tests/line-crossing-live` wire suite (F8/F9 byte goldens incl. hand-computed 48B headers, 0/1/16/17-crossing frames, 64 tracks × 16 points = 9008B closure, truncation gap, gap/loss-unknown flags, rebind + config-generation, gate paused/unknown, publish-failure gap, u32/packet_seq exhaustion, capacity fail-closed, session reuse, independent ref_decoder positive/negative cases) | PASS (1486 checks, 0 fail) |
+| `tests/line-crossing-live` bus suite (real lc_bus+lc_tracker end-to-end ordering, unarmed byte-identical business regression, GAP events, allocator-fault dropped frames, idle/window regression, v3 report byte-equality armed vs unarmed, target-change clear view, malformed frame isolation) | PASS (100 checks, 0 fail) |
+| both live suites under `-fsanitize=address,undefined` | PASS |
+| `tests/line-crossing` core regression + byte-identical golden trace | PASS |
+| `tests/line-crossing-app` unit/business/contract | PASS (50 / 214 / 52) |
+| `tests/line-crossing-v3` unit/txn/snapshot/contract + v2 regression | PASS (68 / 267 / 52 / 49) |
+| `tests/sidecar` | PASS |
+| `tests/line-crossing-runtime` contract + browser | PASS (47/47) |
+
+Per-run evidence logs live in `docs/evidence/line-crossing-live/`
+(`env.txt`, `test-live-wire.log`, `test-live-bus.log`).
+
+### NOT_RUN (honest gaps, not claimed)
+
+- Host #91 cross-repo golden-byte reconciliation with an independent trusted
+  unpacker: NOT_RUN — Host #91's in-flight branch
+  (`agent/91/1a7bfe00`) still returns `UNAVAILABLE` from
+  `sess_api_live_publish` and contains no LVN4 parser; reconciliation inside
+  this repo is covered by the independent `ref_decoder.c` second
+  implementation only.
+- #30 joint Enable/Paused producer gate test with the real v4 `ENABLE_SET`
+  path: NOT_RUN — App #30 is unmerged and provides no real v4 Enable yet; the
+  producer gate semantics are verified directly at the gate API.
+- Real signed v4 package/caps admission (`live_publish` fn delivered by a v4
+  function table), actual NPU frame feed, target RAM/CPU/stack budget for the
+  9008B packet buffer and per-frame publishing cadence, device run, production
+  keys: NOT_RUN.
+- Slow-reader/ring-drop Host-owned GAP: NOT_RUN on the Host side by design
+  (F10 keeps Host-owned loss separate); the App side only asserts its own
+  watermarks stay exact.

@@ -1,7 +1,7 @@
-native_image: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/21/apps/line-crossing/app/build/lc-line-crossing.bin
-native_image_sha256: db6c04e7ce885367e97106339971cdf312be700d1918e75bac5e9c572badc323
-package: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/21/tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2
-package_sha256: 2cb98e99c6cb09f41d96c58f70f75ca36832a7ab8b01a9c81481b809c4b4edcd  (per-run dev-key signature; identity, not a pinned artifact)
+native_image: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/apps/line-crossing/app/build/lc-line-crossing.bin
+native_image_sha256: 727496317ac7c98d98b1da017483bf42b348ee85142f57383cf7832135380e9f
+package: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/tests/line-crossing-app/work/pkg/lc-line-crossing-1.0.0.neapp.v2
+package_sha256: 3a89769b0563562f9569b82f9b300aa36ca82022a07cee4b4bef30491527c3ae  (per-run dev-key signature; identity, not a pinned artifact)
 signing_identity: NON-PRODUCTION per-run dev key (tests/package/gen_dev_key.py), gitignored
 verifier: package/neapp_verify_v2.py --expect PASS (see native-build.log for full report)
 boundary: offline packaging/verification only — no device install/execution (v2 spec §12)

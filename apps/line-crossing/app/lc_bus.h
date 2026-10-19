@@ -125,6 +125,23 @@ typedef struct lcbus_cfg_txn {
     uint8_t          tracker_changed;
 } lcbus_cfg_txn_t;
 
+#define LCBUS_LIVE_MAX_EVENTS 16u
+
+typedef struct lcbus_live_facts {
+    uint32_t       mono_ms;
+    uint8_t        kind_frame;
+    uint8_t        frame_complete;
+    uint8_t        frame_dropped;
+    uint8_t        is_gap;
+    uint8_t        lost_unknown;
+    uint8_t        n_evts;
+    uint32_t       frame_in;
+    uint32_t       frame_out;
+    lc_cross_evt_t evts[LCBUS_LIVE_MAX_EVENTS];
+} lcbus_live_facts_t;
+
+typedef void (*lcbus_live_observer_t)(void *user, const lcbus_live_facts_t *facts);
+
 typedef struct lcbus {
     lcbus_host_ops_t      ops;
     lc_bus_config_t       cfg;
@@ -171,7 +188,12 @@ typedef struct lcbus {
     uint8_t  session_fatal;
     uint8_t  resource_fatal;
     uint8_t  stop_requested;
+
+    lcbus_live_observer_t live_observer;
+    void                 *live_observer_user;
 } lcbus_t;
+
+void lcbus_set_live_observer(lcbus_t *b, lcbus_live_observer_t fn, void *user);
 
 void lcbus_init(lcbus_t *b, const lcbus_host_ops_t *ops);
 
