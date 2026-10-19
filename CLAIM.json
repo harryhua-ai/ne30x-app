@@ -14,7 +14,7 @@
  "contract_digest": "37eafc03fdef56ec9f778b29a10ad9f9c7b1060ca8ac37223a90a3ebf89a9344",
  "candidate": {
   "branch": "agent/30/cab8a664",
-  "sha": "1a8323a5cc14ddedb1f0ba015600390814feea2e",
+  "sha": "85e3d4a46b8b4c53a63fac3405b91efb084a3f8a",
   "scope": {
    "pass": true,
    "paths": {
@@ -33,19 +33,21 @@
     "tests/enable-persistence-study/test_enable_persistence.c": "ALLOWED",
     "tests/line-crossing-app/host_stub.c": "ALLOWED",
     "tests/line-crossing-app/host_stub.h": "ALLOWED",
+    "tests/line-crossing-enable/run_joint_matrix.sh": "ALLOWED",
     "tests/line-crossing-enable/run_tests.sh": "ALLOWED",
+    "tests/line-crossing-enable/test_cross_owner_matrix.c": "ALLOWED",
     "tests/line-crossing-enable/test_enable.c": "ALLOWED",
     "tests/line-crossing-enable/test_v4_entry.c": "ALLOWED"
    },
    "violations": [],
    "main_attributed_paths": [],
    "counts": {
-    "ALLOWED": 18,
+    "ALLOWED": 20,
     "FORBIDDEN": 0,
     "MAIN_ATTRIBUTED": 0
    }
   },
-  "preserved_at": "2026-10-19T06:00:14Z"
+  "preserved_at": "2026-10-19T06:54:37Z"
  },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
