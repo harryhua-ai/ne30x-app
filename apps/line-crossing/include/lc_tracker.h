@@ -59,6 +59,7 @@ typedef struct {
     uint32_t         track_id;
     uint32_t         ts_ms;
     lc_cross_event_t direction;
+    lc_point_t       pos;
 } lc_cross_evt_t;
 
 void lc_tracker_check_line_crossings(lc_tracker_t* t, lc_line_cross_t* lc,
@@ -72,5 +73,6 @@ uint16_t lc_tracker_active_count(const lc_tracker_t* t);
 
 typedef void (*lc_track_visitor_t)(const lc_track_t* trk, void* user);
 void lc_tracker_for_each_stable(const lc_tracker_t* t, lc_track_visitor_t fn, void* user);
+void lc_tracker_for_each_active(const lc_tracker_t* t, lc_track_visitor_t fn, void* user);
 
 #endif

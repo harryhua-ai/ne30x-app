@@ -275,7 +275,8 @@ static void heat_cb(const lc_track_t *trk, void *user)
     heat[gy * LCBUS_HEAT_DIM + gx]++;
 }
 
-static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
+static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h,
+                          lcbus_live_facts_t *facts)
 {
     if (!business_state_trusted(b)) return;
     b->st.frames_total++;
@@ -319,6 +320,7 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
         b->consecutive_alloc_failures++;
         b->st.frames_unusable++;
         b->unusable_window++;
+        if (facts) facts->frame_dropped = 1;
         if (b->consecutive_alloc_failures >= 16u) {
 
             b->resource_fatal = 1;
@@ -346,6 +348,15 @@ static void process_frame(lcbus_t *b, const uint8_t *ev, const lc_evt_hdr_t *h)
     if (win_in + win_out > 0u) {
         b->state_dirty = 1;
         b->business_mutated = 1;
+    }
+
+    if (facts) {
+        uint8_t i;
+        facts->frame_complete = 1;
+        facts->frame_in = win_in;
+        facts->frame_out = win_out;
+        facts->n_evts = n_evts;
+        for (i = 0; i < n_evts; i++) facts->evts[i] = evts[i];
     }
 
     if (b->cfg.heat_grid_enable) {
@@ -1178,9 +1189,17 @@ void lcbus_restore(lcbus_t *b)
     lc_log(b, "LC_APP: persisted state undeterminable -> degraded; no write until verified");
 }
 
+void lcbus_set_live_observer(lcbus_t *b, lcbus_live_observer_t fn, void *user)
+{
+    if (!b) return;
+    b->live_observer = fn;
+    b->live_observer_user = user;
+}
+
 void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
 {
     lc_evt_hdr_t h;
+    lcbus_live_facts_t facts;
     if (!validate_event(b, ev, len, &h)) {
         b->st.malformed_events++;
         b->st.host_faults++;
@@ -1189,6 +1208,8 @@ void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
         return;
     }
 
+    lc_memset(&facts, 0, sizeof(facts));
+    facts.mono_ms = h.monotonic_ms;
     if (h.kind == LC_EVT_KIND_STOPPING) {
         b->stop_requested = 1;
         return;
@@ -1208,15 +1229,18 @@ void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
         if ((h.flags & LC_EVT_FLAG_LOST_UNKNOWN) || h.lost == LC_EVT_LOST_UNKNOWN_MARK) {
             b->lost_unknown_window = 1;
             b->st.lost_unknown_events++;
+            facts.lost_unknown = 1;
         } else {
             b->lost_window += h.lost;
             b->st.lost_frames_total += h.lost;
         }
+        facts.is_gap = 1;
     }
 
     switch (h.kind) {
     case LC_EVT_KIND_FRAME:
-        process_frame(b, ev, &h);
+        facts.kind_frame = 1;
+        process_frame(b, ev, &h, &facts);
         break;
     case LC_EVT_KIND_MODEL_CHANGED:
         lcbus_rebind(b, 1);
@@ -1228,6 +1252,10 @@ void lcbus_on_event(lcbus_t *b, const uint8_t *ev, uint32_t len)
         break;
     default:
         break;
+    }
+
+    if (b->live_observer) {
+        b->live_observer(b->live_observer_user, &facts);
     }
 
     maybe_close_window(b, now_tick(b));

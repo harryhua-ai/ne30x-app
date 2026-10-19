@@ -95,6 +95,7 @@ MATRIX_CFLAGS=(
     "$APP_DIR/app/lc_cfgcodec.c" \
     "$APP_DIR/app/lc_json.c" \
     "$APP_DIR/app/lc_arena.c" \
+    "$APP_DIR/app/lc_lvn4.c" \
     "$APP_DIR/src/lc_tracker.c" \
     "$APP_DIR/src/lc_line_cross.c" \
     "$HOST_SNAPSHOT/Custom/Services/AppHost/app_host_control.c" \

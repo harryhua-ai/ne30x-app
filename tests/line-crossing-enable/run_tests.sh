@@ -40,6 +40,7 @@ CFLAGS="-Wall -Wextra -Werror -std=c11 -O2 -I$APP_DIR/include -I$APP_DIR/app -I$
     "$APP_DIR/app/lc_cfgcodec.c" \
     "$APP_DIR/app/lc_json.c" \
     "$APP_DIR/app/lc_arena.c" \
+    "$APP_DIR/app/lc_lvn4.c" \
     "$APP_DIR/src/lc_tracker.c" \
     "$APP_DIR/src/lc_line_cross.c" \
     -o "$WORK/test_v4_entry"

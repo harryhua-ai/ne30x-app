@@ -164,7 +164,8 @@ clean-v3:
 V4_APP_VERSION ?= 4.0.0
 V4_ELF := $(BUILD)/lc-line-crossing-v4.elf
 V4_APP_SRCS := lc_app_entry_v4.c lc_bus.c lc_bus_config.c lc_stateblob.c \
-               lc_ctrl.c lc_cfgcodec.c lc_json.c lc_arena.c lc_libc_mini.c
+               lc_ctrl.c lc_cfgcodec.c lc_json.c lc_arena.c lc_libc_mini.c \
+               lc_lvn4.c
 V4_OBJS := $(patsubst $(APP_DIR)/src/%.c,$(BUILD)/core_%.o,$(CORE_SRCS)) \
            $(patsubst %.c,$(BUILD)/v4_%.o,$(V4_APP_SRCS))
 

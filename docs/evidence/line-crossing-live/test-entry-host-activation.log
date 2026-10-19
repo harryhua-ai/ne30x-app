@@ -1,0 +1,2 @@
+entry-host-slow state=2 unknown=0 resync=0 dropped=32
+[line-crossing-live/entry-host-activation] pass=79 fail=0 -> PASS

@@ -2,7 +2,7 @@
   "issue": "harryhua-ai/ne30x-app#26 (sidecar v1 offline pack/verify/golden)",
   "protocol_authority": "ne301 issue #79 §12 (frozen Sidecar v1 wire, 2026-10-15)",
   "boundary": "OFFLINE packaging evidence only; NOT NE301 Host verification/admission/install, NOT device LittleFS free space, RAM, dual-artifact transaction, camera H264, browser trusted loading, or User product acceptance; the §12.2 caps are maximum accepted bundle-INPUT limits, not a device installability promise; signing identities are NON-PRODUCTION test roots (the PUBLIC spec d=1 key and ephemeral test keys) and never device production trust roots",
-  "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46",
+  "source_commit": "1f48bdd5a78e789e2a2bd62a3ce460eda9292a10",
   "toolchain": {
     "python": "3.14.4",
     "python_cryptography": "48.0.0",
@@ -248,7 +248,7 @@
         "category": "sidecar",
         "expected": "SIGNATURE_INVALID",
         "observed": "SIGNATURE_INVALID",
-        "bundle_sha256": "90ad8990385b21bb3c95ea073a38343bb5d412273c2fda213e9c6c4c35c957cd",
+        "bundle_sha256": "e2eb6b974cdeddf5ad7e17cf67e8ce77dabca1461aea86fac518e48f1eac942b",
         "detail": "ECDSA P-256/SHA-256 verification failed over the exact TBS",
         "note": "TBS signed by an ephemeral non-trusted key; manifest fingerprint still names the trusted d=1 key"
       },
@@ -257,7 +257,7 @@
         "category": "sidecar",
         "expected": "PUBLISHER_UNTRUSTED",
         "observed": "PUBLISHER_UNTRUSTED",
-        "bundle_sha256": "22d1bdd69dc33d7957492158be2aab6bc7f895994261de1dfcef5699a4934bf7",
+        "bundle_sha256": "5ed2376f1806ed40365936f615d2098710617e05440290488dc5d5276b5a0fbc",
         "detail": "publisher_id 'other-pub' is not in the local trust mapping",
         "note": "publisher_id absent from the Host trust mapping; the bundle-carried fingerprint cannot self-trust"
       },
@@ -266,7 +266,7 @@
         "category": "sidecar",
         "expected": "PUBLISHER_UNTRUSTED",
         "observed": "PUBLISHER_UNTRUSTED",
-        "bundle_sha256": "5dc01088a38e4cbe61e267b54189d3eacdccd61aaed799865c4a3c856f3831c2",
+        "bundle_sha256": "ffd6292e5e424eb2232c62bbeab8c34af5e9995ff2631ad54ec2a9ef38ea9d3d",
         "detail": "manifest publisher_key_sha256 does not match the trusted key for publisher_id 'test-publisher'",
         "note": "manifest publisher_key_sha256 no longer matches the trusted store entry (re-signed)"
       },
@@ -819,7 +819,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: asset root rejected: symbolic-link asset is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/trees/symlink-file/link.txt",
+        "detail": "ERROR: asset root rejected: symbolic-link asset is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/tests/sidecar/work/trees/symlink-file/link.txt",
         "note": "pack_refusal_symlink_file"
       },
       {
@@ -827,7 +827,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: asset root rejected: symbolic-link directory is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/trees/symlink-dir/escape",
+        "detail": "ERROR: asset root rejected: symbolic-link directory is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/tests/sidecar/work/trees/symlink-dir/escape",
         "note": "pack_refusal_symlink_dir_escape"
       },
       {
@@ -835,7 +835,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: asset root rejected: non-regular asset is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/26/tests/sidecar/work/trees/fifo/pipe",
+        "detail": "ERROR: asset root rejected: non-regular asset is not packable: /Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/tests/sidecar/work/trees/fifo/pipe",
         "note": "pack_refusal_fifo"
       },
       {
@@ -883,7 +883,7 @@
         "category": "packer-refusal",
         "expected": "packer exit 2 (fail-closed, no bundle emitted)",
         "observed": "packer exit 2",
-        "detail": "ERROR: sidecar signing key fingerprint 6e5fb882bdaf673a7309471449a4aabcf4ac5d268f5ecc6dc9e7a7294f7cf4a6 does not match the native package publisher_key_sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3; the same trusted SPKI publisher must sign both the Sidecar and its native package",
+        "detail": "ERROR: sidecar signing key fingerprint a7db61a3a7e2bcab4cdf0bf205af7943efa784a4e8dc207e7a62770f58555942 does not match the native package publisher_key_sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3; the same trusted SPKI publisher must sign both the Sidecar and its native package",
         "note": "pack_refusal_signer_key_not_native_publisher"
       },
       {
@@ -893,7 +893,7 @@
         "observed": "PASS",
         "note": "provenance sidecar records the format authority, NON-PRODUCTION trust-root notice, generator, source commit, ui_tbs_sha256, signer SPKI fingerprint, the native binding (verified native TBS; signer fingerprint equals the native publisher_key_sha256; whole-file native digest labelled traceability-only) and the full per-file digest list",
         "generator": "neui_pack_v1.py 1.0.0",
-        "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46"
+        "source_commit": "1f48bdd5a78e789e2a2bd62a3ce460eda9292a10"
       }
     ]
   },
@@ -908,7 +908,7 @@
   "native_regression": {
     "issue": "harryhua-ai/ne30x-app#26 (AC4 native regression)",
     "boundary": "native v1/v2/v3 pack/verify/spec suites re-run UNCHANGED from this branch; their owned docs/evidence files were pre-checked committed-clean, then restored byte-identical after each run",
-    "source_commit": "dc42bbe72753b0d08db14f536b942215d180df46",
+    "source_commit": "1f48bdd5a78e789e2a2bd62a3ce460eda9292a10",
     "suites": {
       "tests/package/run_package_checks.sh": {
         "result": "PASS (exit 0)",
