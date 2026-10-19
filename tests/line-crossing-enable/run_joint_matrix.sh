@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 HOST_REPO=${HOST_REPO:-/Users/harryhua/Documents/GitHub/ne301}
-HOST_SHA=dc0948c1e12e954612fbfa9769434bf01e449c3
+HOST_SHA=dc0948c1e12e954612fbfa9769434bf01e449c3c
 APP_SHA=${APP_SHA:-$(git -C "$ROOT" rev-parse HEAD)}
 APP_TREE_SHA=$(git -C "$ROOT" rev-parse "$APP_SHA^{tree}")
 HOST_SNAPSHOT="${TMPDIR:-/tmp}/ne30x-app-issue30-host-$HOST_SHA"
