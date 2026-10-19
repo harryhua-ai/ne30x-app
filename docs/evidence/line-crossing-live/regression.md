@@ -4,7 +4,7 @@
 
 - App code revision under test: `c06fdedc5c7422b88d24a1e07d018dd07ff41567`
 - Accepted App #30 base: `a1b93322ae010356a6293421a137564fc0e23664`
-- Host #91 delivered candidate: `4c1c0d7ec5bc8ae18fae4ca5a31f0699b7c5895b`
+- Host parser source revision actually archived and tested: `4c1c0d7ec5bc8ae18fae4ca5a31f0699b7c5895b`. Host #91's latest formally delivered r2 is `4ca98ed074fa0d81ca1169f1a24062e30e4eac8d`; its parser source is unchanged, so no wholesale retest is warranted for this labeling.
 - The test runner records the App source SHA, accepted base SHA, Host SHA,
   compiler, and UTC time in `env.txt`.
 - The exact documentation Candidate SHA is bound by the PR #39 `ght deliver`

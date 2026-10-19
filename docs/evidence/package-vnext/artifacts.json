@@ -531,13 +531,13 @@
         "name": "admission.host_without_bit9_refuses_emit",
         "expected": "refused rc=2",
         "ok": true,
-        "detail": "ERROR: target-Host admission simulation (/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/tests/package-vnext/work/v4-cases/policy-no-bit9.json) rejected the package: ABI_INCOMPATIBLE: Host does not provide capability bits 0x200 (package requests 0x3ff, Host provides 0x1ff); ENABLE_CONTROL/LIVE_PUBLISH without an actual Host grant are UNAVAILABLE/UNAUTHORIZED at runtime, never downgraded"
+        "detail": "ERROR: target-Host admission simulation (/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/v4-cases/policy-no-bit9.json) rejected the package: ABI_INCOMPATIBLE: Host does not provide capability bits 0x200 (package requests 0x3ff, Host provides 0x1ff); ENABLE_CONTROL/LIVE_PUBLISH without an actual Host grant are UNAVAILABLE/UNAUTHORIZED at runtime, never downgraded"
       },
       {
         "name": "admission.live_capacity_below_declaration_refuses_emit",
         "expected": "refused rc=2",
         "ok": true,
-        "detail": "ERROR: target-Host admission simulation (/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/27/tests/package-vnext/work/v4-cases/policy-tight-live.json) rejected the package: RESOURCE_LIMIT: live_publish_max 1168 exceeds the Host live capacity 1000; the live capability is refused whole rather than degraded"
+        "detail": "ERROR: target-Host admission simulation (/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/v4-cases/policy-tight-live.json) rejected the package: RESOURCE_LIMIT: live_publish_max 1168 exceeds the Host live capacity 1000; the live capability is refused whole rather than degraded"
       },
       {
         "name": "old.v1_verifier_rejects_v4_package",
@@ -648,7 +648,7 @@
   "joint_interop": {
     "status": "PASS",
     "app_signer_source_sha": "71f1850063f022b86f3b027e27eaabb992de60b0",
-    "app_candidate_sha_at_run": "3968b54edf02d20fe9ca6bf69a62c5df588e46e9",
+    "app_candidate_sha_at_run": "76cf1fccd49e8911f4fa385e90e582a44bdd2b29",
     "host_parser_source_sha": "f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1",
     "matrix_cases": 12,
     "matrix_passed": 12,
