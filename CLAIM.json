@@ -14,7 +14,7 @@
  "contract_digest": "6097a2a5b61fc8a79744981c9c8beb462775dc3469a19252d22605e48f3797c1",
  "candidate": {
   "branch": "agent/27/12c88d73",
-  "sha": "da321131aceda97405a4040b54415d2d25605957",
+  "sha": "c06fdedc5c7422b88d24a1e07d018dd07ff41567",
   "scope": {
    "pass": true,
    "paths": {
@@ -41,6 +41,7 @@
     "docs/evidence/line-crossing-live/fixtures/kind2-tracks-64x16.bin": "ALLOWED",
     "docs/evidence/line-crossing-live/fixtures/kind2-zero-track.bin": "ALLOWED",
     "docs/evidence/line-crossing-live/regression.md": "ALLOWED",
+    "docs/evidence/line-crossing-live/test-entry-host-activation.log": "ALLOWED",
     "docs/evidence/line-crossing-live/test-host-joint.log": "ALLOWED",
     "docs/evidence/line-crossing-live/test-live-bus.log": "ALLOWED",
     "docs/evidence/line-crossing-live/test-live-wire.log": "ALLOWED",
@@ -101,6 +102,7 @@
     "tests/line-crossing-live/ref_decoder.c": "ALLOWED",
     "tests/line-crossing-live/ref_decoder.h": "ALLOWED",
     "tests/line-crossing-live/run_tests.sh": "ALLOWED",
+    "tests/line-crossing-live/test_entry_activation.c": "ALLOWED",
     "tests/line-crossing-live/test_host_joint.c": "ALLOWED",
     "tests/line-crossing-live/test_live.h": "ALLOWED",
     "tests/line-crossing-live/test_live_bus.c": "ALLOWED",
@@ -125,7 +127,7 @@
     "package/vnext/neapp_verify_v4.py"
    ],
    "counts": {
-    "ALLOWED": 96,
+    "ALLOWED": 98,
     "FORBIDDEN": 0,
     "MAIN_ATTRIBUTED": 3
    },
@@ -140,7 +142,7 @@
     ]
    }
   },
-  "preserved_at": "2026-10-19T08:13:10Z"
+  "preserved_at": "2026-10-19T09:33:06Z"
  },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
