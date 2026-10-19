@@ -7,8 +7,9 @@
     "f5_f7": "https://github.com/harryhua-ai/ne301/issues/104#issuecomment-6258601629",
     "f8_f10": "https://github.com/harryhua-ai/ne301/issues/104#issuecomment-6258637748",
     "host_claim_execution_base": "6357a04d509fb8e1851603d1efe0de51def9edb1",
-    "host_claim_branch": "agent/104/de1fd467 (claim comment 6258843064; no v4 parser commits pushed at packaging time — cross-repo interop NOT_RUN)",
-    "app_protocol_docs": "existing docs/app-package-protocol-v{1,2-draft,3}.md untouched; no second competing spec written in this repo"
+    "host_claim_branch": "agent/104/de1fd467; PR #111 r2 parser source pinned at f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1",
+    "app_protocol_docs": "existing docs/app-package-protocol-v{1,2-draft,3}.md untouched; no second competing spec written in this repo",
+    "host_parser_source_sha": "f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1"
   },
   "toolchain": {
     "python": "Python 3.14.4",
@@ -610,13 +611,10 @@
       "trust fail-closed (unknown publisher, fingerprint mismatch; package keys never self-trust)",
       "bit8/bit9 capability prerequisites and live quota closure (312 / 48+140*tracks)",
       "NFC4 ENABLE_SET/ENR1 receipt and LVN4 packet/GAP vector coverage (frozen bytes)",
-      "legacy v1/v2/v3 suites byte-stable; cross-major fail-closed both directions"
+      "legacy v1/v2/v3 suites byte-stable; cross-major fail-closed both directions",
+      "same App-signed v4 bytes verified by pinned Host C parser: 12/12 joint outcomes and categories match"
     ],
     "NOT_RUN": [
-      {
-        "item": "cross-repo Host #104 parser/golden interop",
-        "reason": "Host implementation candidate not merged: branch agent/104/de1fd467 stands at execution_base 6357a04d509fb8e1851603d1efe0de51def9edb1 with no v4 parser commits at packaging time; App goldens under docs/evidence/package-vnext/spec/ are the exported black-box vectors for that future interop (final AC3 acceptance per contract)"
-      },
       {
         "item": "device flash/NVS/LittleFS, board install or execution",
         "reason": "no device"
@@ -626,16 +624,12 @@
         "reason": "out of scope; non-production only"
       },
       {
-        "item": "Host #104 admission/floor implementation",
-        "reason": "Host-owned; non-goal here"
-      },
-      {
         "item": "App #30 Enable/Paused business semantics",
         "reason": "owned by #30; non-goal here"
       },
       {
         "item": "Host #91 producer-ingest / live read path, App #27 tracker",
-        "reason": "owned by #91/#27; non-goal here"
+        "reason": "Host #91 live_publish returns APP_SESSION_ERR_UNAVAILABLE; producer-ingest/live runtime path and App #27 tracker remain unimplemented"
       },
       {
         "item": "ARM target build static asserts (sizeof(void*)==4, Thumb)",
@@ -650,5 +644,19 @@
         "reason": "A freeze in progress at Host #104"
       }
     ]
+  },
+  "joint_interop": {
+    "status": "PASS",
+    "app_signer_source_sha": "71f1850063f022b86f3b027e27eaabb992de60b0",
+    "app_candidate_sha_at_run": "7b84c49c576b1cd9bc597e9434526a1cbe405e70",
+    "host_parser_source_sha": "f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1",
+    "matrix_cases": 12,
+    "matrix_passed": 12,
+    "host_integration_checks": 77,
+    "host_integration_failures": 0,
+    "host_session_checks": 592,
+    "host_session_failures": 0,
+    "runtime_live_authorization": "APP_SESSION_ERR_UNAVAILABLE; Host #91 producer-ingest is not implemented",
+    "evidence": "joint-interop.json, joint-interop.log, joint-interoperability.md"
   }
 }
