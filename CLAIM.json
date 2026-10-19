@@ -12,7 +12,41 @@
  "heartbeat_at": "2026-10-19T05:58:02Z",
  "supersedes": null,
  "contract_digest": "37eafc03fdef56ec9f778b29a10ad9f9c7b1060ca8ac37223a90a3ebf89a9344",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/30/cab8a664",
+  "sha": "38c5b3f54cbfa6d5fd6f087a668e5c6ce3d4fae4",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "apps/line-crossing/app/Makefile": "ALLOWED",
+    "apps/line-crossing/app/lc_app_abi_v4.h": "ALLOWED",
+    "apps/line-crossing/app/lc_app_entry_v4.c": "ALLOWED",
+    "apps/line-crossing/app/lc_app_entry_v4.h": "ALLOWED",
+    "apps/line-crossing/app/lc_bus.c": "ALLOWED",
+    "apps/line-crossing/app/lc_bus.h": "ALLOWED",
+    "apps/line-crossing/app/lc_ctrl.c": "ALLOWED",
+    "apps/line-crossing/app/lc_ctrl.h": "ALLOWED",
+    "apps/line-crossing/app/lc_stateblob.c": "ALLOWED",
+    "apps/line-crossing/app/lc_stateblob.h": "ALLOWED",
+    "docs/evidence/line-crossing-enable/golden-enable-wire.hex": "ALLOWED",
+    "docs/evidence/line-crossing-enable/report.md": "ALLOWED",
+    "tests/enable-persistence-study/test_enable_persistence.c": "ALLOWED",
+    "tests/line-crossing-app/host_stub.c": "ALLOWED",
+    "tests/line-crossing-app/host_stub.h": "ALLOWED",
+    "tests/line-crossing-enable/run_tests.sh": "ALLOWED",
+    "tests/line-crossing-enable/test_enable.c": "ALLOWED",
+    "tests/line-crossing-enable/test_v4_entry.c": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 18,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-19T05:58:53Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
