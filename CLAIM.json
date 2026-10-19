@@ -14,13 +14,22 @@
  "contract_digest": "780aa3fa2f628d0a176b242e5b14a59b78d11cbb4359838eb0d573882054a4b1",
  "candidate": {
   "branch": "agent/36/37e78f3c",
-  "sha": "71f1850063f022b86f3b027e27eaabb992de60b0",
+  "sha": "f4548adfb26e92906a8b19e819352be47733ee50",
   "scope": {
    "pass": true,
    "paths": {
     "docs/evidence/package-vnext/README.md": "ALLOWED",
     "docs/evidence/package-vnext/artifacts.json": "ALLOWED",
+    "docs/evidence/package-vnext/joint-interop.json": "ALLOWED",
+    "docs/evidence/package-vnext/joint-interop.log": "ALLOWED",
+    "docs/evidence/package-vnext/joint-interoperability.md": "ALLOWED",
+    "docs/evidence/package-vnext/package-v3-regression.log": "ALLOWED",
     "docs/evidence/package-vnext/run.log": "ALLOWED",
+    "docs/evidence/package-vnext/spec/app-pr37/dev-publisher.spki.der": "ALLOWED",
+    "docs/evidence/package-vnext/spec/app-pr37/enable.neapp.v4": "ALLOWED",
+    "docs/evidence/package-vnext/spec/app-pr37/golden.neapp.v4": "ALLOWED",
+    "docs/evidence/package-vnext/spec/app-pr37/live-only.neapp.v4": "ALLOWED",
+    "docs/evidence/package-vnext/spec/app-pr37/test-publisher.spki.der": "ALLOWED",
     "docs/evidence/package-vnext/spec/golden-lvn4-event-batch.bin": "ALLOWED",
     "docs/evidence/package-vnext/spec/golden-lvn4-tracks-snapshot.bin": "ALLOWED",
     "docs/evidence/package-vnext/spec/golden-native.bin": "ALLOWED",
@@ -36,6 +45,8 @@
     "package/vnext/neapp_v4_format.py": "ALLOWED",
     "package/vnext/neapp_verify_v4.py": "ALLOWED",
     "tests/package-vnext/.gitignore": "ALLOWED",
+    "tests/package-vnext/joint_host_parser.c": "ALLOWED",
+    "tests/package-vnext/joint_interop.py": "ALLOWED",
     "tests/package-vnext/make_test_identity.py": "ALLOWED",
     "tests/package-vnext/make_v4_test_image.py": "ALLOWED",
     "tests/package-vnext/run.sh": "ALLOWED",
@@ -48,12 +59,12 @@
    "violations": [],
    "main_attributed_paths": [],
    "counts": {
-    "ALLOWED": 26,
+    "ALLOWED": 37,
     "FORBIDDEN": 0,
     "MAIN_ATTRIBUTED": 0
    }
   },
-  "preserved_at": "2026-10-19T04:05:46Z"
+  "preserved_at": "2026-10-19T05:49:02Z"
  },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
