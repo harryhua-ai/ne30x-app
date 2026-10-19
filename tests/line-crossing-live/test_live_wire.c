@@ -571,6 +571,37 @@ static void test_disarmed_and_unarmed(void)
     live_env_free(e);
 }
 
+static void test_lost_capability_reset(void)
+{
+    live_env_t *e = live_env_new();
+    live_env_arm(e, 98u, 8u);
+    feed_row(e, 100u, 0.40f, 1u, 0.5f, 0.0f);
+    uint32_t before = live_rec_count(e->rec);
+    CHECK(before >= 2u);
+    live_rec_fail_next(e->rec, LC_RET_UNAUTHORIZED, 1u);
+    feed_row(e, 300u, 0.60f, 1u, 0.5f, 0.0f);
+    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY);
+    CHECK_EQ_I(e->prod.session_generation, 98u);
+    CHECK_EQ_I(e->prod.live_publish_max, 0u);
+    CHECK_EQ_I(e->prod.live_track_max, 0u);
+    CHECK_EQ_I(e->prod.packet_seq, 0u);
+    CHECK_EQ_I(e->prod.through_seq, 0u);
+    CHECK_EQ_I(e->prod.cumulative_total, 0u);
+    CHECK_EQ_I(e->prod.cumulative_gap, 0u);
+    CHECK_EQ_I(live_rec_count(e->rec), before);
+    feed_row(e, 500u, 0.40f, 1u, 0.5f, 0.0f);
+    feed_row(e, 700u, 0.60f, 1u, 0.5f, 0.0f);
+    CHECK_EQ_I(live_rec_count(e->rec), before);
+    lc_lvn4_grant_t grant = {98u, 2288u, 16u};
+    CHECK_EQ_I(lc_lvn4_arm(&e->prod, &grant), -1);
+    grant.session_generation = 99u;
+    CHECK_EQ_I(lc_lvn4_arm(&e->prod, &grant), 0);
+    CHECK_EQ_I(e->prod.packet_seq, 0u);
+    CHECK_EQ_I(e->prod.through_seq, 0u);
+    CHECK_EQ_I(e->prod.cumulative_total, 0u);
+    live_env_free(e);
+}
+
 static void test_decoder_negatives(void)
 {
     live_env_t *e = live_env_new();
@@ -691,6 +722,7 @@ int main(void)
     test_exhaustion_total();
     test_packet_seq_exhaustion();
     test_disarmed_and_unarmed();
+    test_lost_capability_reset();
     test_decoder_negatives();
     TEST_REPORT("line-crossing-live/wire");
 }

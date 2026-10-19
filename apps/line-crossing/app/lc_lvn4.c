@@ -147,11 +147,29 @@ static int take_packet_seq(lc_lvn4_t *p)
     return 1;
 }
 
+static void lose_capability(lc_lvn4_t *p)
+{
+    p->live_publish_max = 0u;
+    p->live_track_max = 0u;
+    p->state = LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY;
+    p->packet_seq = 0u;
+    p->through_seq = 0u;
+    p->cumulative_total = 0u;
+    p->cumulative_gap = 0u;
+    p->last_pub_gap = 0u;
+    p->bound_model_gen = 0u;
+    p->bound_class_gen = 0u;
+    p->bound_target_index = -1;
+    p->loss_unknown_latch = 0u;
+    p->resync_required = 1u;
+}
+
 static int publish_packet(lc_lvn4_t *p, uint32_t len)
 {
     int32_t rc = p->publish(p->publish_user, p->pkt, len);
     if (rc != 0) {
         p->st.publish_failures++;
+        if (rc == LC_RET_UNAUTHORIZED) lose_capability(p);
         return 0;
     }
     p->st.publish_ok++;
@@ -192,7 +210,7 @@ static void publish_event_batch(lc_lvn4_t *p, const lcbus_live_facts_t *f,
     if (publish_packet(p, total_len)) {
         p->st.packets_event++;
         p->st.encoded_events += n_enc;
-    } else {
+    } else if (p->state == LC_LVN4_STATE_ARMED) {
         if (!add_gap(p, n_enc)) return;
     }
 }
