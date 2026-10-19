@@ -10,6 +10,14 @@
 - Golden command and receipt: [golden-enable-wire.hex](golden-enable-wire.hex)
 - SHA-256 of the concatenated 96-byte golden pair: `6e266fba558364bb72ae73e20e0f4cd71a134aa4c1f8086b52f4c6cbf27b8009`
 
+## Acceptance summary
+
+- [x] AC1 App state: schema3 stores Enable, configuration, counters and sequence with CRC and revision CAS; schema1/2 migrate once to Enabled; untrusted storage fails closed to UNKNOWN/restricted.
+- [x] AC2 App control: NFC4 type5 ENB1 is accepted only from the latched v4 session; ENABLE_SET, CONFIG_APPLY and COUNTERS_RESET share verified revision CAS; APPLIED follows exact readback.
+- [x] AC3 Pause/resume: FRAME and idle paths stop business counting, window close and report submission; partial window/tracker continuity is cleared while totals, report sequence and queued history remain.
+- [x] AC4 App tests: real bus, controller, state blob and v4 entry are covered, with legacy, rollback, failure and regression suites recorded below.
+- Host #104 floor/identity lifecycle, app live producer and joint live gate remain NOT_RUN as listed below.
+
 ## Verification matrix
 
 | Surface | Result | Evidence |
