@@ -11,10 +11,14 @@ A-owned Host #104 architecture freeze (harryhua-ai/ne301#104, 2026-10-19):
 
 Host-side interop anchor (claim comment `6258843064`): branch
 `agent/104/de1fd467`, execution_base
-`6357a04d509fb8e1851603d1efe0de51def9edb1`.  At packaging time that branch
-contains **no v4 parser commits yet**, so the cross-repo parser/golden
-interop is **NOT_RUN** (see matrix below); the golden bytes exported here
-are the black-box consumables for that future interop.
+`6357a04d509fb8e1851603d1efe0de51def9edb1`.  The earlier reviewed snapshot
+recorded interop as NOT_RUN.  This r2 evidence closes that gap against the
+read-only Host #104 PR #111 r2 source at
+`f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1`; the exact App packages are rebuilt
+from App `71f1850063f022b86f3b027e27eaabb992de60b0`, then passed to the real
+Host C parser with matching test SPKI and policy.  See
+[`joint-interoperability.md`](joint-interoperability.md), its full log, and
+byte-preserving JSON report.
 
 No competing protocol document is created in this repo; the existing
 `docs/app-package-protocol-v{1,2-draft,3}.md` remain the sole old-major
@@ -30,9 +34,12 @@ bash tests/package-vnext/run.sh
 # independent spec vector suite only (stdlib; 117 vectors)
 python3 tests/spec-vnext/run_all_tests.py
 
-# canonical heavyweight legacy proof (pre-existing #20 suite; refreshes its
-# own committed p6 evidence by design — run from a clean tree)
+# canonical heavyweight legacy proof (pre-existing #20 suite; run in an
+# isolated clean checkout because it rebuilds its own v1/v2/v3 artifacts)
 bash tests/package-v3/run_checks.sh
+
+# standalone exact-source App/Host matrix (also run by package-vnext/run.sh)
+python3 tests/package-vnext/joint_interop.py
 ```
 
 Toolchain used for the committed evidence: python3 3.14.4, cryptography
@@ -139,12 +146,10 @@ NOT_RUN (with reasons; also recorded in `artifacts.json`):
 
 | Item | Reason |
 | --- | --- |
-| Cross-repo Host #104 parser/golden interop | Host candidate not merged: `agent/104/de1fd467` stands at execution_base `6357a04d509fb8e1851603d1efe0de51def9edb1` with no v4 parser commits at packaging time; final AC3 acceptance is contractually after both Candidates exist |
 | Device flash/NVS/LittleFS, install, execution | no device |
 | Production keys / real issuance | non-production scope only |
-| Host #104 admission/floor implementation | Host-owned; non-goal |
 | App #30 Enable/Paused business semantics | owned by #30; non-goal |
-| Host #91 producer-ingest / live read, App #27 tracker | owned by #91/#27; non-goal |
+| Host #91 producer-ingest / live read, App #27 tracker | the pinned Host handler returns `APP_SESSION_ERR_UNAVAILABLE`; runtime producer-ingest and App #27 remain unimplemented |
 | ARM target-build static asserts (`sizeof(void*)==4`, Thumb) | target-build proof |
 | Real RAM/CPU/live-queue capacity on hardware | device measurement |
 | Remaining #104 wire bytes (beyond F5/F8/F9 frozen set) | A freeze still in progress at Host #104 |
@@ -154,5 +159,8 @@ NOT_RUN (with reasons; also recorded in `artifacts.json`):
 - `run.log` — deterministic log of the last `run.sh` execution
 - `artifacts.json` — structured evidence (spec authority, digests,
   packages, case matrix, key discipline, PASS/NOT_RUN)
+- `joint-interop.log` — complete App packer, Host C parser, matrix, and Host C-suite output
+- `joint-interop.json` — exact package bytes as hex, digests, source commits, and per-case outcomes
+- `joint-interoperability.md` — concise profile and App/Host comparison tables
 - `spec/` — deterministic outputs of `tests/spec-vnext` (golden package,
   TBS, signature, native image, SPKI, NFC4/LVN4 wire goldens, report)

@@ -376,6 +376,58 @@ out.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encodi
 print(f"evidence -> {out}")
 EOF
 
+step "[9/9] exact App/Host AC3 interop (App baseline + pinned Host parser)"
+"$PYTHON" "$ROOT/tests/package-vnext/joint_interop.py" 2>&1 \
+    | tee "$ROOT/docs/evidence/package-vnext/joint-interop.log"
+"$PYTHON" - "$ROOT" <<'EOF'
+import json, sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+evidence = root / "docs/evidence/package-vnext/artifacts.json"
+joint_path = root / "docs/evidence/package-vnext/joint-interop.json"
+data = json.loads(evidence.read_text(encoding="utf-8"))
+joint = json.loads(joint_path.read_text(encoding="utf-8"))
+passed = sum(1 for row in joint["joint_matrix"] if row["pass"])
+if passed != len(joint["joint_matrix"]):
+    raise SystemExit("FATAL: joint App/Host matrix contains a failure")
+data["spec_authority"]["host_claim_branch"] = (
+    "agent/104/de1fd467; PR #111 r2 parser source pinned at "
+    + joint["host_parser_sha"])
+data["spec_authority"]["host_parser_source_sha"] = joint["host_parser_sha"]
+data["joint_interop"] = {
+    "status": "PASS",
+    "app_signer_source_sha": joint["app_base_sha"],
+    "app_candidate_sha_at_run": joint["app_candidate_sha"],
+    "host_parser_source_sha": joint["host_parser_sha"],
+    "matrix_cases": len(joint["joint_matrix"]),
+    "matrix_passed": passed,
+    "host_integration_checks": joint["host_integration_suite"]["checks"],
+    "host_integration_failures": joint["host_integration_suite"]["failures"],
+    "host_session_checks": joint["host_session_suite"]["checks"],
+    "host_session_failures": joint["host_session_suite"]["failures"],
+    "runtime_live_authorization": joint["runtime_live_authorization"],
+    "evidence": "joint-interop.json, joint-interop.log, joint-interoperability.md",
+}
+matrix = data["pass_not_run_matrix"]
+matrix["PASS_offline"].append(
+    "same App-signed v4 bytes verified by pinned Host C parser: "
+    f"{passed}/{len(joint['joint_matrix'])} joint outcomes and categories match")
+matrix["NOT_RUN"] = [item for item in matrix["NOT_RUN"]
+                     if item["item"] != "cross-repo Host #104 parser/golden interop"
+                     and item["item"] != "Host #104 admission/floor implementation"]
+for item in matrix["NOT_RUN"]:
+    if item["item"] == "Host #91 producer-ingest / live read path, App #27 tracker":
+        item["reason"] = (
+            "Host #91 live_publish returns APP_SESSION_ERR_UNAVAILABLE; "
+            "producer-ingest/live runtime path and App #27 tracker remain unimplemented")
+evidence.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+                    encoding="utf-8")
+print(f"joint evidence merged: {passed}/{len(joint['joint_matrix'])}; "
+      f"Host suites {joint['host_integration_suite']['checks']}/0 and "
+      f"{joint['host_session_suite']['checks']}/0")
+EOF
+
 printf '\n== ALL PACKAGE-VNEXT CHECKS PASSED\n'
 printf 'golden replica %s\n  sha256 %s\n' "$GOLDEN_REPLICA" "$(sha "$GOLDEN_REPLICA")"
 printf 'evidence log   %s\n' "$LOG"

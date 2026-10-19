@@ -1,0 +1,734 @@
+evidence guard: all guarded evidence files are in committed-clean state (fail-closed pre-check passed)
+
+== [1/4] isolated clean repo: guard accepts
+evidence guard: all guarded evidence files are in committed-clean state (fail-closed pre-check passed)
+guard accepted the clean repo
+
+== [2/4] uncommitted worktree modification: guard fails closed, caller bytes survive
+guard refused the dirty repo; the uncommitted caller bytes are intact
+
+== [3/4] staged-only modification: guard fails closed
+guard refused the staged-only modification
+
+== [4/4] real repo: run_checks.sh fail-closes fast on a dirty guarded file (probe self-restored)
+run_checks.sh refused to start with guidance; probe restored byte-identical
+
+== EVIDENCE GUARD NON-DESTRUCTIVE REGRESSION PASSED
+
+== [0/7] preflight
+python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2 arm-none-eabi-gcc=15.2.1
+non-destructive evidence-guard regression: PASS (tests/package-v3/test_evidence_guard.sh: clean accept, dirty refuse, caller bytes survive, run_checks.sh fail-closed probe self-restored)
+
+== [1/7] frozen v1/v2 package-tool regression UNCHANGED (tests/package-v2/run_checks.sh)
+
+== [0/8] preflight
+python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2
+
+== [1/8] v1 regression UNCHANGED (tests/package/run_package_checks.sh)
+
+== [0/9] preflight
+python3=Python 3.14.4 cryptography=48.0.0 openssl=OpenSSL3.6.2
+
+== [1/9] generate NON-PRODUCTION dev/test signing identity (AC3)
+dev signing identity generated (NON-PRODUCTION TEST ROOT)
+  private key (gitignored, owner-only): /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/keys/dev-signer.pem
+  signer SPKI DER: /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/keys/dev-signer.spki.der (91 B)
+  SHA-256(SPKI DER): f6b0ed1f9f73fbcbd1a1795cfca6461199e5b8d275606213cb0d3dec910a1be3
+  trust store: /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/trust-dev.json (publisher_id 'dev-publisher')
+
+== [2/9] clean build hello-app V1 + V2 native images (pinned ABI, Arm GNU)
+make: Entering directory '/private/tmp/ne30x-app-36-v3.Qx617W/apps/hello-app'
+rm -rf build build-v2
+bash ../../tools/fetch_abi_header.sh build/cache/app_host_abi.h
+fetch_abi_header: OK (raw.githubusercontent.com) -> build/cache/app_host_abi.h
+  pinned harryhua-ai/ne301@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e:Custom/Common/Inc/app_host_abi.h
+  sha256 9337f684893cf2a06aea6f6f8c448708d91e8f9c6c86c24905ced8a7d5df23f4
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -Ibuild/cache  -nostdlib -T hello_app.ld -Wl,--gc-sections -Wl,-Map,build/hello-app.map -o build/hello-app.elf main.c
+arm-none-eabi-objcopy -O binary build/hello-app.elf build/hello-app.payload.bin
+python3 ../../tools/pack_app_image.py \
+	--elf build/hello-app.elf --payload build/hello-app.payload.bin --out build/hello-app.bin \
+	--abi-header build/cache/app_host_abi.h --nm arm-none-eabi-nm --objcopy arm-none-eabi-objcopy \
+	--exec-base 0x93E00000
+packed build/hello-app.bin: header 32 B + payload 576 B = 608 B, entry_offset 0x50, crc32 0x1eb77cb6, abi 0x00010000, target 0x93e00000
+   text	   data	    bss	    dec	    hex	filename
+    576	      0	      0	    576	    240	build/hello-app.elf
+hello-app: image ready -> build/hello-app.bin
+make: Leaving directory '/private/tmp/ne30x-app-36-v3.Qx617W/apps/hello-app'
+make: Entering directory '/private/tmp/ne30x-app-36-v3.Qx617W/apps/hello-app'
+rm -rf build-v2
+bash ../../tools/fetch_abi_header.sh build-v2/cache/app_host_abi.h
+fetch_abi_header: OK (raw.githubusercontent.com) -> build-v2/cache/app_host_abi.h
+  pinned harryhua-ai/ne301@a5b4bf3dd25931d612680aff200e4e0ac8d8e64e:Custom/Common/Inc/app_host_abi.h
+  sha256 9337f684893cf2a06aea6f6f8c448708d91e8f9c6c86c24905ced8a7d5df23f4
+arm-none-eabi-gcc -mcpu=cortex-m55 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -std=gnu11 -Os -Wall -Werror -ffunction-sections -fdata-sections -ffreestanding -fno-builtin -Ibuild-v2/cache -DHELLO_APP_VERSION=2 -nostdlib -T hello_app.ld -Wl,--gc-sections -Wl,-Map,build-v2/hello-app-v2.map -o build-v2/hello-app-v2.elf main.c
+arm-none-eabi-objcopy -O binary build-v2/hello-app-v2.elf build-v2/hello-app-v2.payload.bin
+python3 ../../tools/pack_app_image.py \
+	--elf build-v2/hello-app-v2.elf --payload build-v2/hello-app-v2.payload.bin --out build-v2/hello-app-v2.bin \
+	--abi-header build-v2/cache/app_host_abi.h --nm arm-none-eabi-nm --objcopy arm-none-eabi-objcopy \
+	--exec-base 0x93E00000
+packed build-v2/hello-app-v2.bin: header 32 B + payload 576 B = 608 B, entry_offset 0x50, crc32 0x24352317, abi 0x00010000, target 0x93e00000
+   text	   data	    bss	    dec	    hex	filename
+    576	      0	      0	    576	    240	build-v2/hello-app-v2.elf
+hello-app: image ready -> build-v2/hello-app-v2.bin
+make: Leaving directory '/private/tmp/ne30x-app-36-v3.Qx617W/apps/hello-app'
+V1 reproduction OK: sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03 (608 B, byte-identical to Issue #2 record)
+V2 new artifact: sha256 e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd (608 B)
+  (historical v2 db1c6d60b398cab11a276e15770fdcdf9d42b9c96b4de6ef2cc93c1ecdec8744 is NOT claimed; see docs/p3-packaging.md)
+VALID: file=608 payload=576 target=0x93e00000 entry_offset=0x50 abi=0x00010000 crc32=0x1eb77cb6
+VALID: file=608 payload=576 target=0x93e00000 entry_offset=0x50 abi=0x00010000 crc32=0x24352317
+
+== [3/9] reproducibility: rebuild V1 from clean, require identical sha256
+reproducible OK: sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03
+
+== [4/9] pack .neapp v1 packages (packer self-verifies before writing)
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v1.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 1b426a4188b08df93986694976f745b1a5ea753595cdc4ace6611bbff4ed71b2, content_identity(SHA-256(TBS)) d8a581c25d90fee3bf4be12f46d2b0d2ab3f0d9278b89eb9868df8dd2b31e6fd
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v1.neapp.provenance.json
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v2.neapp: tbs 784 B + der 71 B = 855 B, package_sha256 2cb9400a92e0c8c6f9c2d875c56d5008fd8d3ff61261780d804e685e29d5c603, content_identity(SHA-256(TBS)) 207dccdbcebf717f14ef1c3f7a67e296af5856f575978ee69ea64651ad35e3f6
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v2.neapp.provenance.json
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/v2-image-as-1.0.0.neapp: tbs 784 B + der 70 B = 854 B, package_sha256 21337a61e39ef66cff9ab6aa0c7cf3e0adfde6dd9268c83675e784fa25ae14c2, content_identity(SHA-256(TBS)) 90816e74f31e9993a6a1eb9ff60f764e5c75fc07b20499c3457360e4b84661f8
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/v2-image-as-1.0.0.neapp.provenance.json
+
+== [5/9] offline verification of the trusted packages (must PASS)
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v1.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "d8a581c25d90fee3bf4be12f46d2b0d2ab3f0d9278b89eb9868df8dd2b31e6fd",
+  "native_crc32": "0x1eb77cb6",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "1b426a4188b08df93986694976f745b1a5ea753595cdc4ace6611bbff4ed71b2",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "f6b0ed1f9f73fbcbd1a1795cfca6461199e5b8d275606213cb0d3dec910a1be3",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 71,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v2.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "2.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "207dccdbcebf717f14ef1c3f7a67e296af5856f575978ee69ea64651ad35e3f6",
+  "native_crc32": "0x24352317",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "2cb9400a92e0c8c6f9c2d875c56d5008fd8d3ff61261780d804e685e29d5c603",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "f6b0ed1f9f73fbcbd1a1795cfca6461199e5b8d275606213cb0d3dec910a1be3",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 71,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/v2-image-as-1.0.0.neapp
+{
+  "app_id": "hello-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, or power-fail recovery evidence",
+  "content_identity_sha256": "90816e74f31e9993a6a1eb9ff60f764e5c75fc07b20499c3457360e4b84661f8",
+  "native_crc32": "0x24352317",
+  "native_entry_offset": "0x50",
+  "native_file_len": 608,
+  "native_file_sha256": "e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd",
+  "native_image_size": 576,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "21337a61e39ef66cff9ab6aa0c7cf3e0adfde6dd9268c83675e784fa25ae14c2",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "f6b0ed1f9f73fbcbd1a1795cfca6461199e5b8d275606213cb0d3dec910a1be3",
+  "required_exec_region_bytes": 576,
+  "required_host_abi": "0x00010000",
+  "required_host_caps": "0x3",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "signature_len": 70,
+  "target_board_id": "0x00003010",
+  "tbs_len": 784
+}
+
+== [6/9] independent OpenSSL cross-verification of the same TBS/signatures
+hello-app-v1: Verified OK
+hello-app-v2: Verified OK
+
+== [7/9] P2 spec §2.5 vectors: byte-exact adoption + expected result classes
+spec vector suite: 15 entries; all hash assertions and expected result classes matched
+results -> /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/spec-vectors-results.json
+
+== [8/9] locally generated structure/DER/policy cases
+[generated] positives
+  ok dev_v1_accept: PASS
+  ok dev_v2_accept: PASS
+  ok repack_same_content_identity
+  ok v1_to_v2_traceable_replacement
+  ok version_content_conflict_discriminator
+[generated] signature coverage negatives
+  tamper_payload: signed_len=784 payload_region=[208,784) tamper_offset=496 expected=SIGNATURE_INVALID
+  ok tamper_payload: SIGNATURE_INVALID
+  ok tamper_signature_last_byte: SIGNATURE_INVALID
+  ok tamper_manifest_version: SIGNATURE_INVALID
+  ok wrong_signer_key: SIGNATURE_INVALID
+[generated] structure negatives
+  ok truncate_signature: BAD_PACKAGE
+  ok truncate_whole_package: BAD_PACKAGE
+  ok append_tail_byte: BAD_PACKAGE
+  ok manifest_len_159: BAD_PACKAGE
+  ok manifest_len_zero: BAD_PACKAGE
+  ok image_len_below_header: BAD_PACKAGE
+  ok image_len_overflow: BAD_PACKAGE
+  ok magic_corrupted: BAD_PACKAGE
+[generated] DER encoding negatives
+  ok der_second_object: BAD_PACKAGE
+  ok der_r_zero: BAD_PACKAGE
+  ok der_nonminimal_length: BAD_PACKAGE
+[generated] manifest encoding negatives (re-signed)
+  ok app_id_nonzero_padding: BAD_PACKAGE
+  ok app_id_embedded_nul: BAD_PACKAGE
+[generated] re-signed policy negatives
+  ok board_0x3011_signed: TARGET_INCOMPATIBLE
+  ok psram_32_signed: TARGET_INCOMPATIBLE
+  ok caps_unknown_bit_signed: BAD_PACKAGE
+  ok abi_manifest_header_mismatch_signed: BAD_PACKAGE
+  ok abi_wrong_everywhere_signed: ABI_INCOMPATIBLE
+  ok entry_odd_signed: BAD_PACKAGE
+  ok exec_region_overcommit_signed: RESOURCE_LIMIT
+  ok unknown_publisher: PUBLISHER_UNTRUSTED
+[generated] re-signed content with inconsistent CRC/manifest cross-checks
+  ok resigned_payload_crc_mismatch: BAD_PACKAGE
+  ok resigned_payload_digest_mismatch: BAD_PACKAGE
+  ok native_file_overrides_small_region: RESOURCE_LIMIT
+generated case suite: 33 entries, all expectations matched
+results -> /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/generated-cases/generated-cases-results.json
+
+== [9/9] write structured evidence
+evidence -> /tmp/ne30x-app-36-v3.Qx617W/docs/evidence/p3-package-artifacts.json
+
+== ALL PACKAGE CHECKS PASSED
+V1 image  /tmp/ne30x-app-36-v3.Qx617W/apps/hello-app/build/hello-app.bin
+  sha256 d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03
+V2 image  /tmp/ne30x-app-36-v3.Qx617W/apps/hello-app/build-v2/hello-app-v2.bin
+  sha256 e8526a1ab0500a49b23d09fabf2f3664823b55de99bef301fe816d39d5041bfd
+V1 package /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v1.neapp
+  sha256 1b426a4188b08df93986694976f745b1a5ea753595cdc4ace6611bbff4ed71b2
+V2 package /tmp/ne30x-app-36-v3.Qx617W/tests/package/work/pkg/hello-app-v2.neapp
+  sha256 2cb9400a92e0c8c6f9c2d875c56d5008fd8d3ff61261780d804e685e29d5c603
+P3-owned artifact restored; this run snapshotted to docs/evidence/p6-v1-regression-artifacts.json
+
+== [2/8] #12 spec-v2 vector suite UNCHANGED (tests/spec-v2/run_all_tests.py)
+.neapp v2 candidate spec vector suite (evidence -> docs/evidence/spec-v2/)
+
+== [1] Golden v2 package rebuild and digest pinning (spec §10.1) ==
+  [PASS] golden_tbs_length — TBS length 244
+  [PASS] golden_tbs_digest_pinned — SHA-256(TBS)=e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278
+  [PASS] golden_pkg_length — package length 314
+  [PASS] golden_pkg_digest_pinned — SHA-256(package)=3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e
+  [PASS] golden_structural_manifest_native_policy — magic ok, manifest_len=192, abi=0x00020000, caps=0x3f, profile=1, quotas 2048/4096/6144
+  [PASS] golden_crypto_pure_python — pure-Python P-256 verify against d=1 SPKI
+  [PASS] golden_spki_digest_pinned — SHA-256(SPKI DER) matches manifest publisher_key_sha256
+  [PASS] golden_crypto_openssl — openssl dgst -sha256 -verify: Verified OK (exit 0)
+== [2] Historical 1024/4096 archive = valid-math / resource-insufficient negative (spec §10.2, §8 M7) ==
+  [PASS] archive_tbs_digest_pinned — archived TBS reconstructed byte-for-byte
+  [PASS] archive_pkg_digest_pinned — archived package (TBS+fixed DER) reconstructed
+  [PASS] archive_signature_math_valid — proving the rejection below is resource policy, not signature
+  [PASS] archive_quota_1024_4096_resource_limit — event_max=1024 < 1576 (64-frame ai_events), report_max=4096 < 6144 -> RESOURCE_LIMIT: event_max 1024 < 1576 required for 64-detection ai_events
+== [3] Re-signed policy rejections + host caps subset: valid signature must NOT bypass policy (spec §10.3.3, §8 M4/M5/M6/M9/M10) ==
+  [PASS] caps_unknown_bit6 — caps bit6 set, RFC6979 re-signed -> BAD_PACKAGE: unknown capability bits 0x00000040
+  [PASS] caps_unknown_bit6_signature_valid — rejection is policy, not signature
+  [PASS] reserved_176_nonzero — manifest reserved[176]=0x01, re-signed -> BAD_PACKAGE: manifest reserved[176..191] not zero
+  [PASS] reserved_58_59_nonzero — manifest reserved[58]=0x01, re-signed -> BAD_PACKAGE: manifest reserved[58..59] not zero
+  [PASS] unknown_run_profile — run_profile=2, re-signed -> BAD_PACKAGE: unknown run_profile 2
+  [PASS] profile1_without_bit5 — caps=0x1f (no session_lifecycle), re-signed -> BAD_PACKAGE: profile 1 must declare session_lifecycle (bit5)
+  [PASS] ai_events_zero_event_max — caps bit2 kept, event_max=0, re-signed -> BAD_PACKAGE: ai_events requires nonzero event_max
+  [PASS] v2_container_v1_abi — required_host_abi=0x00010000 inside NMF2 manifest, re-signed -> BAD_PACKAGE: v2 manifest required_host_abi=0x00010000 != 0x00020000
+  [PASS] caps_subset_negative_signature_valid — golden signature pinned valid; the rejection below is host policy, not signature
+  [PASS] caps_subset_host_missing_report_submit — caps=0x3f all known bits; Host lacks report_submit -> ABI_INCOMPATIBLE: host does not provide capability bits 0x00000008 (known but unsupported)
+  [PASS] unknown_publisher_id — format-valid publisher_id absent from Host trust store, re-signed -> PUBLISHER_UNTRUSTED: publisher_id 'untrusted-pub' not in Host trusted mapping
+  [PASS] publisher_negative_signature_valid — re-signed with the Host-store key: rejection below is trust mapping, not signature
+  [PASS] publisher_key_fingerprint_mismatch — manifest fingerprint altered, Host store entry unchanged, re-signed -> PUBLISHER_UNTRUSTED: publisher_key_sha256 mismatch for 'test-publisher' vs Host trust store
+  [PASS] target_outside_host_loader_range — self-consistent target 0x94E00000 outside Host loader range, re-signed -> RESOURCE_LIMIT: native target_addr 0x94e00000+36B outside host loader range 0x93e00000..0x94000000
+  [PASS] exec_region_exceeds_host_actual — required_exec_region_bytes=3MiB > host actual 2MiB, re-signed -> RESOURCE_LIMIT: exec_region 3145728 exceeds host actual execution region 2097152
+  [PASS] native_header_abi_mismatch_vs_manifest — native header abi=0x00010000 vs manifest 0x00020000, digest-consistent, re-signed -> BAD_PACKAGE: native abi 0x00010000 != manifest required_host_abi
+  [PASS] native_reserved0_nonzero — native reserved0=1 with matching digest, re-signed -> BAD_PACKAGE: native header reserved0 != 0
+  [PASS] manifest_native_len_mismatch — manifest native_file_len=+1, re-signed -> BAD_PACKAGE: manifest native_file_len != actual native length
+== [4] Container/DER structural negatives (spec §10.3.2, §10.3.7) ==
+  [PASS] der_trailing_byte — valid 70B DER + 1 trailing byte (must fully consume tail) -> BAD_PACKAGE: DER does not consume its tail exactly
+  [PASS] der_truncated — signature truncated by 1 byte -> BAD_PACKAGE: DER does not consume its tail exactly
+  [PASS] manifest_len_160_in_v2 — manifest_len field=160 (v1 value) in v2 header -> BAD_PACKAGE: manifest_len 160 wrong for container
+  [PASS] v1_magic_on_v2_container — container magic downgraded to v1, body unchanged -> BAD_PACKAGE: container magic 4e45415050010000 != 4e45415050020000
+  [PASS] v2_package_on_v1_host — v2 golden fed to frozen v1 structural rules -> BAD_PACKAGE: v1: unknown container magic 4e45415050020000
+  [PASS] nmf1_magic_in_v2 — manifest magic NMF1 in v2 container, re-signed -> BAD_PACKAGE: manifest magic b'NMF1' != NMF2
+== [5] Signed-content tamper (spec §10.3.1) ==
+     layout: manifest [16,208), native hdr [208,240), true payload [240,244), DER [244,314)
+  [PASS] payload_tamper_detected — true payload byte at TBS[240] flipped (DER untouched) -> SIGNATURE_INVALID
+  [PASS] payload_tamper_openssl_rejects — openssl: Verification failure (exit 1)
+  [PASS] manifest_tamper_detected — manifest byte 40 (app_id area) flipped -> SIGNATURE_INVALID
+  [PASS] der_region_tamper_detected — DER byte 250 flipped (TBS untouched) -> SIGNATURE_INVALID
+== [6] Old/new interop discrimination (spec §8 M2/M3/M4) ==
+  [PASS] v1_golden_digest — frozen v1 §2.5 golden rebuilt from spec HEX
+  [PASS] v1_golden_structural — v1 container ok, abi=0x00010000, caps=0x3 (log|tick_ms only)
+  [PASS] v1_golden_signature_valid — v1 golden DER verifies against the same d=1 SPKI
+  [PASS] v1_on_v2_host_caps_limited — v2 Host grants log|tick_ms only; no v2 capability may be inferred
+  [PASS] v1_golden_openssl — openssl: Verified OK (exit 0)
+== [7] AI event wire (spec §5, §10.4) ==
+  [PASS] frame64_length_1576 — len=1576
+  [PASS] frame64_roundtrip — encode/validate round trip
+  [PASS] frame0_is_40b — distinct from NO_EVENT/MODEL_CHANGED/STOPPING
+  [PASS] kind_model_changed_encodes — kind=2
+  [PASS] kind_gap_encodes — kind=3
+  [PASS] kind_stopping_encodes — kind=4
+  [PASS] event_unknown_kind — kind=5 -> BAD_EVENT: unknown kind 5
+  [PASS] event_unknown_flag_bit — flags bit2 set -> BAD_EVENT: undefined flag bits 0x00000004
+  [PASS] event_flag1_without_sentinel — flags.bit1=1 but lost_frame_count=7 (must be 0xFFFFFFFF) -> BAD_EVENT: flags.bit1=1 requires lost_frame_count=0xFFFFFFFF
+  [PASS] event_sentinel_without_flag1 — lost_frame_count=0xFFFFFFFF without flags.bit1 -> BAD_EVENT: lost_frame_count sentinel without flags.bit1
+  [PASS] event_65_detections_encode — 65 detections > 64 -> BAD_EVENT: 65 detections > 64
+  [PASS] event_65_detections_wire — hand-built 65-detection event rejected, not truncated -> BAD_EVENT: detection_count 65 > 64
+  [PASS] event_total_len_mismatch — total_len=100 != 40+24*2 -> BAD_EVENT: total_len != 40 + 24*detection_count
+  [PASS] event_nonfinite_confidence — confidence bits = quiet NaN -> BAD_EVENT: record 0 confidence not finite
+  [PASS] event_class_index_oob — class_index=8 >= class_count=8 -> BAD_EVENT: record 0 class_index 8 >= class_count 8
+== [8] model_meta / report-size host semantics (spec §6.5/§6.6) ==
+  [PASS] model_meta_layout — loaded=1 name='line-crossing-model' ver='2.1.0'
+  [PASS] model_meta_wrong_type_incompatible — result_type=2 -> INCOMPATIBLE
+  [PASS] report_oversize_rejected — 6145B report vs report_max=6144 -> QUOTA_EXCEEDED (no truncation)
+  [PASS] report_capacity_aligns_lc_dq — declared report_max == LC_DQ_SLOT_CAPACITY evidence anchor
+  [PASS] model_name_no_nul — model_name fills all 64B without NUL -> INCOMPATIBLE: model_name missing NUL terminator
+  [PASS] model_name_junk_after_nul — model_name carries junk after its NUL -> INCOMPATIBLE: model_name has non-zero bytes after its NUL
+  [PASS] model_version_no_nul — model_version fills all 32B without NUL -> INCOMPATIBLE: model_version missing NUL terminator
+  [PASS] model_meta_trailing_reserved_nonzero — trailing 8B reserved nonzero -> INCOMPATIBLE: model_meta trailing reserved not zero
+== [9] tick_ms modulo-2^32 semantics (spec §6.3/§6.4; A decision issuecomment-6093724900) ==
+  [PASS] tick_positive_small_delta — ordinary small forward step, well below the wrap point
+  [PASS] tick_wrap_7fffffff_to_80000000 — mod-2^32 wrap past 2^31; the naive signed-int32 reading of 0x80000000 is -2147483648 and must NOT be treated as a §6.4 negative error code
+  [PASS] tick_int32_trap_guard_80000000 — negative int32 value exists but the delta channel is uint32 mod-2^32 only
+  [PASS] tick_wrap_ffffffff_to_00000000 — 0xffffffff -> 0x00000000 is +1 mod 2^32; the int32 reading -1 is not a §6.4 error
+  [PASS] tick_bits_out_of_range — non-u32 bit pattern rejected -> INVALID_ARGUMENT: tick bits 0x100000000 outside u32
+
+Evidence written to docs/evidence/spec-v2/
+
+Result: 73/73 vectors PASS
+All vectors PASS. Host-side spec evidence only — no device PASS (spec §12).
+
+== [3/8] NON-PRODUCTION identities (dev key per round + PUBLIC spec d=1 test signer)
+dev signing identity generated (NON-PRODUCTION TEST ROOT)
+  private key (gitignored, owner-only): /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/keys/dev-signer.pem
+  signer SPKI DER: /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/keys/dev-signer.spki.der (91 B)
+  SHA-256(SPKI DER): 0e4d2b7712d5464638ac65a4951dc615f0f41b1acb2d2e27fcecba7ef5745296
+  trust store: /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/trust-dev.json (publisher_id 'dev-publisher')
+d=1 test identity generated (PUBLIC, NON-PRODUCTION): SPKI sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3
+  private key (gitignored): /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/keys/d1-test-signer.pem
+  trust store: /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/trust-d1.json (publisher_id 'test-publisher')
+
+== [4/8] controlled v2-ABI native test images (deterministic)
+v2 test image -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/img/lc-test-image.bin
+  bytes    36 (32B NEA1 header + 4B payload)
+  abi      0x00020000  target 0x93e00000  entry 0x0  crc32 0xde8e3439
+  sha256   9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095
+controlled image == #12 golden native image (byte-identical)
+v2 test image -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/img/lc-test-alt-image.bin
+  bytes    36 (32B NEA1 header + 4B payload)
+  abi      0x00020000  target 0x93e00000  entry 0x0  crc32 0x4e3129a8
+  sha256   16cd5a93088375060043fdd728f7fec56d4edec17c684225f327a813e30fb39a
+
+== [5/8] golden replica pack (d=1): TBS must equal the #12 golden TBS byte-for-byte
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/golden-replica.neapp.v2: tbs 244 B + der 71 B = 315 B, package_sha256 aad02bca22a1e10cd70f73d592ad89440e11a12a9c361abb5c99271087af3112, content_identity(SHA-256(TBS)) e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/golden-replica.neapp.v2.provenance.json
+replica TBS byte-identical to #12 golden; SHA-256(TBS) e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/golden-replica.neapp.v2
+{
+  "app_id": "hello-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
+  "content_identity_sha256": "e14e2cce8b3b0ecfa1d0af0538e931d3403c318a665126288c5c82b96ffbd278",
+  "event_max": 2048,
+  "format": "neapp-v2",
+  "native_crc32": "0xde8e3439",
+  "native_entry_offset": "0x0",
+  "native_file_len": 36,
+  "native_file_sha256": "9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095",
+  "native_image_size": 4,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "aad02bca22a1e10cd70f73d592ad89440e11a12a9c361abb5c99271087af3112",
+  "publisher_id": "test-publisher",
+  "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+  "report_max": 6144,
+  "required_exec_region_bytes": 4,
+  "required_host_abi": "0x00020000",
+  "required_host_caps": "0x3f",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "run_profile": 1,
+  "signature_len": 71,
+  "state_quota": 4096,
+  "target_board_id": "0x00003010",
+  "tbs_len": 244
+}
+
+== [6/8] dev-key v2 packages (AC1 traceable provenance, upgrade + conflict discriminators)
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2: tbs 244 B + der 70 B = 314 B, package_sha256 0ba7ed6fe12814190832789e97124cc9911bd4027209cf093c278c9af42fb95c, content_identity(SHA-256(TBS)) 3deb1e26de997e3ab6608875585fbd7b3f8799526ba55d50ca3ed63d7c84322c
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2.provenance.json
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2
+{
+  "app_id": "lc-test-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
+  "content_identity_sha256": "3deb1e26de997e3ab6608875585fbd7b3f8799526ba55d50ca3ed63d7c84322c",
+  "event_max": 2048,
+  "format": "neapp-v2",
+  "native_crc32": "0xde8e3439",
+  "native_entry_offset": "0x0",
+  "native_file_len": 36,
+  "native_file_sha256": "9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095",
+  "native_image_size": 4,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "0ba7ed6fe12814190832789e97124cc9911bd4027209cf093c278c9af42fb95c",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "0e4d2b7712d5464638ac65a4951dc615f0f41b1acb2d2e27fcecba7ef5745296",
+  "report_max": 6144,
+  "required_exec_region_bytes": 4,
+  "required_host_abi": "0x00020000",
+  "required_host_caps": "0x3f",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "run_profile": 1,
+  "signature_len": 70,
+  "state_quota": 4096,
+  "target_board_id": "0x00003010",
+  "tbs_len": 244
+}
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2: tbs 244 B + der 70 B = 314 B, package_sha256 afe626a0092489a00caeefa0babe732be2de5d83d0052b008eeb804ed2e0e167, content_identity(SHA-256(TBS)) f41f2b2c62d2da2cd0050ab5f46d0c0fa5d0d910f4e6480bcf2dd304124f4122
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2.provenance.json
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-2.0.0.neapp.v2
+{
+  "app_id": "lc-test-app",
+  "app_version": "2.0.0",
+  "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
+  "content_identity_sha256": "f41f2b2c62d2da2cd0050ab5f46d0c0fa5d0d910f4e6480bcf2dd304124f4122",
+  "event_max": 2048,
+  "format": "neapp-v2",
+  "native_crc32": "0xde8e3439",
+  "native_entry_offset": "0x0",
+  "native_file_len": 36,
+  "native_file_sha256": "9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095",
+  "native_image_size": 4,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "afe626a0092489a00caeefa0babe732be2de5d83d0052b008eeb804ed2e0e167",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "0e4d2b7712d5464638ac65a4951dc615f0f41b1acb2d2e27fcecba7ef5745296",
+  "report_max": 6144,
+  "required_exec_region_bytes": 4,
+  "required_host_abi": "0x00020000",
+  "required_host_caps": "0x3f",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "run_profile": 1,
+  "signature_len": 70,
+  "state_quota": 4096,
+  "target_board_id": "0x00003010",
+  "tbs_len": 244
+}
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2: tbs 244 B + der 70 B = 314 B, package_sha256 36e0d7dd37a2a634f1bceb51edd55b679c0a293df5986556a2f8b0824123eb0c, content_identity(SHA-256(TBS)) 01dfff03b6f2f489ef229f23f439fac48c4255a62031eae24caba107b21bebe1
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2.provenance.json
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-alt-1.0.0.neapp.v2
+{
+  "app_id": "lc-test-app",
+  "app_version": "1.0.0",
+  "boundary": "offline verification only: not device install, execution, STM32/PKA verification, or power-fail recovery evidence",
+  "content_identity_sha256": "01dfff03b6f2f489ef229f23f439fac48c4255a62031eae24caba107b21bebe1",
+  "event_max": 2048,
+  "format": "neapp-v2",
+  "native_crc32": "0x4e3129a8",
+  "native_entry_offset": "0x0",
+  "native_file_len": 36,
+  "native_file_sha256": "16cd5a93088375060043fdd728f7fec56d4edec17c684225f327a813e30fb39a",
+  "native_image_size": 4,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "36e0d7dd37a2a634f1bceb51edd55b679c0a293df5986556a2f8b0824123eb0c",
+  "publisher_id": "dev-publisher",
+  "publisher_key_sha256": "0e4d2b7712d5464638ac65a4951dc615f0f41b1acb2d2e27fcecba7ef5745296",
+  "report_max": 6144,
+  "required_exec_region_bytes": 4,
+  "required_host_abi": "0x00020000",
+  "required_host_caps": "0x3f",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "run_profile": 1,
+  "signature_len": 70,
+  "state_quota": 4096,
+  "target_board_id": "0x00003010",
+  "tbs_len": 244
+}
+
+== [7/8] v2 rejection matrix + cross-version discrimination
+[v2-cases] positives: AC1 controlled-image package + #12 golden consistency (AC3)
+  ok dev_v2_accept: PASS
+  ok golden_replica_tbs_identity: PASS
+  ok golden_artifact_accept: PASS
+  ok golden_der_independent_cross: predicate
+  ok archive_negative_resource_limit: RESOURCE_LIMIT [event_max 1024]
+  ok golden_low_s_variant_same_identity: PASS
+  ok dev_provenance_traceable: predicate
+[v2-cases] rejection matrix: structure / DER / manifest encoding
+  ok magic_unknown_version: BAD_PACKAGE [container magic]
+  ok magic_v1_on_v2: BAD_PACKAGE [container magic]
+  ok manifest_len_160_in_v2: BAD_PACKAGE [manifest_len]
+  ok manifest_len_193_in_v2: BAD_PACKAGE [manifest_len]
+  ok image_len_below_header: BAD_PACKAGE [cannot hold]
+  ok image_len_overflow: BAD_PACKAGE [exceeds the v2 native file cap]
+  ok truncate_whole_package: BAD_PACKAGE [shorter than the minimum]
+  ok truncate_signature: BAD_PACKAGE [DER]
+  ok der_tail_byte: BAD_PACKAGE [DER]
+  ok der_second_object: BAD_PACKAGE [DER]
+  ok der_r_zero: BAD_PACKAGE [r outside P-256 range]
+  ok der_nonminimal_length: BAD_PACKAGE [DER]
+  ok nmf1_magic_in_v2: BAD_PACKAGE [manifest magic]
+  ok reserved_58_nonzero: BAD_PACKAGE [reserved bytes (58..59)]
+  ok reserved_176_nonzero: BAD_PACKAGE [reserved bytes (176..191)]
+  ok v2_container_v1_abi_m4: BAD_PACKAGE [required_host_abi must be 0x00020000]
+[v2-cases] rejection matrix: signature coverage (tamper native/manifest/DER)
+  ok tamper_native_payload: SIGNATURE_INVALID [verification failed]
+  ok tamper_manifest_caps_escalation: SIGNATURE_INVALID [verification failed]
+  ok tamper_manifest_version: SIGNATURE_INVALID [verification failed]
+  ok tamper_der_region: SIGNATURE_INVALID [verification failed]
+  ok wrong_signer_key: SIGNATURE_INVALID [verification failed]
+[v2-cases] rejection matrix: publisher trust mapping (re-signed)
+  ok unknown_publisher: PUBLISHER_UNTRUSTED [not in the local trust mapping]
+  ok publisher_fingerprint_mismatch: PUBLISHER_UNTRUSTED [does not match the trusted key]
+[v2-cases] rejection matrix: native cross-checks (re-signed, digest-consistent)
+  ok native_header_abi_mismatch_m8: BAD_PACKAGE [abi_version]
+  ok native_reserved0_nonzero: BAD_PACKAGE [reserved0]
+  ok resigned_payload_crc_stale: BAD_PACKAGE [CRC-32]
+  ok resigned_payload_digest_stale: BAD_PACKAGE [native_file_sha256]
+  ok manifest_native_len_mismatch: BAD_PACKAGE [native_file_len]
+  ok entry_odd_signed: BAD_PACKAGE [entry_offset]
+  ok helloapp_v1_image_in_v2_container: BAD_PACKAGE [abi_version]
+  ok helloapp_v1_image_pack_refusal: refused
+[v2-cases] rejection matrix: v2 policy after valid signature (re-signed)
+  ok caps_unknown_bit6: BAD_PACKAGE [unknown bits]
+  ok profile1_without_bit5: BAD_PACKAGE [session_lifecycle]
+  ok unknown_run_profile_2: BAD_PACKAGE [unknown run_profile]
+  ok quota_without_cap: BAD_PACKAGE [without the ai_events]
+  ok cap_without_quota: BAD_PACKAGE [requires a nonzero event_max]
+  ok board_mismatch: TARGET_INCOMPATIBLE [target_board_id]
+  ok psram_mismatch: TARGET_INCOMPATIBLE [required_psram_mib]
+  ok caps_subset_host_missing_report_submit: ABI_INCOMPATIBLE [does not provide capability bits]
+  ok event_max_under_business_floor: RESOURCE_LIMIT [below the 64-detection]
+  ok report_max_under_business_floor: RESOURCE_LIMIT [below the line_counting report minimum]
+  ok event_max_over_host_buffer: RESOURCE_LIMIT [exceeds the Host event buffer]
+  ok state_quota_over_host: RESOURCE_LIMIT [exceeds the Host state quota]
+  ok exec_region_over_host_actual: RESOURCE_LIMIT [exceeds the Host actual execution region]
+  ok target_outside_host_loader_range: RESOURCE_LIMIT [outside the Host loader range]
+  ok native_file_overrides_small_load_region: RESOURCE_LIMIT [Host load region]
+[v2-cases] cross-version discrimination (§8 M2/M3, downgrade/conflict discriminators)
+  ok v2_package_on_v1_verifier_m2: BAD_PACKAGE
+  ok v1_package_on_v2_verifier: BAD_PACKAGE [not NEAPP v2]
+  ok v1_caps_no_v2_upgrade_m3: predicate
+  ok downgrade_discriminator: predicate
+  ok content_conflict_discriminator: predicate
+  ok idempotent_repack_same_identity: predicate
+v2 case suite: 59 entries, all expectations matched
+results -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/v2-cases/v2-cases-results.json
+
+== [8/8] write structured evidence
+evidence -> /tmp/ne30x-app-36-v3.Qx617W/docs/evidence/p6-package-artifacts.json
+
+== ALL P6 PACKAGE CHECKS PASSED
+controlled image /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/img/lc-test-image.bin
+  sha256 9e7fb5a89e294425e83ac3fb39d6251424ab12a1d236b821d06eb41053c8c095
+golden replica  /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/golden-replica.neapp.v2
+  sha256 aad02bca22a1e10cd70f73d592ad89440e11a12a9c361abb5c99271087af3112
+dev package     /tmp/ne30x-app-36-v3.Qx617W/tests/package-v2/work/pkg/lc-test-app-1.0.0.neapp.v2
+  sha256 0ba7ed6fe12814190832789e97124cc9911bd4027209cf093c278c9af42fb95c
+evidence log    /tmp/ne30x-app-36-v3.Qx617W/docs/evidence/p6-package-checks.log
+frozen v1/v2 regression snapshot captured:
+  v1 spec vectors: 15, generated cases: 33
+  hello-app V1 sha256: d6eec431c6c17b84770263ce8e8a9d386f9e798d14024f4452f090c87c6e2d03 (byte-exact)
+  v2 cases: 59
+#13-owned p6 evidence files restored to committed bytes (guard pre-checked them clean before the run; this round's results are recorded in the v3 evidence)
+
+== [2/7] frozen spec suites UNCHANGED (spec-v2 then spec-v3, evidence must stay deterministic)
+spec-v2 suite: PASS (committed evidence byte-identical)
+spec-v3 suite: PASS (committed evidence byte-identical)
+
+== [3/7] NON-PRODUCTION identities (dev key per round + PUBLIC spec d=1 test signer)
+dev signing identity generated (NON-PRODUCTION TEST ROOT)
+  private key (gitignored, owner-only): /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/keys/dev-signer.pem
+  signer SPKI DER: /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/keys/dev-signer.spki.der (91 B)
+  SHA-256(SPKI DER): f14c3be80635f9fd8cce0c8c8bd54ae81bdb75f5f452801c71de10f9f85660e0
+  trust store: /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/trust-dev.json (publisher_id 'dev-publisher')
+d=1 test identity generated (PUBLIC, NON-PRODUCTION): SPKI sha256 5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3
+  private key (gitignored): /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/keys/d1-test-signer.pem
+  trust store: /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/trust-d1.json (publisher_id 'test-publisher')
+
+== [4/7] controlled v3-ABI native test images (deterministic)
+v3 test image -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/img/lc-v3-test-image.bin
+  bytes    36 (32B NEA1 header + 4B payload)
+  abi      0x00030000  target 0x93e00000  entry 0x0  crc32 0xde8e3439
+  sha256   aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69
+controlled image == #19 golden native image (byte-identical)
+v3 test image -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/img/lc-v3-alt-image.bin
+  bytes    36 (32B NEA1 header + 4B payload)
+  abi      0x00030000  target 0x93e00000  entry 0x0  crc32 0x4e3129a8
+  sha256   2b22aaac5ed17fa345769505be9ec187655446c6234880c19f6084fcb9ad3a3c
+
+== [5/7] golden replica pack (d=1): TBS and whole package must be byte-identical to #19 golden
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/golden-replica.neapp.v3: tbs 244 B + der 70 B = 314 B, package_sha256 c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342, content_identity(SHA-256(TBS)) d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/golden-replica.neapp.v3.provenance.json
+replica TBS byte-identical; SHA-256(TBS) d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e
+replica package byte-identical (314B); SHA-256(package) c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/golden-replica.neapp.v3
+{
+  "app_id": "line-crossing",
+  "app_version": "3.0.0",
+  "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence",
+  "content_identity_sha256": "d793a455e3ccda715c8ee9ae95a718cf0fc2627c0ff20969f23e7ea9349b349e",
+  "control_max": 256,
+  "event_max": 2048,
+  "format": "neapp-v3",
+  "native_crc32": "0xde8e3439",
+  "native_entry_offset": "0x0",
+  "native_file_len": 36,
+  "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69",
+  "native_image_size": 4,
+  "native_target_addr": "0x93e00000",
+  "package_sha256": "c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342",
+  "publisher_id": "test-publisher",
+  "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+  "report_max": 6144,
+  "required_exec_region_bytes": 4,
+  "required_host_abi": "0x00030000",
+  "required_host_caps": "0xff",
+  "required_psram_mib": 64,
+  "result": "PASS",
+  "run_profile": 2,
+  "signature_len": 70,
+  "snapshot_max": 1024,
+  "state_quota": 4096,
+  "target_board_id": "0x00003010",
+  "tbs_len": 244
+}
+golden replica verified PASS
+
+== [6/7] dev-key v3 packages (AC1 traceable provenance, upgrade + conflict discriminators)
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3: tbs 244 B + der 72 B = 316 B, package_sha256 f5a77701c8d571e7175781ac1ee99a025fc77097075ffb043d8c6fda557f3834, content_identity(SHA-256(TBS)) cf68d831f414a2b2773c271ba5a2516934bada672adf084f0205d016cedce4a4
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3.provenance.json
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
+{"app_id": "lc-test-app", "app_version": "1.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "cf68d831f414a2b2773c271ba5a2516934bada672adf084f0205d016cedce4a4", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0xde8e3439", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "f5a77701c8d571e7175781ac1ee99a025fc77097075ffb043d8c6fda557f3834", "publisher_id": "dev-publisher", "publisher_key_sha256": "f14c3be80635f9fd8cce0c8c8bd54ae81bdb75f5f452801c71de10f9f85660e0", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 72, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
+packed+verified /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3: tbs 244 B + der 70 B = 314 B, package_sha256 91f8cd09d962646d8b76838bb9353463c67fefaadf38574f1e6ca8cd98469b08, content_identity(SHA-256(TBS)) 5242c3017802cb78eb4a3165012ff3672840178acbdf7f30ebc1792a608d3f62
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3.provenance.json
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3
+{"app_id": "lc-test-app", "app_version": "2.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "5242c3017802cb78eb4a3165012ff3672840178acbdf7f30ebc1792a608d3f62", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0xde8e3439", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "91f8cd09d962646d8b76838bb9353463c67fefaadf38574f1e6ca8cd98469b08", "publisher_id": "dev-publisher", "publisher_key_sha256": "f14c3be80635f9fd8cce0c8c8bd54ae81bdb75f5f452801c71de10f9f85660e0", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 70, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
+packed+verified /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-2.0.0.neapp.v3
+packed /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3: tbs 244 B + der 72 B = 316 B, package_sha256 408a18808ddc34b2482ecdaf4dbd324df397b8a8e4a1851f1380f134d2c59a54, content_identity(SHA-256(TBS)) 66b8bc56bc9c9edd64f4d4fe1b11df1f653d9ebbb926d0d5ca09516f76eaa7c6
+provenance -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3.provenance.json
+VERIFIED: PASS — /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3
+{"app_id": "lc-test-app", "app_version": "1.0.0", "boundary": "offline verification only: not NE301 admission, install, execution, hot reconfiguration, STM32/PKA verification, or power-fail recovery evidence", "content_identity_sha256": "66b8bc56bc9c9edd64f4d4fe1b11df1f653d9ebbb926d0d5ca09516f76eaa7c6", "control_max": 256, "event_max": 2048, "format": "neapp-v3", "native_crc32": "0x4e3129a8", "native_entry_offset": "0x0", "native_file_len": 36, "native_file_sha256": "2b22aaac5ed17fa345769505be9ec187655446c6234880c19f6084fcb9ad3a3c", "native_image_size": 4, "native_target_addr": "0x93e00000", "package_sha256": "408a18808ddc34b2482ecdaf4dbd324df397b8a8e4a1851f1380f134d2c59a54", "publisher_id": "dev-publisher", "publisher_key_sha256": "f14c3be80635f9fd8cce0c8c8bd54ae81bdb75f5f452801c71de10f9f85660e0", "report_max": 6144, "required_exec_region_bytes": 4, "required_host_abi": "0x00030000", "required_host_caps": "0xff", "required_psram_mib": 64, "result": "PASS", "run_profile": 2, "signature_len": 72, "snapshot_max": 1024, "state_quota": 4096, "target_board_id": "0x00003010", "tbs_len": 244}
+packed+verified /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-v3-alt-1.0.0.neapp.v3
+
+== [7/7] v3 rejection matrix + cross-version discrimination + evidence
+[v3-cases] positives: AC1 controlled-image package + #19 golden reproduction (AC3)
+  ok dev_v3_accept: PASS
+  ok golden_replica_byte_identical: predicate
+  ok golden_artifact_accept: PASS
+  ok golden_der_independent_cross: predicate
+  ok golden_low_s_variant_same_identity: PASS
+  ok dev_provenance_traceable: predicate
+[v3-cases] packer admission semantics: generic profile 2 default pack + explicit target-Host policy separation (Issue #20 fix)
+  ok pack_default_generic_profile2_shape: predicate
+  ok pack_default_generic_profile2_verifier_pass: PASS
+  ok generic_profile2_vs_line_crossing_host: BAD_PACKAGE [line-crossing-64 requires capability bits]
+  ok pack_large_quota_with_sufficient_host_policy: PASS
+  ok large_quota_pkg_vs_insufficient_host: RESOURCE_LIMIT [exceeds the Host control message capacity]
+  ok pack_large_quota_insufficient_host_refusal: refused
+[v3-cases] rejection matrix: structure / DER / manifest encoding
+  ok magic_v2_on_v3: BAD_PACKAGE [container magic]
+  ok magic_v1_on_v3: BAD_PACKAGE [container magic]
+  ok manifest_len_160_in_v3: BAD_PACKAGE [manifest_len]
+  ok manifest_len_193_in_v3: BAD_PACKAGE [manifest_len]
+  ok image_len_below_header: BAD_PACKAGE [cannot hold]
+  ok image_len_overflow: BAD_PACKAGE [exceeds the v3 native file cap]
+  ok truncate_whole_package: BAD_PACKAGE [shorter than the minimum]
+  ok truncate_signature: BAD_PACKAGE [DER]
+  ok der_tail_byte: BAD_PACKAGE [DER]
+  ok der_second_object: BAD_PACKAGE [DER]
+  ok der_r_zero: BAD_PACKAGE [r outside P-256 range]
+  ok der_nonminimal_length: BAD_PACKAGE [DER]
+  ok nmf2_magic_in_v3: BAD_PACKAGE [manifest magic]
+  ok reserved_58_nonzero: BAD_PACKAGE [reserved bytes (58..59)]
+  ok reserved_184_nonzero: BAD_PACKAGE [reserved bytes (184..191)]
+  ok abi_v2_value_in_nmf3_m6: BAD_PACKAGE [required_host_abi must be 0x00030000]
+[v3-cases] rejection matrix: signature coverage (tamper native/manifest/DER)
+  ok tamper_native_payload: SIGNATURE_INVALID [verification failed]
+  ok tamper_manifest_caps_escalation: SIGNATURE_INVALID [verification failed]
+  ok tamper_manifest_control_max: SIGNATURE_INVALID [verification failed]
+  ok tamper_manifest_version: SIGNATURE_INVALID [verification failed]
+  ok tamper_der_region: SIGNATURE_INVALID [verification failed]
+  ok wrong_signer_key: SIGNATURE_INVALID [verification failed]
+[v3-cases] rejection matrix: publisher trust mapping (re-signed)
+  ok unknown_publisher: PUBLISHER_UNTRUSTED [not in the local trust mapping]
+  ok publisher_fingerprint_mismatch: PUBLISHER_UNTRUSTED [does not match the trusted key]
+[v3-cases] rejection matrix: native cross-checks (re-signed, digest-consistent)
+  ok native_header_abi_v2_mismatch: BAD_PACKAGE [abi_version]
+  ok native_reserved0_nonzero: BAD_PACKAGE [reserved0]
+  ok resigned_payload_crc_stale: BAD_PACKAGE [CRC-32]
+  ok resigned_payload_digest_stale: BAD_PACKAGE [native_file_sha256]
+  ok manifest_native_len_mismatch: BAD_PACKAGE [native_file_len]
+  ok entry_odd_signed: BAD_PACKAGE [entry_offset]
+[v3-cases] rejection matrix: v3 policy after valid signature (re-signed)
+  ok caps_unknown_bit8_m8: BAD_PACKAGE [unknown bits]
+  ok profile1_in_v3_m9: BAD_PACKAGE [unknown run_profile]
+  ok profile2_missing_bit5: BAD_PACKAGE [session_lifecycle]
+  ok profile2_missing_bit6: BAD_PACKAGE [control_receive]
+  ok cap_bit6_without_control_max: BAD_PACKAGE [requires a nonzero control_max]
+  ok snapshot_max_without_bit7: BAD_PACKAGE [without the business_snapshot]
+  ok control_max_below_wire_min_m11: RESOURCE_LIMIT [below the generic 32B control-wire minimum]
+  ok control_max_above_host_m11: RESOURCE_LIMIT [exceeds the Host control message capacity]
+  ok snapshot_max_above_host_m11: RESOURCE_LIMIT [exceeds the Host snapshot RAM]
+  ok event_max_under_business_floor: RESOURCE_LIMIT [below the 64-detection]
+  ok report_max_under_business_floor: RESOURCE_LIMIT [below the line_counting report minimum]
+  ok event_max_over_host_buffer: RESOURCE_LIMIT [exceeds the Host event buffer]
+  ok state_quota_over_host: RESOURCE_LIMIT [exceeds the Host state quota]
+  ok board_mismatch: TARGET_INCOMPATIBLE [target_board_id]
+  ok psram_mismatch: TARGET_INCOMPATIBLE [required_psram_mib]
+  ok exec_region_over_host_actual: RESOURCE_LIMIT [exceeds the Host actual execution region]
+  ok target_outside_host_loader_range: RESOURCE_LIMIT [outside the Host loader range]
+  ok native_file_overrides_small_load_region: RESOURCE_LIMIT [Host load region]
+  ok host_missing_bit7_m10: ABI_INCOMPATIBLE [does not provide capability bits]
+[v3-cases] cross-version discrimination (§10 M2/M3/M4/M5, no v2-reserved escalation)
+  ok v3_golden_on_v2_verifier_m2: BAD_PACKAGE
+  ok v3_golden_on_v1_verifier_m3: BAD_PACKAGE
+  ok v2_golden_on_v3_verifier_m4: BAD_PACKAGE [container magic]
+  ok v1_golden_on_v3_verifier_m5: BAD_PACKAGE [container magic]
+  ok v2_reserved_bits_no_v3_upgrade_m4: predicate
+  ok downgrade_discriminator: predicate
+  ok content_conflict_discriminator: predicate
+  ok idempotent_repack_same_identity: predicate
+  ok helloapp_v1_image_pinned: predicate
+  ok helloapp_v1_image_in_v3_container: BAD_PACKAGE [abi_version]
+  ok helloapp_v1_image_pack_refusal: refused
+  ok v2abi_image_pack_refusal: refused
+v3 case suite: 73 entries, all expectations matched
+results -> /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/v3-cases/v3-cases-results.json
+evidence -> /tmp/ne30x-app-36-v3.Qx617W/docs/evidence/p6-package-v3-artifacts.json
+
+== ALL P6 v3 PACKAGE CHECKS PASSED
+controlled image /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/img/lc-v3-test-image.bin
+  sha256 aa8c3ef6e4082656c76255807bee5a7c562ad212a0c3e2a4f009a62129cdee69
+golden replica  /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/golden-replica.neapp.v3
+  sha256 c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342
+dev package     /tmp/ne30x-app-36-v3.Qx617W/tests/package-v3/work/pkg/lc-test-app-1.0.0.neapp.v3
+  sha256 f5a77701c8d571e7175781ac1ee99a025fc77097075ffb043d8c6fda557f3834
+evidence log    /tmp/ne30x-app-36-v3.Qx617W/docs/evidence/p6-package-v3-checks.log
