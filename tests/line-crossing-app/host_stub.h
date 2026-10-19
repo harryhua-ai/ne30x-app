@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "lc_app_abi_v2.h"
 #include "lc_app_abi_v3.h"
+#include "lc_app_abi_v4.h"
 
 #define LCSTUB_MAX_CLASSES  16
 #define LCSTUB_MAX_EVENTS   64
@@ -76,10 +77,12 @@ typedef struct lcstub {
     uint32_t state_len;
     int      state_present;
     uint32_t state_revision;
+    uint32_t state_revision_reply;
     int32_t  state_read_fault;
     int      state_read_fault_times;
     int32_t  state_commit_fault;
     int      state_commit_fault_times;
+    int      state_torn_write;
 
     lcstub_report_t reports[LCSTUB_MAX_REPORTS];
     int      report_count;
@@ -93,6 +96,8 @@ typedef struct lcstub {
     int      cmd_head, cmd_count;
     int      ctrl_unauthorized;
     int      ctrl_delivered_valid;
+    uint32_t delivered_type;
+    uint32_t delivered_magic;
     uint32_t delivered_session;
     uint32_t delivered_request;
     uint32_t control_max;
@@ -102,7 +107,8 @@ typedef struct lcstub {
 
     struct {
         int      present;
-        uint8_t  bytes[LC_CTRL_HEADER_SIZE];
+        uint32_t len;
+        uint8_t  bytes[LC_CTRL_V4_ENABLE_RECEIPT_SIZE];
     } replies[LCSTUB_MAX_REPLIES];
     int reply_count;
 
@@ -158,6 +164,8 @@ void lcstub_wr32(uint8_t *p, uint32_t v);
 void lcstub_make_table(lcstub_t *s, lc_app_api_v2_t *out);
 
 void lcstub_make_table_v3(lcstub_t *s, lc_app_api_v3_t *out);
+
+void lcstub_make_table_v4(lcstub_t *s, lc_app_api_v4_t *out);
 
 uint32_t lcstub_make_command(uint8_t *out, uint32_t cap, uint32_t msg_type,
                              uint32_t session_gen, uint32_t request_id,

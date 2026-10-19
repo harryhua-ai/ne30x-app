@@ -27,13 +27,25 @@ void lc_ctrl_init(lc_ctrl_t *c, lcbus_t *bus, const lc_app_api_v3_t *api)
     c->last_snapshot_ms = ctrl_now(c);
 }
 
+void lc_ctrl_init_v4(lc_ctrl_t *c, lcbus_t *bus, const lc_app_api_v4_t *api)
+{
+    lc_memset(c, 0, sizeof(*c));
+    c->bus = bus;
+    c->control_next = api->control_next;
+    c->control_reply = api->control_reply;
+    c->snapshot_publish = api->snapshot_publish;
+    c->protocol_major = 4u;
+    c->last_snapshot_ms = ctrl_now(c);
+}
+
 static void send_reply(lc_ctrl_t *c, uint32_t session_generation,
                        uint32_t request_id, uint32_t result_status,
                        uint32_t result_generation, uint32_t result_revision)
 {
     uint8_t r[LC_CTRL_HEADER_SIZE];
     lc_memset(r, 0, sizeof(r));
-    lc_wr_u32(r + LC_CTRL_OFF_PROTO_MAGIC, LC_CTRL_PROTO_MAGIC);
+    lc_wr_u32(r + LC_CTRL_OFF_PROTO_MAGIC,
+              c->protocol_major == 4u ? LC_CTRL_V4_PROTO_MAGIC : LC_CTRL_PROTO_MAGIC);
     r[LC_CTRL_OFF_HEADER_VERSION] = (uint8_t)LC_CTRL_HEADER_VERSION;
     r[LC_CTRL_OFF_HEADER_VERSION + 1u] = 0u;
     r[LC_CTRL_OFF_MSG_TYPE] = (uint8_t)LC_CTRL_TYPE_REPLY;
@@ -56,6 +68,63 @@ static void send_reply(lc_ctrl_t *c, uint32_t session_generation,
     c->bus->st.host_faults++;
 }
 
+static void send_enable_receipt(lc_ctrl_t *c, uint32_t session_generation,
+                                uint32_t request_id, uint32_t result_status,
+                                uint32_t result_generation, uint32_t result_revision,
+                                uint32_t effective_state)
+{
+    uint8_t r[LC_CTRL_V4_ENABLE_RECEIPT_SIZE];
+    lc_memset(r, 0, sizeof(r));
+    lc_wr_u32(r + LC_CTRL_OFF_PROTO_MAGIC, LC_CTRL_V4_PROTO_MAGIC);
+    r[LC_CTRL_OFF_HEADER_VERSION] = (uint8_t)LC_CTRL_HEADER_VERSION;
+    r[LC_CTRL_OFF_HEADER_VERSION + 1u] = 0u;
+    r[LC_CTRL_OFF_MSG_TYPE] = (uint8_t)LC_CTRL_TYPE_REPLY;
+    r[LC_CTRL_OFF_MSG_TYPE + 1u] = 0u;
+    lc_wr_u32(r + LC_CTRL_OFF_TOTAL_LEN, (uint32_t)sizeof(r));
+    lc_wr_u32(r + LC_CTRL_OFF_SESSION_GENERATION, session_generation);
+    lc_wr_u32(r + LC_CTRL_OFF_REQUEST_ID, request_id);
+    lc_wr_u32(r + LC_CTRL_OFF_CONFIG_GENERATION, result_generation);
+    lc_wr_u32(r + LC_CTRL_OFF_STATE_REVISION, result_revision);
+    lc_wr_u32(r + LC_CTRL_OFF_FLAGS, result_status);
+    lc_wr_u32(r + 32u, LC_CTRL_V4_RECEIPT_MAGIC);
+    lc_wr_u32(r + 36u, effective_state);
+    lc_wr_u32(r + 40u, result_revision);
+    int32_t rr = c->control_reply(r, (uint32_t)sizeof(r));
+    if (rr == LC_RET_OK) {
+        c->st.replies_sent++;
+        return;
+    }
+    if (rr == LC_RET_UNAUTHORIZED) {
+        c->bus->session_fatal = 1;
+        return;
+    }
+    c->bus->st.host_faults++;
+}
+
+static uint32_t effective_enable_state(const lcbus_t *b)
+{
+    if (b->enable_state == LCBUS_ENABLE_ENABLED) return 1u;
+    if (b->enable_state == LCBUS_ENABLE_PAUSED) return 2u;
+    return LC_CTRL_V4_ENABLE_UNKNOWN;
+}
+
+static void send_command_reply(lc_ctrl_t *c, const uint8_t *cmd,
+                               uint32_t result_status, uint32_t result_generation,
+                               uint32_t result_revision, uint32_t effective_state)
+{
+    uint32_t type = (uint32_t)cmd[LC_CTRL_OFF_MSG_TYPE] |
+                    ((uint32_t)cmd[LC_CTRL_OFF_MSG_TYPE + 1u] << 8);
+    uint32_t session = lc_rd_u32(cmd + LC_CTRL_OFF_SESSION_GENERATION);
+    uint32_t request_id = lc_rd_u32(cmd + LC_CTRL_OFF_REQUEST_ID);
+    if (c->protocol_major == 4u && type == LC_CTRL_V4_TYPE_ENABLE_SET) {
+        send_enable_receipt(c, session, request_id, result_status,
+                            result_generation, result_revision, effective_state);
+    } else {
+        send_reply(c, session, request_id, result_status,
+                   result_generation, result_revision);
+    }
+}
+
 static lc_ctrl_dedup_slot_t *dedup_find(lc_ctrl_t *c, uint32_t request_id)
 {
     for (uint32_t i = 0; i < LC_CTRL_DEDUP_SLOTS; i++) {
@@ -68,7 +137,7 @@ static lc_ctrl_dedup_slot_t *dedup_find(lc_ctrl_t *c, uint32_t request_id)
 
 static void dedup_record(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len,
                          uint32_t result_status, uint32_t result_generation,
-                         uint32_t result_revision)
+                         uint32_t result_revision, uint32_t result_enable_state)
 {
     lc_ctrl_dedup_slot_t *slot = &c->dedup[c->dedup_cursor];
     c->dedup_cursor = (c->dedup_cursor + 1u) % LC_CTRL_DEDUP_SLOTS;
@@ -79,6 +148,7 @@ static void dedup_record(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len,
     slot->result_status = result_status;
     slot->result_generation = result_generation;
     slot->result_revision = result_revision;
+    slot->result_enable_state = result_enable_state;
 }
 
 static void reject_result(lc_ctrl_t *c, uint32_t status)
@@ -99,25 +169,27 @@ static void finish_command(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len,
                            uint32_t result_status, uint32_t result_generation)
 {
     lcbus_t *b = c->bus;
-    uint32_t session = lc_rd_u32(cmd + LC_CTRL_OFF_SESSION_GENERATION);
-    uint32_t request_id = lc_rd_u32(cmd + LC_CTRL_OFF_REQUEST_ID);
     uint32_t revision = b->revision;
     reject_result(c, result_status);
     if (result_status == LC_CTRL_RESULT_APPLIED) c->st.applied++;
-    send_reply(c, session, request_id, result_status, result_generation, revision);
-    dedup_record(c, cmd, len, result_status, result_generation, revision);
+    uint32_t effective = effective_enable_state(b);
+    send_command_reply(c, cmd, result_status, result_generation, revision, effective);
+    dedup_record(c, cmd, len, result_status, result_generation, revision, effective);
     if (result_status == LC_CTRL_RESULT_APPLIED) lc_ctrl_snapshot_force(c);
 }
 
-static int wire_header_valid(const uint8_t *cmd, uint32_t len)
+static int wire_header_valid(const lc_ctrl_t *c, const uint8_t *cmd, uint32_t len)
 {
     if (len < LC_CTRL_HEADER_SIZE) return 0;
-    if (lc_rd_u32(cmd + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC) return 0;
+    uint32_t magic = c->protocol_major == 4u ? LC_CTRL_V4_PROTO_MAGIC
+                                             : LC_CTRL_PROTO_MAGIC;
+    if (lc_rd_u32(cmd + LC_CTRL_OFF_PROTO_MAGIC) != magic) return 0;
     if (cmd[LC_CTRL_OFF_HEADER_VERSION] != (uint8_t)LC_CTRL_HEADER_VERSION ||
         cmd[LC_CTRL_OFF_HEADER_VERSION + 1u] != 0u) return 0;
     uint32_t type = (uint32_t)cmd[LC_CTRL_OFF_MSG_TYPE] |
                     ((uint32_t)cmd[LC_CTRL_OFF_MSG_TYPE + 1u] << 8);
-    if (type != LC_CTRL_TYPE_CONFIG_APPLY && type != LC_CTRL_TYPE_COUNTERS_RESET) return 0;
+    if (type != LC_CTRL_TYPE_CONFIG_APPLY && type != LC_CTRL_TYPE_COUNTERS_RESET &&
+        !(c->protocol_major == 4u && type == LC_CTRL_V4_TYPE_ENABLE_SET)) return 0;
     if (lc_rd_u32(cmd + LC_CTRL_OFF_TOTAL_LEN) != len) return 0;
     if (lc_rd_u32(cmd + LC_CTRL_OFF_SESSION_GENERATION) == 0u) return 0;
     if (lc_rd_u32(cmd + LC_CTRL_OFF_REQUEST_ID) == 0u) return 0;
@@ -126,6 +198,14 @@ static int wire_header_valid(const uint8_t *cmd, uint32_t len)
     if ((lc_rd_u32(cmd + LC_CTRL_OFF_FLAGS) & ~LC_CTRL_FLAGS_VALID_MASK) != 0u) return 0;
     if (type == LC_CTRL_TYPE_COUNTERS_RESET && len != LC_CTRL_HEADER_SIZE) return 0;
     if (type == LC_CTRL_TYPE_CONFIG_APPLY && len <= LC_CTRL_HEADER_SIZE) return 0;
+    if (type == LC_CTRL_V4_TYPE_ENABLE_SET) {
+        if (len != LC_CTRL_V4_ENABLE_SET_SIZE) return 0;
+        if (lc_rd_u32(cmd + LC_CTRL_OFF_FLAGS) != 0u) return 0;
+        if (lc_rd_u32(cmd + 32u) != LC_CTRL_V4_ENABLE_MAGIC) return 0;
+        uint32_t desired = lc_rd_u32(cmd + 36u);
+        if (desired != 1u && desired != 2u) return 0;
+        if (lc_rd_u32(cmd + 44u) != 0u) return 0;
+    }
     return 1;
 }
 
@@ -236,6 +316,49 @@ static void handle_counters_reset(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len
     }
 }
 
+static void handle_enable_set(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len)
+{
+    lcbus_t *b = c->bus;
+    uint32_t desired = lc_rd_u32(cmd + 36u);
+    uint32_t expected_revision = lc_rd_u32(cmd + 40u);
+    uint32_t expected_generation = lc_rd_u32(cmd + LC_CTRL_OFF_CONFIG_GENERATION);
+    uint32_t new_revision = b->revision;
+    int result = lcbus_enable_set(b, desired, expected_generation,
+                                  expected_revision, &new_revision);
+    uint32_t status;
+    switch (result) {
+    case LCBUS_TXN_OK:
+        status = LC_CTRL_RESULT_APPLIED;
+        break;
+    case LCBUS_TXN_ERR_STALE_CONFIG:
+        status = LC_CTRL_RESULT_REJECTED_STALE_CONFIG;
+        break;
+    case LCBUS_TXN_ERR_INVALID:
+        status = LC_CTRL_RESULT_REJECTED_INVALID;
+        break;
+    case LCBUS_TXN_ERR_RESOURCE:
+        status = LC_CTRL_RESULT_REJECTED_RESOURCE;
+        break;
+    case LCBUS_TXN_ERR_STATE_CONFLICT:
+        status = LC_CTRL_RESULT_FAILED_STATE_CONFLICT;
+        break;
+    case LCBUS_TXN_ERR_STORAGE_UNKNOWN:
+        status = LC_CTRL_RESULT_FAILED_STORAGE_UNKNOWN;
+        break;
+    default:
+        status = LC_CTRL_RESULT_FAILED_STORAGE_IO;
+        break;
+    }
+    if (status == LC_CTRL_RESULT_APPLIED &&
+        (new_revision != b->revision || (uint32_t)b->enable_state != desired)) {
+        b->enable_state = LCBUS_ENABLE_UNKNOWN;
+        b->storage_unknown_latch = 1u;
+        b->persist_state = LCBUS_PERSIST_DEGRADED;
+        status = LC_CTRL_RESULT_FAILED_STORAGE_UNKNOWN;
+    }
+    finish_command(c, cmd, len, status, b->config_generation);
+}
+
 static void handle_command(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len)
 {
     lcbus_t *b = c->bus;
@@ -248,16 +371,16 @@ static void handle_command(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len)
         if (slot->cmd_len == len && lc_memcmp(slot->cmd, cmd, len) == 0) {
             c->st.dedup_cached++;
             ctrl_log(c, "LC_CTRL: duplicate request_id with identical semantics; cached result reused");
-            send_reply(c, lc_rd_u32(cmd + LC_CTRL_OFF_SESSION_GENERATION),
-                       request_id, slot->result_status,
-                       slot->result_generation, slot->result_revision);
+            send_command_reply(c, cmd, slot->result_status,
+                               slot->result_generation, slot->result_revision,
+                               slot->result_enable_state);
             return;
         }
         c->st.dedup_conflict++;
         ctrl_log(c, "LC_CTRL: duplicate request_id with different semantics; rejected");
-        send_reply(c, lc_rd_u32(cmd + LC_CTRL_OFF_SESSION_GENERATION),
-                   request_id, LC_CTRL_RESULT_REJECTED_INVALID,
-                   b->config_generation, b->revision);
+        send_command_reply(c, cmd, LC_CTRL_RESULT_REJECTED_INVALID,
+                           b->config_generation, b->revision,
+                           effective_enable_state(b));
         return;
     }
 
@@ -272,8 +395,10 @@ static void handle_command(lc_ctrl_t *c, const uint8_t *cmd, uint32_t len)
 
     if (type == LC_CTRL_TYPE_CONFIG_APPLY) {
         handle_config_apply(c, cmd, len);
-    } else {
+    } else if (type == LC_CTRL_TYPE_COUNTERS_RESET) {
         handle_counters_reset(c, cmd, len);
+    } else {
+        handle_enable_set(c, cmd, len);
     }
 }
 
@@ -300,10 +425,20 @@ static void take_command(lc_ctrl_t *c)
         return;
     }
     c->st.commands_received++;
-    if (!wire_header_valid(lc_ctrl_cmd_buf, alen)) {
+    if (!wire_header_valid(c, lc_ctrl_cmd_buf, alen)) {
         c->st.wire_rejected++;
         ctrl_log(c, "LC_CTRL: command failed wire header validation; dropped without reply");
         return;
+    }
+    if (c->protocol_major == 4u) {
+        uint32_t session = lc_rd_u32(lc_ctrl_cmd_buf + LC_CTRL_OFF_SESSION_GENERATION);
+        if (c->session_generation_valid && c->session_generation != session) {
+            c->st.wire_rejected++;
+            c->bus->session_fatal = 1u;
+            return;
+        }
+        c->session_generation = session;
+        c->session_generation_valid = 1u;
     }
     handle_command(c, lc_ctrl_cmd_buf, alen);
 }
@@ -353,7 +488,15 @@ static const char *storage_state_name(uint32_t st)
     }
 }
 
-static uint32_t build_snapshot_json(const lcbus_t *b, char *out, uint32_t cap)
+static const char *enable_state_name(const lcbus_t *b)
+{
+    if (b->enable_state == LCBUS_ENABLE_ENABLED) return "enabled";
+    if (b->enable_state == LCBUS_ENABLE_PAUSED) return "paused";
+    return "unknown";
+}
+
+static uint32_t build_snapshot_json(const lcbus_t *b, char *out, uint32_t cap,
+                                   uint8_t protocol_major, uint32_t now_ms)
 {
     lc_json_t j;
     lcj_init(&j, out, cap);
@@ -366,6 +509,18 @@ static uint32_t build_snapshot_json(const lcbus_t *b, char *out, uint32_t cap)
     lcj_u32(&j, b->config_generation);
     lcj_raw(&j, ",\"state_revision\":");
     lcj_u32(&j, b->revision);
+    if (protocol_major == 4u) {
+        lcj_raw(&j, ",\"enable_state\":");
+        lcj_string(&j, enable_state_name(b));
+        lcj_raw(&j, ",\"video_freshness\":{\"valid\":");
+        lcj_bool(&j, b->last_frame_received_valid);
+        lcj_raw(&j, ",\"last_frame_received_ms\":");
+        lcj_u32(&j, b->last_frame_received_ms);
+        lcj_raw(&j, ",\"age_ms\":");
+        lcj_u32(&j, b->last_frame_received_valid
+                        ? lc_tick_diff(now_ms, b->last_frame_received_ms) : 0u);
+        lcj_raw(&j, "},\"live_freshness\":\"not_connected\"");
+    }
     lcj_raw(&j, ",\"app_state\":");
     lcj_string(&j, app_state_name(astate));
     lcj_raw(&j, ",\"storage\":{\"state\":");
@@ -441,7 +596,8 @@ static void publish_snapshot(lc_ctrl_t *c)
     lcbus_t *b = c->bus;
     uint32_t plen = build_snapshot_json(
         b, (char *)lc_ctrl_snapshot_buf + LC_CTRL_HEADER_SIZE,
-        (uint32_t)sizeof(lc_ctrl_snapshot_buf) - LC_CTRL_HEADER_SIZE);
+        (uint32_t)sizeof(lc_ctrl_snapshot_buf) - LC_CTRL_HEADER_SIZE,
+        c->protocol_major, c->protocol_major == 4u ? ctrl_now(c) : 0u);
     if (plen == 0u) {
         c->st.snapshots_rejected++;
         ctrl_log(c, "LC_CTRL: snapshot projection overflow; whole snapshot withheld");
@@ -449,7 +605,8 @@ static void publish_snapshot(lc_ctrl_t *c)
     }
     uint8_t *hdr = lc_ctrl_snapshot_buf;
     lc_memset(hdr, 0, LC_CTRL_HEADER_SIZE);
-    lc_wr_u32(hdr + LC_CTRL_OFF_PROTO_MAGIC, LC_CTRL_PROTO_MAGIC);
+    lc_wr_u32(hdr + LC_CTRL_OFF_PROTO_MAGIC,
+              c->protocol_major == 4u ? LC_CTRL_V4_PROTO_MAGIC : LC_CTRL_PROTO_MAGIC);
     hdr[LC_CTRL_OFF_HEADER_VERSION] = (uint8_t)LC_CTRL_HEADER_VERSION;
     hdr[LC_CTRL_OFF_HEADER_VERSION + 1u] = 0u;
     hdr[LC_CTRL_OFF_MSG_TYPE] = (uint8_t)LC_CTRL_TYPE_SNAPSHOT;

@@ -57,6 +57,12 @@ typedef enum {
     LCBUS_PERSIST_CONFLICT
 } lcbus_persist_state_t;
 
+typedef enum {
+    LCBUS_ENABLE_UNKNOWN = 0,
+    LCBUS_ENABLE_ENABLED = 1,
+    LCBUS_ENABLE_PAUSED = 2
+} lcbus_enable_state_t;
+
 typedef struct lcbus_binding {
     uint8_t  bound;
     uint32_t model_generation;
@@ -110,7 +116,8 @@ typedef enum {
     LCBUS_TXN_ERR_RESOURCE = -2,
     LCBUS_TXN_ERR_STATE_CONFLICT = -3,
     LCBUS_TXN_ERR_STORAGE_IO = -4,
-    LCBUS_TXN_ERR_STORAGE_UNKNOWN = -5
+    LCBUS_TXN_ERR_STORAGE_UNKNOWN = -5,
+    LCBUS_TXN_ERR_STALE_CONFIG = -6
 } lcbus_txn_result_t;
 
 typedef struct lcbus_cfg_txn {
@@ -131,11 +138,14 @@ typedef struct lcbus {
     lcbus_binding_t       binding;
     lcbus_model_state_t   model_state;
     lcbus_persist_state_t persist_state;
+    lcbus_enable_state_t  enable_state;
 
     lc_tracker_t   *tracker;
     lc_line_cross_t *line;
     uint32_t        next_id_carry;
     uint32_t        consecutive_alloc_failures;
+    uint32_t        last_frame_received_ms;
+    uint8_t         last_frame_received_valid;
 
     uint32_t window_in, window_out, total_in, total_out;
     uint32_t window_start_ms;
@@ -197,6 +207,11 @@ int  lcbus_txn_commit_config(lcbus_t *b, lcbus_cfg_txn_t *txn);
 void lcbus_txn_abort_config(lcbus_t *b, lcbus_cfg_txn_t *txn);
 
 int  lcbus_txn_commit_reset(lcbus_t *b, int allow_corrupt_replace);
+
+int  lcbus_enable_set(lcbus_t *b, uint32_t desired_state,
+                      uint32_t expected_config_generation,
+                      uint32_t expected_state_revision,
+                      uint32_t *out_revision);
 
 int  lcbus_storage_restricted(const lcbus_t *b);
 

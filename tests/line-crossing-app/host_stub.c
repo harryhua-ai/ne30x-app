@@ -437,11 +437,22 @@ static int32_t fn_state_commit(const void *blob, uint32_t len, uint32_t expected
     if (!s->authorized) return LC_RET_UNAUTHORIZED;
     if (!blob || len == 0 || len > LCSTUB_STATE_CAP) return LC_RET_QUOTA_EXCEEDED;
     if (expected_revision != s->state_revision) return LC_RET_REVISION_CONFLICT;
+    if (s->state_torn_write) {
+        memcpy(s->state_blob, blob, len / 2u);
+        s->state_len = len;
+        s->state_present = 1;
+        s->state_revision++;
+        *new_revision = s->state_revision_reply != 0u
+                            ? s->state_revision_reply : s->state_revision;
+        s->state_torn_write = 0;
+        return LC_RET_OK;
+    }
     memcpy(s->state_blob, blob, len);
     s->state_len = len;
     s->state_present = 1;
     s->state_revision++;
-    *new_revision = s->state_revision;
+    *new_revision = s->state_revision_reply != 0u
+                        ? s->state_revision_reply : s->state_revision;
     return LC_RET_OK;
 }
 
@@ -491,7 +502,8 @@ static int32_t fn_control_next(void *out, uint32_t cap, uint32_t *actual_len)
     *actual_len = s->command_len[slot];
     uint32_t type = (uint32_t)s->commands[slot][LC_CTRL_OFF_MSG_TYPE] |
                     ((uint32_t)s->commands[slot][LC_CTRL_OFF_MSG_TYPE + 1u] << 8);
-    (void)type;
+    s->delivered_type = type;
+    s->delivered_magic = lc_rd_u32(s->commands[slot] + LC_CTRL_OFF_PROTO_MAGIC);
     s->delivered_session = lc_rd_u32(s->commands[slot] + LC_CTRL_OFF_SESSION_GENERATION);
     s->delivered_request = lc_rd_u32(s->commands[slot] + LC_CTRL_OFF_REQUEST_ID);
     s->ctrl_delivered_valid = 1;
@@ -679,17 +691,32 @@ static int32_t fn_control_reply(const void *buf, uint32_t len)
     int32_t f = take_fault(s, LCSTUB_FN_CONTROL_REPLY);
     if (f != LC_RET_OK) return f;
     if (!s->authorized || s->ctrl_unauthorized) return LC_RET_UNAUTHORIZED;
-    if (!buf || len != LC_CTRL_HEADER_SIZE) {
+    uint32_t expected_len = s->delivered_type == LC_CTRL_V4_TYPE_ENABLE_SET
+                                ? LC_CTRL_V4_ENABLE_RECEIPT_SIZE
+                                : LC_CTRL_HEADER_SIZE;
+    if (!buf || len != expected_len) {
         s->reply_wire_rejects++;
         return LC_RET_INVALID_ARGUMENT;
     }
     const uint8_t *p = (const uint8_t *)buf;
-    if (lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC ||
+    uint32_t expected_magic = s->delivered_magic;
+    if ((lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC &&
+         lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_V4_PROTO_MAGIC) ||
+        lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != expected_magic ||
         p[LC_CTRL_OFF_HEADER_VERSION] != LC_CTRL_HEADER_VERSION ||
         p[LC_CTRL_OFF_HEADER_VERSION + 1u] != 0u ||
         p[LC_CTRL_OFF_MSG_TYPE] != LC_CTRL_TYPE_REPLY ||
         p[LC_CTRL_OFF_MSG_TYPE + 1u] != 0u ||
         lc_rd_u32(p + LC_CTRL_OFF_TOTAL_LEN) != len) {
+        s->reply_wire_rejects++;
+        return LC_RET_INVALID_ARGUMENT;
+    }
+    if (expected_len == LC_CTRL_V4_ENABLE_RECEIPT_SIZE &&
+        (lc_rd_u32(p + 32u) != LC_CTRL_V4_RECEIPT_MAGIC ||
+         lc_rd_u32(p + 36u) < 1u || lc_rd_u32(p + 36u) > LC_CTRL_V4_ENABLE_UNKNOWN ||
+         lc_rd_u32(p + 40u) != lc_rd_u32(p + LC_CTRL_OFF_STATE_REVISION) ||
+         lc_rd_u32(p + 44u) != 0u ||
+         lc_rd_u32(p + LC_CTRL_OFF_FLAGS) > LC_CTRL_RESULT_FAILED_STORAGE_UNKNOWN)) {
         s->reply_wire_rejects++;
         return LC_RET_INVALID_ARGUMENT;
     }
@@ -709,6 +736,7 @@ static int32_t fn_control_reply(const void *buf, uint32_t len)
     if (s->reply_count < LCSTUB_MAX_REPLIES) {
         memcpy(s->replies[s->reply_count].bytes, buf, len);
         s->replies[s->reply_count].present = 1;
+        s->replies[s->reply_count].len = len;
         s->reply_count++;
     }
     return LC_RET_OK;
@@ -727,7 +755,8 @@ static int32_t fn_snapshot_publish(const void *buf, uint32_t len)
         return LC_RET_INVALID_ARGUMENT;
     }
     const uint8_t *p = (const uint8_t *)buf;
-    if (lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC ||
+    if ((lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_PROTO_MAGIC &&
+         lc_rd_u32(p + LC_CTRL_OFF_PROTO_MAGIC) != LC_CTRL_V4_PROTO_MAGIC) ||
         p[LC_CTRL_OFF_HEADER_VERSION] != LC_CTRL_HEADER_VERSION ||
         p[LC_CTRL_OFF_HEADER_VERSION + 1u] != 0u ||
         p[LC_CTRL_OFF_MSG_TYPE] != LC_CTRL_TYPE_SNAPSHOT ||
@@ -774,6 +803,26 @@ void lcstub_make_table_v3(lcstub_t *s, lc_app_api_v3_t *out)
     out->control_next = fn_control_next;
     out->control_reply = fn_control_reply;
     out->snapshot_publish = fn_snapshot_publish;
+}
+
+static int32_t fn_live_publish(const void *buf, uint32_t len)
+{
+    lcstub_t *s = g_cur;
+    (void)buf;
+    (void)len;
+    if (!s || !s->authorized) return LC_RET_UNAUTHORIZED;
+    return LC_RET_OK;
+}
+
+void lcstub_make_table_v4(lcstub_t *s, lc_app_api_v4_t *out)
+{
+    lc_app_api_v3_t base;
+    lcstub_make_table_v3(s, &base);
+    memset(out, 0, sizeof(*out));
+    memcpy(out, &base, sizeof(base));
+    out->table_size = LC_APP_API_V4_TABLE_SIZE;
+    out->abi_version = LC_APP_ABI_V4;
+    out->live_publish = fn_live_publish;
 }
 
 uint32_t lcstub_make_command(uint8_t *out, uint32_t cap, uint32_t msg_type,
