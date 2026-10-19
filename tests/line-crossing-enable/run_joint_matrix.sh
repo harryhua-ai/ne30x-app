@@ -45,7 +45,7 @@ make -C "$HOST_SNAPSHOT/tests/app_native_vnext" test
 make -C "$HOST_SNAPSHOT/tests/app_host_session" test
 
 RAISE_SOURCE_HITS=$(rg -n 'app_native_vnext_floor_raise[[:space:]]*\(' \
-    "$HOST_SNAPSHOT" --glob '*.c' --glob '!tests/**' | wc -l | tr -d ' ')
+    "$HOST_SNAPSHOT" --glob '*.c' --glob '!**/tests/**' | wc -l | tr -d ' ')
 if [ "$RAISE_SOURCE_HITS" != "1" ]; then
     echo "FAIL: Host floor raise production call-site shape changed; review the matrix" >&2
     exit 1
