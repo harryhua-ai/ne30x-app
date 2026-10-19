@@ -35,7 +35,7 @@ static void test_arm_validation(void)
     live_env_t *e = live_env_new();
     CHECK(e != NULL);
     lc_lvn4_init(&e->prod, &e->bus, NULL, NULL);
-    lc_lvn4_grant_t g = {1u, 312u, 1u};
+    lc_lvn4_profile_t g = {1u, 312u, 1u};
     CHECK_EQ_I(lc_lvn4_arm(&e->prod, &g), -1);
     CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY);
     live_env_free(e);
@@ -43,30 +43,30 @@ static void test_arm_validation(void)
     live_env_t *e2 = live_env_new();
     CHECK(e2 != NULL);
     CHECK_EQ_I(lc_lvn4_arm(&e2->prod, NULL), -1);
-    CHECK_EQ_I(lc_lvn4_state(&e2->prod), LC_LVN4_STATE_UNAVAILABLE_BAD_GRANT);
+    CHECK_EQ_I(lc_lvn4_state(&e2->prod), LC_LVN4_STATE_UNAVAILABLE_BAD_PROFILE);
 
-    g.session_generation = 0u;
+    g.entry_epoch = 0u;
     CHECK_EQ_I(lc_lvn4_arm(&e2->prod, &g), -1);
-    g.session_generation = 1u;
-    g.live_track_max = 0u;
+    g.entry_epoch = 1u;
+    g.track_max = 0u;
     CHECK_EQ_I(lc_lvn4_arm(&e2->prod, &g), -1);
-    g.live_track_max = 65u;
+    g.track_max = 65u;
     CHECK_EQ_I(lc_lvn4_arm(&e2->prod, &g), -1);
-    g.live_track_max = 1u;
-    g.live_publish_max = 311u;
+    g.track_max = 1u;
+    g.publish_max = 311u;
     CHECK_EQ_I(lc_lvn4_arm(&e2->prod, &g), -1);
-    CHECK_EQ_I(lc_lvn4_state(&e2->prod), LC_LVN4_STATE_UNAVAILABLE_BAD_GRANT);
-    g.live_publish_max = 312u;
+    CHECK_EQ_I(lc_lvn4_state(&e2->prod), LC_LVN4_STATE_UNAVAILABLE_BAD_PROFILE);
+    g.publish_max = 312u;
     CHECK_EQ_I(lc_lvn4_arm(&e2->prod, &g), 0);
     CHECK_EQ_I(lc_lvn4_state(&e2->prod), LC_LVN4_STATE_ARMED);
     live_env_free(e2);
 
     live_env_t *e3 = live_env_new();
     CHECK(e3 != NULL);
-    lc_lvn4_grant_t g64 = {9u, 9007u, 64u};
+    lc_lvn4_profile_t g64 = {9u, 9007u, 64u};
     CHECK_EQ_I(lc_lvn4_arm(&e3->prod, &g64), -1);
-    CHECK_EQ_I(lc_lvn4_state(&e3->prod), LC_LVN4_STATE_UNAVAILABLE_BAD_GRANT);
-    g64.live_publish_max = 9008u;
+    CHECK_EQ_I(lc_lvn4_state(&e3->prod), LC_LVN4_STATE_UNAVAILABLE_BAD_PROFILE);
+    g64.publish_max = 9008u;
     CHECK_EQ_I(lc_lvn4_arm(&e3->prod, &g64), 0);
     live_env_free(e3);
 }
@@ -81,11 +81,11 @@ static void test_session_reuse(void)
     CHECK(before >= 3u);
 
     lc_lvn4_disarm(&e->prod);
-    lc_lvn4_grant_t g = {7u, 2288u, 16u};
+    lc_lvn4_profile_t g = {7u, 2288u, 16u};
     CHECK_EQ_I(lc_lvn4_arm(&e->prod, &g), -1);
-    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_SESSION_REUSED);
+    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_ENTRY_REUSED);
 
-    g.session_generation = 8u;
+    g.entry_epoch = 8u;
     CHECK_EQ_I(lc_lvn4_arm(&e->prod, &g), 0);
     CHECK_EQ_I(e->prod.through_seq, 0u);
     CHECK_EQ_I(e->prod.cumulative_total, 0u);
@@ -480,7 +480,7 @@ static void test_gate_unknown_loss(void)
     live_env_free(e);
 }
 
-static void test_publish_failure_gap(void)
+static void test_publish_failure_fail_closed(void)
 {
     live_env_t *e = live_env_new();
     live_env_arm(e, 93u, 8u);
@@ -492,25 +492,23 @@ static void test_publish_failure_gap(void)
     CHECK_EQ_I(e->prod.st.publish_failures, 1u);
     CHECK_EQ_I(e->prod.cumulative_gap, 1u);
     CHECK_EQ_I(e->prod.cumulative_total, 1u);
-    CHECK_EQ_I(live_rec_count(e->rec), 3u);
-
-    rd_view_t v;
-    CHECK_EQ_I(decode_pkt(e, 2u, &v), 0);
-    CHECK_EQ_I(v.kind, 2u);
-    CHECK_EQ_I(v.record_count, 1u);
-    CHECK_EQ_I(v.event_through_seq, 1u);
-    CHECK_EQ_I(v.cumulative_event_total, 1u);
-    CHECK_EQ_I(v.cumulative_source_gap, 1u);
-    CHECK_EQ_I(v.flags, 0x1u);
+    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_PUBLISH);
+    CHECK_EQ_I(e->prod.packet_seq, 3u);
+    CHECK_EQ_I(e->prod.st.publish_ok, 2u);
+    CHECK_EQ_I(e->prod.st.encoded_events, 0u);
+    CHECK_EQ_I(e->prod.loss_unknown_latch, 1u);
+    CHECK_EQ_I(e->prod.resync_required, 1u);
+    CHECK_EQ_I(e->prod.last_pub_gap, 0u);
+    CHECK_EQ_I(live_rec_count(e->rec), 2u);
 
     feed_row(e, 500u, 0.40f, 1u, 0.5f, 0.0f);
-    CHECK_EQ_I(decode_pkt(e, 3u, &v), 0);
-    CHECK_EQ_I(v.kind, 1u);
-    CHECK_EQ_I(v.record_count, 1u);
-    CHECK_EQ_I(v.events[0].seq, 2u);
-    CHECK_EQ_I(v.event_through_seq, 2u);
-    CHECK_EQ_I(v.cumulative_source_gap, 1u);
-    CHECK_EQ_I(v.flags, 0u);
+    feed_row(e, 700u, 0.60f, 1u, 0.5f, 0.0f);
+    CHECK_EQ_I(e->prod.through_seq, 1u);
+    CHECK_EQ_I(e->prod.cumulative_total, 1u);
+    CHECK_EQ_I(e->prod.cumulative_gap, 1u);
+    CHECK_EQ_I(e->prod.st.publish_failures, 1u);
+    CHECK_EQ_I(e->prod.packet_seq, 3u);
+    CHECK_EQ_I(live_rec_count(e->rec), 2u);
     live_env_free(e);
 }
 
@@ -571,7 +569,7 @@ static void test_disarmed_and_unarmed(void)
     live_env_free(e);
 }
 
-static void test_lost_capability_reset(void)
+static void test_lost_callback_preserves_watermarks_and_resume(void)
 {
     live_env_t *e = live_env_new();
     live_env_arm(e, 98u, 8u);
@@ -580,22 +578,23 @@ static void test_lost_capability_reset(void)
     CHECK(before >= 2u);
     live_rec_fail_next(e->rec, LC_RET_UNAUTHORIZED, 1u);
     feed_row(e, 300u, 0.60f, 1u, 0.5f, 0.0f);
-    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY);
-    CHECK_EQ_I(e->prod.session_generation, 98u);
-    CHECK_EQ_I(e->prod.live_publish_max, 0u);
-    CHECK_EQ_I(e->prod.live_track_max, 0u);
-    CHECK_EQ_I(e->prod.packet_seq, 0u);
-    CHECK_EQ_I(e->prod.through_seq, 0u);
-    CHECK_EQ_I(e->prod.cumulative_total, 0u);
-    CHECK_EQ_I(e->prod.cumulative_gap, 0u);
+    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_PUBLISH);
+    CHECK_EQ_I(e->prod.entry_epoch, 98u);
+    CHECK_EQ_I(e->prod.live_publish_max, 1168u);
+    CHECK_EQ_I(e->prod.live_track_max, 8u);
+    CHECK_EQ_I(e->prod.packet_seq, 3u);
+    CHECK_EQ_I(e->prod.through_seq, 1u);
+    CHECK_EQ_I(e->prod.cumulative_total, 1u);
+    CHECK_EQ_I(e->prod.cumulative_gap, 1u);
     CHECK_EQ_I(live_rec_count(e->rec), before);
     feed_row(e, 500u, 0.40f, 1u, 0.5f, 0.0f);
     feed_row(e, 700u, 0.60f, 1u, 0.5f, 0.0f);
     CHECK_EQ_I(live_rec_count(e->rec), before);
-    lc_lvn4_grant_t grant = {98u, 2288u, 16u};
-    CHECK_EQ_I(lc_lvn4_arm(&e->prod, &grant), -1);
-    grant.session_generation = 99u;
-    CHECK_EQ_I(lc_lvn4_arm(&e->prod, &grant), 0);
+    lc_lvn4_profile_t profile = {98u, 2288u, 16u};
+    CHECK_EQ_I(lc_lvn4_arm(&e->prod, &profile), -1);
+    CHECK_EQ_I(lc_lvn4_state(&e->prod), LC_LVN4_STATE_UNAVAILABLE_ENTRY_REUSED);
+    profile.entry_epoch = 99u;
+    CHECK_EQ_I(lc_lvn4_arm(&e->prod, &profile), 0);
     CHECK_EQ_I(e->prod.packet_seq, 0u);
     CHECK_EQ_I(e->prod.through_seq, 0u);
     CHECK_EQ_I(e->prod.cumulative_total, 0u);
@@ -718,11 +717,11 @@ int main(void)
     test_config_generation_change();
     test_gate_paused_accounts();
     test_gate_unknown_loss();
-    test_publish_failure_gap();
+    test_publish_failure_fail_closed();
     test_exhaustion_total();
     test_packet_seq_exhaustion();
     test_disarmed_and_unarmed();
-    test_lost_capability_reset();
+    test_lost_callback_preserves_watermarks_and_resume();
     test_decoder_negatives();
     TEST_REPORT("line-crossing-live/wire");
 }

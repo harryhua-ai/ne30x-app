@@ -808,9 +808,13 @@ void lcstub_make_table_v3(lcstub_t *s, lc_app_api_v3_t *out)
 static int32_t fn_live_publish(const void *buf, uint32_t len)
 {
     lcstub_t *s = g_cur;
-    (void)buf;
-    (void)len;
+    if (!s) return LC_RET_UNAUTHORIZED;
+    s->calls[LCSTUB_FN_LIVE_PUBLISH]++;
+    s->live_publish_calls++;
     if (!s || !s->authorized) return LC_RET_UNAUTHORIZED;
+    if (s->live_publish_hook) {
+        return s->live_publish_hook(s->live_publish_user, buf, len);
+    }
     return LC_RET_OK;
 }
 

@@ -240,6 +240,7 @@ live_env_t *live_env_new(void)
     lcbus_restore(&e->bus);
     lcbus_rebind(&e->bus, 1);
     lc_lvn4_init(&e->prod, &e->bus, rec_publish, e->rec);
+    lc_lvn4_set_gate(&e->prod, LC_LVN4_GATE_OPEN);
     lcbus_set_live_observer(&e->bus, live_obs_forward, &e->prod);
     return e;
 }
@@ -255,10 +256,10 @@ void live_env_arm(live_env_t *e, uint32_t session_gen, uint32_t track_max)
 {
     uint32_t closure = 48u + track_max * (12u + 16u * 8u);
     uint32_t publish_max = (closure < 312u) ? 312u : closure;
-    lc_lvn4_grant_t g;
-    g.session_generation = session_gen;
-    g.live_publish_max = publish_max;
-    g.live_track_max = track_max;
+    lc_lvn4_profile_t g;
+    g.entry_epoch = session_gen;
+    g.publish_max = publish_max;
+    g.track_max = track_max;
     (void)lc_lvn4_arm(&e->prod, &g);
 }
 

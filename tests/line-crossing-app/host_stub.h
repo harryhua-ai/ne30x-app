@@ -32,8 +32,12 @@ typedef enum {
     LCSTUB_FN_CONTROL_NEXT,
     LCSTUB_FN_CONTROL_REPLY,
     LCSTUB_FN_SNAPSHOT_PUBLISH,
+    LCSTUB_FN_LIVE_PUBLISH,
     LCSTUB_FN_COUNT
 } lcstub_fn_t;
+
+typedef int32_t (*lcstub_live_publish_hook_t)(void *user, const void *buf,
+                                               uint32_t len);
 
 typedef struct {
     float    x, y, w, h, conf;
@@ -104,6 +108,9 @@ typedef struct lcstub {
     uint32_t snapshot_ram;
     uint32_t snapshot_wire_rejects;
     uint32_t reply_wire_rejects;
+    uint32_t live_publish_calls;
+    lcstub_live_publish_hook_t live_publish_hook;
+    void *live_publish_user;
 
     struct {
         int      present;

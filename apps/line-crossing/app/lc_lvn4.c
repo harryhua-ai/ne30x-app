@@ -147,29 +147,14 @@ static int take_packet_seq(lc_lvn4_t *p)
     return 1;
 }
 
-static void lose_capability(lc_lvn4_t *p)
-{
-    p->live_publish_max = 0u;
-    p->live_track_max = 0u;
-    p->state = LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY;
-    p->packet_seq = 0u;
-    p->through_seq = 0u;
-    p->cumulative_total = 0u;
-    p->cumulative_gap = 0u;
-    p->last_pub_gap = 0u;
-    p->bound_model_gen = 0u;
-    p->bound_class_gen = 0u;
-    p->bound_target_index = -1;
-    p->loss_unknown_latch = 0u;
-    p->resync_required = 1u;
-}
-
 static int publish_packet(lc_lvn4_t *p, uint32_t len)
 {
     int32_t rc = p->publish(p->publish_user, p->pkt, len);
     if (rc != 0) {
         p->st.publish_failures++;
-        if (rc == LC_RET_UNAUTHORIZED) lose_capability(p);
+        p->state = LC_LVN4_STATE_UNAVAILABLE_PUBLISH;
+        p->loss_unknown_latch = 1u;
+        p->resync_required = 1u;
         return 0;
     }
     p->st.publish_ok++;
@@ -210,7 +195,7 @@ static void publish_event_batch(lc_lvn4_t *p, const lcbus_live_facts_t *f,
     if (publish_packet(p, total_len)) {
         p->st.packets_event++;
         p->st.encoded_events += n_enc;
-    } else if (p->state == LC_LVN4_STATE_ARMED) {
+    } else {
         if (!add_gap(p, n_enc)) return;
     }
 }
@@ -317,39 +302,40 @@ void lc_lvn4_init(lc_lvn4_t *p, lcbus_t *bus,
     p->publish = publish;
     p->publish_user = publish_user;
     p->state = LC_LVN4_STATE_UNARMED;
-    p->gate = LC_LVN4_GATE_OPEN;
+    p->gate = LC_LVN4_GATE_UNKNOWN;
     p->bound_target_index = -1;
 }
 
-int lc_lvn4_arm(lc_lvn4_t *p, const lc_lvn4_grant_t *grant)
+int lc_lvn4_arm(lc_lvn4_t *p, const lc_lvn4_profile_t *profile)
 {
     if (!p) return -1;
     if (!p->publish || !p->bus) {
         p->state = LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY;
         return -1;
     }
-    if (!grant || grant->session_generation == 0u ||
-        grant->live_track_max == 0u || grant->live_track_max > LC_LVN4_TRACKS_MAX) {
-        p->state = LC_LVN4_STATE_UNAVAILABLE_BAD_GRANT;
+    if (!profile || profile->entry_epoch == 0u ||
+        profile->track_max == 0u || profile->track_max > LC_LVN4_TRACKS_MAX) {
+        p->state = LC_LVN4_STATE_UNAVAILABLE_BAD_PROFILE;
         return -1;
     }
     uint64_t closure = (uint64_t)LC_LVN4_HEADER_SIZE +
-                       (uint64_t)grant->live_track_max *
+                       (uint64_t)profile->track_max *
                            (LC_LVN4_TRACK_HEADER_SIZE +
                             (uint64_t)LC_LVN4_TRACK_POINTS_MAX * LC_LVN4_TRACK_POINT_SIZE);
-    if (grant->live_publish_max < LC_LVN4_MIN_PUBLISH_MAX ||
-        (uint64_t)grant->live_publish_max < closure) {
-        p->state = LC_LVN4_STATE_UNAVAILABLE_BAD_GRANT;
+    if (profile->publish_max < LC_LVN4_MIN_PUBLISH_MAX ||
+        (uint64_t)profile->publish_max < closure ||
+        profile->publish_max > LC_LVN4_PKT_MAX) {
+        p->state = LC_LVN4_STATE_UNAVAILABLE_BAD_PROFILE;
         return -1;
     }
-    if (p->armed_ever && grant->session_generation == p->session_generation) {
-        p->state = LC_LVN4_STATE_UNAVAILABLE_SESSION_REUSED;
+    if (p->armed_ever && profile->entry_epoch == p->entry_epoch) {
+        p->state = LC_LVN4_STATE_UNAVAILABLE_ENTRY_REUSED;
         return -1;
     }
 
-    p->session_generation = grant->session_generation;
-    p->live_publish_max = grant->live_publish_max;
-    p->live_track_max = grant->live_track_max;
+    p->entry_epoch = profile->entry_epoch;
+    p->live_publish_max = profile->publish_max;
+    p->live_track_max = profile->track_max;
     p->packet_seq = 0u;
     p->through_seq = 0u;
     p->cumulative_total = 0u;

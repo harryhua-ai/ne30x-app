@@ -52,6 +52,8 @@
     (LC_LVN4_HEADER_SIZE + (uint32_t)LC_LVN4_EVENT_MAX * LC_LVN4_EVENT_RECORD_SIZE)
 
 #define LC_LVN4_MIN_PUBLISH_MAX    312u
+#define LC_LVN4_PROFILE_PUBLISH_MAX 9008u
+#define LC_LVN4_PROFILE_TRACK_MAX  64u
 
 #define LC_LVN4_PKT_MAX \
     (LC_LVN4_HEADER_SIZE + \
@@ -62,10 +64,11 @@ typedef enum {
     LC_LVN4_STATE_UNARMED = 0,
     LC_LVN4_STATE_ARMED,
     LC_LVN4_STATE_UNAVAILABLE_NO_CAPABILITY,
-    LC_LVN4_STATE_UNAVAILABLE_BAD_GRANT,
-    LC_LVN4_STATE_UNAVAILABLE_SESSION_REUSED,
+    LC_LVN4_STATE_UNAVAILABLE_BAD_PROFILE,
+    LC_LVN4_STATE_UNAVAILABLE_ENTRY_REUSED,
     LC_LVN4_STATE_UNAVAILABLE_TRACK_CAPACITY,
     LC_LVN4_STATE_UNAVAILABLE_CONFIG_GEN,
+    LC_LVN4_STATE_UNAVAILABLE_PUBLISH,
     LC_LVN4_STATE_UNAVAILABLE_EXHAUSTED,
     LC_LVN4_STATE_DISARMED
 } lc_lvn4_state_t;
@@ -78,11 +81,11 @@ typedef enum {
 
 typedef int32_t (*lc_lvn4_publish_fn)(void *user, const void *buf, uint32_t len);
 
-typedef struct lc_lvn4_grant {
-    uint32_t session_generation;
-    uint32_t live_publish_max;
-    uint32_t live_track_max;
-} lc_lvn4_grant_t;
+typedef struct lc_lvn4_profile {
+    uint32_t entry_epoch;
+    uint32_t publish_max;
+    uint32_t track_max;
+} lc_lvn4_profile_t;
 
 typedef struct lc_lvn4_stats {
     uint32_t packets_event;
@@ -101,7 +104,7 @@ typedef struct lc_lvn4 {
     lcbus_t            *bus;
     lc_lvn4_publish_fn  publish;
     void               *publish_user;
-    uint32_t            session_generation;
+    uint32_t            entry_epoch;
     uint32_t            live_publish_max;
     uint32_t            live_track_max;
     lc_lvn4_state_t     state;
@@ -124,7 +127,7 @@ typedef struct lc_lvn4 {
 void lc_lvn4_init(lc_lvn4_t *p, lcbus_t *bus,
                   lc_lvn4_publish_fn publish, void *publish_user);
 
-int lc_lvn4_arm(lc_lvn4_t *p, const lc_lvn4_grant_t *grant);
+int lc_lvn4_arm(lc_lvn4_t *p, const lc_lvn4_profile_t *profile);
 
 void lc_lvn4_disarm(lc_lvn4_t *p);
 

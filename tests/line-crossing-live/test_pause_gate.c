@@ -57,9 +57,9 @@ static void setup_bus(lcstub_t *stub, lc_app_api_v4_t *api, lcbus_t *bus,
 static void setup_producer(lcbus_t *bus, lc_lvn4_t *producer,
                            capture_t *capture, lc_lvn4_gate_t gate)
 {
-    lc_lvn4_grant_t fixture_grant = { 9901u, 9008u, 64u };
+    lc_lvn4_profile_t fixture_profile = { 9901u, 9008u, 64u };
     lc_lvn4_init(producer, bus, publish, capture);
-    CHECK_EQ_I(lc_lvn4_arm(producer, &fixture_grant), 0);
+    CHECK_EQ_I(lc_lvn4_arm(producer, &fixture_profile), 0);
     lc_lvn4_set_gate(producer, gate);
     lcbus_set_live_observer(bus, observe, producer);
 }

@@ -49,17 +49,17 @@ git -C "$HOST_REPO" archive --format=tar "$HOST_SHA" \
     echo "date: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 } > "$EVIDENCE_DIR/env.txt"
 
-step "[1/4] live wire producer suite (real lc_bus + real lc_tracker fixture)"
+step "[1/5] live wire producer suite (real lc_bus + real lc_tracker fixture)"
 "$CC" $CFLAGS $ALLOC "$TESTS_DIR/test_live_wire.c" $FIXTURE_SRCS $BUS_SRCS $CORE_SRCS \
     -o "$TESTS_DIR/work/test_live_wire"
 "$TESTS_DIR/work/test_live_wire" | tee "$EVIDENCE_DIR/test-live-wire.log"
 
-step "[2/4] live bus integration suite"
+step "[2/5] live bus integration suite"
 "$CC" $CFLAGS $ALLOC "$TESTS_DIR/test_live_bus.c" $FIXTURE_SRCS $BUS_SRCS $CORE_SRCS \
     -o "$TESTS_DIR/work/test_live_bus"
 "$TESTS_DIR/work/test_live_bus" | tee "$EVIDENCE_DIR/test-live-bus.log"
 
-step "[3/4] App producer bytes through pinned Host #91 parser and read cursor"
+step "[3/5] App producer bytes through pinned Host #91 parser and read cursor"
 HOST_APP_DIR="$HOST_SRC/Custom/Services/AppHost"
 HOST_COMMON_DIR="$HOST_SRC/Custom/Common/Inc"
 "$CC" $CFLAGS $ALLOC \
@@ -69,7 +69,7 @@ HOST_COMMON_DIR="$HOST_SRC/Custom/Common/Inc"
     -o "$TESTS_DIR/work/test_host_joint"
 "$TESTS_DIR/work/test_host_joint" "$EVIDENCE_DIR/fixtures" | tee "$EVIDENCE_DIR/test-host-joint.log"
 
-step "[4/4] App #30 schema3 Paused/UNKNOWN gate with the live observer attached"
+step "[4/5] App #30 schema3 Paused/UNKNOWN gate with the live observer attached"
 "$CC" $CFLAGS \
     "$TESTS_DIR/test_pause_gate.c" \
     "$APP_TESTS/host_stub.c" \
@@ -87,6 +87,26 @@ step "[4/4] App #30 schema3 Paused/UNKNOWN gate with the live observer attached"
     -o "$TESTS_DIR/work/test_pause_gate"
 "$TESTS_DIR/work/test_pause_gate" | tee "$EVIDENCE_DIR/test-paused-gate.log"
 
+step "[5/5] real v4 app_entry producer through current Host #91 parser"
+"$CC" $CFLAGS \
+    -I"$HOST_APP_DIR" -I"$HOST_COMMON_DIR" -I"$APP_TESTS" \
+    "$TESTS_DIR/test_entry_activation.c" \
+    "$APP_TESTS/host_stub.c" \
+    "$APP_DIR/app/lc_app_entry_v4.c" \
+    "$APP_DIR/app/lc_bus.c" \
+    "$APP_DIR/app/lc_bus_config.c" \
+    "$APP_DIR/app/lc_stateblob.c" \
+    "$APP_DIR/app/lc_ctrl.c" \
+    "$APP_DIR/app/lc_cfgcodec.c" \
+    "$APP_DIR/app/lc_json.c" \
+    "$APP_DIR/app/lc_arena.c" \
+    "$APP_DIR/app/lc_lvn4.c" \
+    "$APP_DIR/src/lc_tracker.c" \
+    "$APP_DIR/src/lc_line_cross.c" \
+    "$HOST_APP_DIR/app_host_live.c" \
+    -o "$TESTS_DIR/work/test_entry_activation"
+"$TESTS_DIR/work/test_entry_activation" | tee "$EVIDENCE_DIR/test-entry-host-activation.log"
+
 python3 -c 'import hashlib,pathlib,sys; root=pathlib.Path(sys.argv[1]); rows=[(p.name,p.stat().st_size,hashlib.sha256(p.read_bytes()).hexdigest()) for p in sorted(root.glob("*.bin"))]; print("".join(f"{digest} {size} {name}\n" for name,size,digest in rows),end="")' \
     "$EVIDENCE_DIR/fixtures" > "$EVIDENCE_DIR/fixture-sha256.txt"
 
@@ -95,4 +115,6 @@ WIRE_N=$(grep -oE "pass=[0-9]+ fail=[0-9]+" "$EVIDENCE_DIR/test-live-wire.log" |
 BUS_N=$(grep -oE "pass=[0-9]+ fail=[0-9]+" "$EVIDENCE_DIR/test-live-bus.log" | tail -1)
 HOST_N=$(grep -oE "pass=[0-9]+ fail=[0-9]+" "$EVIDENCE_DIR/test-host-joint.log" | tail -1)
 PAUSE_N=$(grep -oE "pass=[0-9]+ fail=[0-9]+" "$EVIDENCE_DIR/test-paused-gate.log" | tail -1)
-printf 'RESULT: PASS (%s, %s, %s, %s)\n' "$WIRE_N" "$BUS_N" "$HOST_N" "$PAUSE_N"
+ENTRY_N=$(grep -oE "pass=[0-9]+ fail=[0-9]+" "$EVIDENCE_DIR/test-entry-host-activation.log" | tail -1)
+printf 'RESULT: PASS (%s, %s, %s, %s, %s)\n' \
+    "$WIRE_N" "$BUS_N" "$HOST_N" "$PAUSE_N" "$ENTRY_N"

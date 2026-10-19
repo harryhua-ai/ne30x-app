@@ -84,6 +84,14 @@ static lcbus_t lc_app_bus;
 static lc_ctrl_t lc_app_ctrl;
 static lc_lvn4_t lc_app_live;
 static uint8_t lc_app_event_buf[LC_APP_EVENT_BUF_CAP];
+static uint32_t lc_app_live_entry_epoch;
+
+static uint32_t next_live_entry_epoch(void)
+{
+    if (lc_app_live_entry_epoch == 0xFFFFFFFFu) return 0u;
+    lc_app_live_entry_epoch++;
+    return lc_app_live_entry_epoch;
+}
 
 static int32_t op_live_publish(void *user, const void *buf, uint32_t len)
 {
@@ -138,6 +146,12 @@ int32_t app_entry(const lc_app_api_v4_t *api, uint32_t abi_version)
         return LC_APP_EXIT_UNAUTHORIZED;
     }
     lc_lvn4_init(&lc_app_live, &lc_app_bus, op_live_publish, (void *)api);
+    lc_lvn4_profile_t live_profile = {
+        next_live_entry_epoch(),
+        LC_LVN4_PROFILE_PUBLISH_MAX,
+        LC_LVN4_PROFILE_TRACK_MAX
+    };
+    (void)lc_lvn4_arm(&lc_app_live, &live_profile);
     lc_lvn4_set_gate(&lc_app_live, LC_LVN4_GATE_UNKNOWN);
     lcbus_set_live_observer(&lc_app_bus, observe_live, &lc_app_live);
     sync_live_gate();
