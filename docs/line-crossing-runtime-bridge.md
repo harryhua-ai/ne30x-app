@@ -259,6 +259,7 @@ subject to Host-side review.
 | Bus and producer regression | PASS, 100 checks |
 | Host #91 parser/read/cursor joint fixture | PASS, 610 checks |
 | App #30 schema3 Paused/UNKNOWN gate fixture | PASS, 19 checks |
+| App #30 source-pinned joint matrix | PASS: Host 77 + 592, cross-owner 67, Enable 204, v4 entry 15; full AC4 production gate NOT_RUN |
 
 The complete App #27 regression matrix and exact candidate SHA are recorded
 in `docs/evidence/line-crossing-live/` after the final run.

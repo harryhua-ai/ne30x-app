@@ -2,6 +2,7 @@
 
 ## Source pins
 
+- App code candidate under test: `24c77d93d17882f4e685d858d21443c6daa792d9`
 - Accepted App #30 base: `a1b93322ae010356a6293421a137564fc0e23664`
 - Host #91 delivered candidate: `4c1c0d7ec5bc8ae18fae4ca5a31f0699b7c5895b`
 - The test runner records the App source SHA, accepted base SHA, Host SHA,
@@ -13,6 +14,7 @@
 | --- | --- |
 | `bash tests/line-crossing-live/run_tests.sh` | PASS: wire 1502/0, bus 100/0, Host parser/read/cursor 610/0, schema3 Paused/UNKNOWN 19/0 |
 | `bash tests/line-crossing-enable/run_tests.sh` | PASS: Enable 204/0, v4 entry 15/0 |
+| `bash tests/line-crossing-enable/run_joint_matrix.sh` | PASS: Host package 77/0, Host session 592/0, cross-owner 67/0, Enable 204/0, v4 entry 15/0; complete AC4 production gate NOT_RUN |
 | `bash tests/enable-persistence-study/run.sh` | PASS: 65 checks |
 | `bash tests/line-crossing/run_tests.sh` | PASS: upstream engine regression and ported golden trace identical; SHA-256 `9d5751d675a61444e0c9db9932b1cd1aa5fd766559182f2e0f78091f1e2aa0c0` |
 | `bash tests/line-crossing-app/run_tests.sh` | PASS: unit 50/0, business 214/0, contract 52/0; native v2 package verified |
