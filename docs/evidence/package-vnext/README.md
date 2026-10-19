@@ -42,8 +42,11 @@ bash tests/package-v3/run_checks.sh
 python3 tests/package-vnext/joint_interop.py
 ```
 
-Toolchain used for the committed evidence: python3 3.14.4, cryptography
-48.0.0, OpenSSL 3.6.2.  No network, no device, no toolchain build.
+The package-vnext and joint-interop runs used Python 3.14.4, cryptography
+48.0.0, OpenSSL 3.6.2, and the local C compiler.  They used no network,
+device, or target toolchain.  The separately captured package-v3 regression
+used `arm-none-eabi-gcc` for its synthetic hello-app fixtures and fetched the
+pinned ABI header; it did not build NE301 firmware.
 
 ## Golden vector digests (key-independent unless noted)
 
@@ -162,5 +165,6 @@ NOT_RUN (with reasons; also recorded in `artifacts.json`):
 - `joint-interop.log` — complete App packer, Host C parser, matrix, and Host C-suite output
 - `joint-interop.json` — exact package bytes as hex, digests, source commits, and per-case outcomes
 - `joint-interoperability.md` — concise profile and App/Host comparison tables
+- `package-v3-regression.log` — full isolated legacy v1/v2/v3 regression output, including the 73-entry v3 matrix
 - `spec/` — deterministic outputs of `tests/spec-vnext` (golden package,
   TBS, signature, native image, SPKI, NFC4/LVN4 wire goldens, report)

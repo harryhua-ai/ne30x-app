@@ -306,7 +306,8 @@ def write_markdown_report(report: dict):
         f"- `app_native_vnext`: {report['host_integration_suite']['checks']} checks, {report['host_integration_suite']['failures']} failures.",
         f"- `app_host_session`: {report['host_session_suite']['checks']} checks, {report['host_session_suite']['failures']} failures.",
         f"- Live runtime authorization: `{report['runtime_live_authorization']}`. Shape verification PASS does not grant live runtime access; Host #91 producer-ingest remains unavailable.",
-        "- Device install/execute, ARM target build, production signing keys, and production/device behavior: NOT_RUN.",
+        "- NE301 firmware ARM target build, device install/execute, production signing keys, and production/device behavior: NOT_RUN.",
+        "- The separate required package-v3 legacy regression cross-compiled only its synthetic hello-app fixtures with `arm-none-eabi-gcc`; it did not build NE301 firmware.",
         "",
     ])
     (EVIDENCE / "joint-interoperability.md").write_text("\n".join(lines), encoding="utf-8")
