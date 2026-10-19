@@ -3,7 +3,7 @@
 Status: PASS for the offline cross-repository parser matrix.
 
 - App signer/independent verifier source: `71f1850063f022b86f3b027e27eaabb992de60b0`
-- App candidate at evidence run: `76cf1fccd49e8911f4fa385e90e582a44bdd2b29`
+- App candidate at evidence run: `3968b54edf02d20fe9ca6bf69a62c5df588e46e9`
 - Host parser/verifier source: `f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1`
 - Host source was archived from that exact commit into a temporary directory; the Host repository was not modified.
 - Reproduction: `bash tests/package-vnext/run.sh` or `python3 tests/package-vnext/joint_interop.py`.

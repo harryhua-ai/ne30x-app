@@ -152,9 +152,12 @@ chromium.launch), ffmpeg-generated baseline H264 fixture.
 
 - Host #84 real resource service, permission granting and broker (the fixture
   broker is test code in this repository, not Host production code).
-- #88/#101 Host policy engine, App #30 native Enable producer, Host #91 /
-  App #27 live tracks/events producers — always answered `UNAVAILABLE`,
-  never faked as available.
+- #88/#101 Host policy engine and App #30 native Enable producer remain
+  unavailable by design. App #27's v4 entry now arms its live producer and
+  publishes through `live_publish`; the fixture boundary is described below
+  and does not prove production signed admission.
+- Production Host resource service/session grant, target hardware, and device
+  acceptance remain NOT_RUN.
 - Real camera/stream, target-board memory/network/flash/integration, device
   acceptance, production signing keys, production downloads/recording export
   (signed FileSaver `saveAs` remains failed; the anchor fallback requires a
@@ -184,8 +187,8 @@ history unchanged.
 - `apps/line-crossing/app/lc_app_entry_v4.c` binds the observer to the producer
   and adapts producer output to the real `api->live_publish` callback. The v4
   Make target compiles `lc_lvn4.c`. A `-3` callback result fails the live
-  capability closed, clears packet/watermark/capacity state, and prevents
-  reuse of that session generation.
+  capability closed, preserves consumed packet/source watermarks, marks loss
+  unknown, and requires resynchronization.
 
 The accepted App #30 base is integrated at exact commit
 `a1b93322ae010356a6293421a137564fc0e23664`. The `lc_bus.c` merge resolution
@@ -197,17 +200,22 @@ opens it, PAUSED holds it, and UNKNOWN/corrupt/restricted/fatal state closes
 it. The joint fixture checks Paused/UNKNOWN suppression, preserved business
 state, and `RESYNC_REQUIRED` after resume.
 
-### Production grant boundary
+### Production entry and capability boundary
 
 The frozen 64-byte v4 function table exposes `live_publish(const void *,
 uint32_t)` but does not expose the signed session generation,
-`live_publish_max`, or `live_track_max` required by `lc_lvn4_arm`. F1–F4 also
-reserve those values to Host-side signed admission. This candidate initializes
-and binds the producer/output callback and durable gate, but does not arm it
-from invented values. Production publishing remains UNAVAILABLE until an
-approved Host-to-App grant source exists within the frozen ABI contract. A
-non-null callback or passing fake-grant fixture is not evidence of a
-production session grant.
+`live_publish_max`, or `live_track_max`. The v4 production entry now creates a
+bounded local entry epoch, arms `lc_lvn4` with the 9008-byte/64-track profile,
+binds the bus observer, and routes produced packets through the real
+`api->live_publish` callback. This is the active App producer path; it removes
+the earlier claim that the production entry does not arm or publish.
+
+The entry test exercises that path with a fixture callback and a real pinned
+Host parser/read implementation, but its Host authorization boundary is
+simulated. It does not establish signed production admission, a production
+Host session grant, or device behavior. The independent signed-Host admission
+tests cover package/admission behavior separately; they do not combine signed
+admission with the App entry/tracker callback path.
 
 ### Joint test and byte fixtures
 
@@ -244,7 +252,7 @@ admission. Negative and boundary cases are individually asserted:
 | Legacy `NFC3` bytes passed to LVN4 ingest | REJECT (`ERR_HEADER`) |
 | Host event ring overrun / slow reader | packets ACCEPT; read is GAPPED with `host_dropped_events > 0` |
 | Session ended, then ingest attempted | REJECT (`ERR_UNBOUND`) |
-| App callback returns `-3` for unavailable/revoked capability | producer stops publishing, clears live watermarks/caps, rejects same-generation rearm |
+| App callback returns `-3` for unavailable/revoked capability | producer fails closed, preserves consumed packet/source watermarks, marks loss unknown, and requires resynchronization |
 | Wrong TBS on packet bytes | UNAVAILABLE at parser layer: LVN4 bytes do not carry TBS; Host admission must bind trusted identity before parser use |
 
 Host #91 is an in-flight delivered candidate, not ACCEPTED. This joint result
@@ -261,17 +269,20 @@ subject to Host-side review.
 | App #30 schema3 Paused/UNKNOWN gate fixture | PASS, 19 checks |
 | App #30 source-pinned joint matrix | PASS: Host 77 + 592, cross-owner 67, Enable 204, v4 entry 15; full AC4 production gate NOT_RUN |
 
-The complete App #27 regression matrix and exact candidate SHA are recorded
-in `docs/evidence/line-crossing-live/` after the final run.
+The regression evidence pins the App code revision exercised by the tests.
+The exact documentation Candidate SHA is recorded by the PR #39 `ght deliver`
+snapshot because that SHA is created after the evidence files are committed.
 
 ### Acceptance layers and NOT_RUN
 
 - Signed-format parser acceptance is a parser result against pinned delivered
   Host source and test identity. It does not prove a production Host session
   grant.
-- Production App arm/publish is UNAVAILABLE because the frozen v4 App ABI
-  does not provide signed grant values. No production keys or device were
-  used.
+- The production v4 App entry arms the producer with a bounded local epoch and
+  9008/64 profile and routes packets through `live_publish`. The 79/0 entry
+  fixture exercises that callback path with simulated Host authorization; it
+  is not signed production admission or a device result. No production keys
+  or device were used.
 - Web/UI integration is NOT_RUN and outside this native producer result;
   #108/#113 work is not represented here.
 - Host #91 remains unaccepted; final Host-side same-byte reconciliation is
