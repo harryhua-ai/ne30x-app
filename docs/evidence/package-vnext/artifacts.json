@@ -1,0 +1,662 @@
+{
+  "issue": "harryhua-ai/ne30x-app#36 (signed native vNext offline tooling)",
+  "boundary": "OFFLINE signed-format evidence only; NOT Host admission/install/execution, NOT native runtime admission, NOT floor/Enable semantics, NOT live delivery, NOT device capacity; signing identities are PUBLIC NON-PRODUCTION test scalars and never device production trust roots",
+  "spec_authority": {
+    "freeze": "harryhua-ai/ne301#104 A architecture freeze (2026-10-19, NO READY by design)",
+    "f1_f4": "https://github.com/harryhua-ai/ne301/issues/104#issuecomment-6258534821",
+    "f5_f7": "https://github.com/harryhua-ai/ne301/issues/104#issuecomment-6258601629",
+    "f8_f10": "https://github.com/harryhua-ai/ne301/issues/104#issuecomment-6258637748",
+    "host_claim_execution_base": "6357a04d509fb8e1851603d1efe0de51def9edb1",
+    "host_claim_branch": "agent/104/de1fd467; PR #111 r2 parser source pinned at f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1",
+    "app_protocol_docs": "existing docs/app-package-protocol-v{1,2-draft,3}.md untouched; no second competing spec written in this repo",
+    "host_parser_source_sha": "f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1"
+  },
+  "toolchain": {
+    "python": "Python 3.14.4",
+    "python_cryptography": "48.0.0",
+    "openssl": "OpenSSL 3.6.2 7 Apr 2026 (Library: OpenSSL 3.6.2 7 Apr 2026)"
+  },
+  "key_discipline": {
+    "private_keys_committed": false,
+    "identities": [
+      {
+        "publisher_id": "test-publisher",
+        "scalar": "d=1 (PUBLIC test scalar, same as v1/v2/v3 goldens)",
+        "spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+        "provenance": "public textbook test scalar; reproducible by anyone; never a production anchor"
+      },
+      {
+        "publisher_id": "dev-publisher",
+        "scalar": "d=2 (PUBLIC test scalar)",
+        "spki_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+        "provenance": "public textbook test scalar; reproducible by anyone; never a production anchor"
+      }
+    ],
+    "private_key_locations": [
+      "tests/package-vnext/work/keys/d1-test-signer.pem (gitignored, 0600)",
+      "tests/package-vnext/work/keys/d2-test-signer.pem (gitignored, 0600)"
+    ],
+    "no_production_key_material": true
+  },
+  "golden_consistency": {
+    "golden_package_sha256": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e",
+    "golden_tbs_sha256": "581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095",
+    "golden_native_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+    "independent_stdlib_rebuild": "tests/spec-vnext (v4lib, from-scratch P-256/RFC-6979/DER) rebuilds the identical package bytes; run.sh asserts byte-identity",
+    "observed_package_sha256": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e",
+    "observed_tbs_sha256": "581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095"
+  },
+  "controlled_images": {
+    "v4_golden_image": {
+      "sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+      "note": "64B frozen function table (SIMULATION pointers) + Thumb stub"
+    },
+    "v4_alt_image": {
+      "sha256": "6ddb0f16c2fada225fa3504f87d76dae25a333f4b2feb8853ece8c390ef27498"
+    }
+  },
+  "packages": {
+    "golden-replica": {
+      "sha256": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e",
+      "verifier_report": {
+        "app_id": "line-crossing",
+        "app_version": "4.0.0",
+        "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence",
+        "content_identity_sha256": "581e3ae98afef313de0bdf7d8bc85c2a36585a7c28e609dea183a558e599e095",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v4",
+        "live_publish_max": 1168,
+        "live_track_max": 8,
+        "native_crc32": "0x990997a2",
+        "native_entry_offset": "0x40",
+        "native_file_len": 100,
+        "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+        "native_image_size": 68,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e",
+        "publisher_id": "test-publisher",
+        "publisher_key_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
+        "report_max": 6144,
+        "required_exec_region_bytes": 68,
+        "required_host_abi": "0x00040000",
+        "required_host_caps": "0x3ff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 3,
+        "signature_len": 70,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 324
+      }
+    },
+    "lc-test-app-4.0.0": {
+      "sha256": "92308f4781d5523f09f4902fe363c98b8a22fb63c2df212753b85579f2320b7b",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "4.0.0",
+        "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence",
+        "content_identity_sha256": "920906f5abffff287dc4fa27152a64fe96992c7efbb6f2e4ed99b2c385ed474b",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v4",
+        "live_publish_max": 1168,
+        "live_track_max": 8,
+        "native_crc32": "0x990997a2",
+        "native_entry_offset": "0x40",
+        "native_file_len": 100,
+        "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+        "native_image_size": 68,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "92308f4781d5523f09f4902fe363c98b8a22fb63c2df212753b85579f2320b7b",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+        "report_max": 6144,
+        "required_exec_region_bytes": 68,
+        "required_host_abi": "0x00040000",
+        "required_host_caps": "0x3ff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 3,
+        "signature_len": 71,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 324
+      }
+    },
+    "lc-test-app-4.1.0": {
+      "sha256": "f0ec52a358468e0c37b17b161a18670a75362d1a1f393b641d654f6e554f6253",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "4.1.0",
+        "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence",
+        "content_identity_sha256": "08f7f7cb4b4db8519333ec0d98c5fe9b35ad2a3ba17871e2f6a4682888ef043d",
+        "control_max": 256,
+        "event_max": 2048,
+        "format": "neapp-v4",
+        "live_publish_max": 1168,
+        "live_track_max": 8,
+        "native_crc32": "0x990997a2",
+        "native_entry_offset": "0x40",
+        "native_file_len": 100,
+        "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+        "native_image_size": 68,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "f0ec52a358468e0c37b17b161a18670a75362d1a1f393b641d654f6e554f6253",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+        "report_max": 6144,
+        "required_exec_region_bytes": 68,
+        "required_host_abi": "0x00040000",
+        "required_host_caps": "0x3ff",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 3,
+        "signature_len": 71,
+        "snapshot_max": 1024,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 324
+      }
+    },
+    "lc-v4-alt-4.0.0": {
+      "sha256": "381131a3f641be80ed882f029f35ec3ee2e481b5437f61df1237729052cff448",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "4.0.0",
+        "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence",
+        "content_identity_sha256": "707d987526698de69209621ae552e53d2f3365563c0712926b7cb4a46e334a41",
+        "control_max": 256,
+        "event_max": 0,
+        "format": "neapp-v4",
+        "live_publish_max": 0,
+        "live_track_max": 0,
+        "native_crc32": "0xde8e3439",
+        "native_entry_offset": "0x0",
+        "native_file_len": 36,
+        "native_file_sha256": "6ddb0f16c2fada225fa3504f87d76dae25a333f4b2feb8853ece8c390ef27498",
+        "native_image_size": 4,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "381131a3f641be80ed882f029f35ec3ee2e481b5437f61df1237729052cff448",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+        "report_max": 0,
+        "required_exec_region_bytes": 4,
+        "required_host_abi": "0x00040000",
+        "required_host_caps": "0x63",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 3,
+        "signature_len": 71,
+        "snapshot_max": 0,
+        "state_quota": 0,
+        "target_board_id": "0x00003010",
+        "tbs_len": 260
+      }
+    },
+    "lc-test-app-enable-4.0.0": {
+      "sha256": "1d6356272535efc854eb968ea23f694144b111ab1830137a81d7dad7461c75a7",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "4.0.0",
+        "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence",
+        "content_identity_sha256": "26df9606642ae23fe14ca570e8ad5c3b88097a1e8d88a18008dae7e0b40127f4",
+        "control_max": 256,
+        "event_max": 0,
+        "format": "neapp-v4",
+        "live_publish_max": 0,
+        "live_track_max": 0,
+        "native_crc32": "0x990997a2",
+        "native_entry_offset": "0x40",
+        "native_file_len": 100,
+        "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+        "native_image_size": 68,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "1d6356272535efc854eb968ea23f694144b111ab1830137a81d7dad7461c75a7",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+        "report_max": 0,
+        "required_exec_region_bytes": 68,
+        "required_host_abi": "0x00040000",
+        "required_host_caps": "0x173",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 3,
+        "signature_len": 71,
+        "snapshot_max": 0,
+        "state_quota": 4096,
+        "target_board_id": "0x00003010",
+        "tbs_len": 324
+      }
+    },
+    "lc-test-app-live-4.0.0": {
+      "sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+      "verifier_report": {
+        "app_id": "lc-test-app",
+        "app_version": "4.0.0",
+        "boundary": "signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence",
+        "content_identity_sha256": "5c61a2522b566af23f46d56cdb6ba82db11a663a2ff6bde7c86fc5981e78111c",
+        "control_max": 0,
+        "event_max": 0,
+        "format": "neapp-v4",
+        "live_publish_max": 9008,
+        "live_track_max": 64,
+        "native_crc32": "0x990997a2",
+        "native_entry_offset": "0x40",
+        "native_file_len": 100,
+        "native_file_sha256": "845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1",
+        "native_image_size": 68,
+        "native_target_addr": "0x93e00000",
+        "package_sha256": "ba64faefea77a1569a2b96f86a4ac356d34f27cbd7e90808af21b7a9b38ae2b2",
+        "publisher_id": "dev-publisher",
+        "publisher_key_sha256": "dc0ce633dbcc913dafafa4b89ac44d8ce683fdfc3f60c8bdf21213b9f2b534ba",
+        "report_max": 0,
+        "required_exec_region_bytes": 68,
+        "required_host_abi": "0x00040000",
+        "required_host_caps": "0x223",
+        "required_psram_mib": 64,
+        "result": "PASS",
+        "run_profile": 3,
+        "signature_len": 70,
+        "snapshot_max": 0,
+        "state_quota": 0,
+        "target_board_id": "0x00003010",
+        "tbs_len": 324
+      }
+    }
+  },
+  "spec_suite": {
+    "suite": "tests/spec-vnext/run_all_tests.py (independent stdlib-only)",
+    "vectors_total": 117,
+    "vectors_passed": 117
+  },
+  "v4_case_suite": {
+    "cases_total": 50,
+    "cases": [
+      {
+        "name": "cross.v3_magic_rejected_by_v4_verifier",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"container magic is not NEAPP v4 (4e45415050 04 00 00); v1/v2/v3 and any other container major is foreign input, never negotiated\", \"package_len\": 395, \"package_sha256\": \"77adc65e0bb996bf1d501095ddfe67be3d4f864d1dc66e0aab329df54e26ee44\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "container.manifest_len_192_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"manifest_len is 192, v4 allows only 208\", \"package_len\": 396, \"package_sha256\": \"4568c4ff9d46b5cb1fdf7a6d6e530fe37f9e3c81f11562865fecc01494e040e0\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "container.native_file_len_31_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native_file_len 31 cannot hold the 32-byte native header\", \"package_len\": 395, \"package_sha256\": \"076294572ab50538c6ac3d3b7617b0b7a701c13c2f317177df9878f11a8d3b11\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "container.native_file_len_over_cap_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native_file_len 2097153 exceeds the v4 cap 2097152\", \"package_len\": 394, \"package_sha256\": \"0ac098a38d2c06281ead8d7438fa91a535b89c8972bbbdc107678501bdc679c4\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "container.truncated_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"DER: SEQUENCE content overruns buffer\", \"package_len\": 393, \"package_sha256\": \"6ba967409d10723166a195877df8217777cea4d94670fdec5a3ae0cd1b7a6d72\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "container.trailing_byte_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"DER: SEQUENCE length does not consume the signature exactly\", \"package_len\": 395, \"package_sha256\": \"7cb5c685f6f488cbc87cef5b0242b4955da1537d78e86e80b3d59416b0d4c5fe\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.magic_nmf3_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"manifest magic is b'NMF3', v4 requires exactly NMF4 (a v3 NMF3 manifest inside a v4 container is foreign input)\", \"package_len\": 394, \"package_sha256\": \"25035b9eca3744e2cbb0370bde72b7aae52a7f27a65a6eed994a682002785f12\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.reserved_58_59_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"manifest reserved bytes (58..59) are not zero\", \"package_len\": 395, \"package_sha256\": \"07635b6fa360a76609647d1313535738d4323081d4bd24e9ee2ae1c3f45a8fe3\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.reserved_192_207_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"manifest reserved bytes (192..207) are not zero\", \"package_len\": 395, \"package_sha256\": \"826afd251580b80a22ad73eea45bae98ebbfc5ee2f039fdbe080bd49ba85a0aa\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.abi_0x00030000_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"v4 manifest required_host_abi must be 0x00040000, got 0x00030000 (format invariant, Host #104 F1/F2)\", \"package_len\": 394, \"package_sha256\": \"ed3c959e261be51d726f6df07b91d08140182fab3cf834c3fc76004737573427\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.identifier_charset_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"publisher_id: character outside [a-z0-9-]\", \"package_len\": 395, \"package_sha256\": \"89720c5f83be617b40fd39716cc8d2dff6fa73479d04b6f153efa3b8c1b8c463\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.caps_bit10_unknown_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"required_host_caps has unknown bits 0x400 (bits 10..31 must be zero, Host #104 F3)\", \"package_len\": 396, \"package_sha256\": \"c914dfea127a7b55da26f335a8546a413a5fe3d1c9c7cc23bde967cbad26423d\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.bit8_without_bit4_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"ENABLE_CONTROL (bit8) requires the same package to declare app_state (bit4)\", \"package_len\": 395, \"package_sha256\": \"db7882148408f200c67da4dcb829cd827bd612099f8211dac8c26fc4293e838e\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.bit9_live_publish_max_311_rejected",
+        "expected": "RESOURCE_LIMIT",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"LIVE_PUBLISH requires live_publish_max >= 312, got 311\", \"package_len\": 394, \"package_sha256\": \"6207f7bff1236d940b7ff44c70325bd026af5cf80139809a3117891a8f7894b1\", \"result\": \"RESOURCE_LIMIT\"}"
+      },
+      {
+        "name": "manifest.bit9_live_track_max_0_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"LIVE_PUBLISH requires live_track_max in 1..64, got 0\", \"package_len\": 395, \"package_sha256\": \"abf722ce29d7226382423d5c751fb6058a00d4cfe5cc28c105781b66bb3d7b75\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.bit9_live_track_max_65_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"LIVE_PUBLISH requires live_track_max in 1..64, got 65\", \"package_len\": 395, \"package_sha256\": \"eecfabe56e6d3be7157b10e428a89f05b998391475c57e22775b539f2049b9aa\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.bit9_track64_below_9008_closure_rejected",
+        "expected": "RESOURCE_LIMIT",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"live_publish_max 9007 is below the worst-case ACTIVE_TRACKS_SNAPSHOT closure 9008 (48 + 64 * 140, Host #104 F9)\", \"package_len\": 395, \"package_sha256\": \"acef21e39c4dd8ddead280927bf09277c4c6aa4d3efa0ad2f2e16d65b3565208\", \"result\": \"RESOURCE_LIMIT\"}"
+      },
+      {
+        "name": "manifest.no_bit9_with_live_publish_max_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"without LIVE_PUBLISH (bit9) both live_publish_max and live_track_max must be 0 (got 1168/8)\", \"package_len\": 395, \"package_sha256\": \"6379d53de420a92779f1314cc4b8a6c3a42b588f36a743ef2a44b2f98ca5ee3c\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.v3_profile_2_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"unknown run_profile 2 (v4 allows only 3; v3 profile 2 and v2 profile 1 are not reinterpreted here)\", \"package_len\": 396, \"package_sha256\": \"b6817d03a6aea66bf2dfa48138bc30c79a856fa4b14ba62e231b459489b8b1e5\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.event_max_without_bit2_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"event_max set without the ai_events (bit2) capability\", \"package_len\": 396, \"package_sha256\": \"da1174d50869368fad8d6e140d604d6f2f5310b11b622dcd1413d34fed3cbe40\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "manifest.control_max_31_rejected",
+        "expected": "RESOURCE_LIMIT",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"control_max 31 is below the generic 32B control-wire minimum 32 (v3-inherited quota semantics, Host #104 F2)\", \"package_len\": 395, \"package_sha256\": \"b4c5cbe42ebc550767914612b67d52d918368c1d370a560882bd9e2be51d3b11\", \"result\": \"RESOURCE_LIMIT\"}"
+      },
+      {
+        "name": "native.crc_mismatch_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native payload CRC-32 mismatch\", \"package_len\": 395, \"package_sha256\": \"f4d1cc48fbbc23ecec542297c08dbbd3b62a9a73e73545d53ce6f7af92d863b6\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "native.abi_0x00030000_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native header abi_version 0x00030000 != 0x00040000 (only 0x00040000 is defined for v4; v1/v2/v3 native ABI semantics are never back-filled)\", \"package_len\": 395, \"package_sha256\": \"4a91f6e385016dbc4ee51dd82a46ad6243bdf395735c6133d7bf33991d9a763f\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "native.reserved0_nonzero_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native header reserved0 is 0x1, must be all zero\", \"package_len\": 394, \"package_sha256\": \"40a88e60776c61c34b28c5661b7300b9cb47c8faf1e9325d7b039ab4bd4e948f\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "native.format_version_2_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native format_version 2 != 1\", \"package_len\": 394, \"package_sha256\": \"a2b12b28547dd90bd0be0b77b581f036520d94a07dee3bf5403044b677d768aa\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "native.header_size_31_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native header_size 31 != 32 (exact)\", \"package_len\": 395, \"package_sha256\": \"8072dd40815e40e5195500dcd91926520a92956f8d661fb1a3e4aa7e0f2a0d74\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "native.odd_thumb_entry_rejected",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"native entry_offset is odd (Thumb entry must be even)\", \"package_len\": 395, \"package_sha256\": \"673b4ecfb54cbc16ac3f31136346a9745fd0869290c99949509191040ddd00ca\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "trust.fingerprint_mismatch_rejected",
+        "expected": "PUBLISHER_UNTRUSTED",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"manifest publisher_key_sha256 does not match the trusted key for publisher_id 'test-publisher'\", \"package_len\": 395, \"package_sha256\": \"e714d1ee8b0fc8ca933cf3feb12e40c794f9c60c023ea4b9711740846c0ae5f9\", \"result\": \"PUBLISHER_UNTRUSTED\"}"
+      },
+      {
+        "name": "trust.unknown_publisher_rejected",
+        "expected": "PUBLISHER_UNTRUSTED",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"publisher_id 'ghost-publisher' is not in the local trust mapping; key material inside or alongside a package never self-trusts\", \"package_len\": 394, \"package_sha256\": \"26307ce6419635b10a944a709b3dec99035ffa994e1e6913fa3db8250a010557\", \"result\": \"PUBLISHER_UNTRUSTED\"}"
+      },
+      {
+        "name": "trust.local_trust_mapping_decides",
+        "expected": "PASS",
+        "ok": true,
+        "detail": "{\"app_id\": \"line-crossing\", \"app_version\": \"4.0.0\", \"boundary\": \"signed-format PASS is offline tooling evidence only: NOT Host admission, NOT native runtime admission; ENABLE_CONTROL/LIVE_PUBLISH exist at runtime only where the actual Host implements and grants them; no device install, execution, floor, or live-delivery evidence\", \"content_identity_sha256\": \"ec768e401ef4a9db6fbacdd0e3be159396989322102b1bc4fa6380097b008613\", \"control_max\": 256, \"event_max\": 2048, \"format\": \"neapp-v4\", \"live_publish_max\": 1168, \"live_track_max\": 8, \"native_crc32\": \"0x990997a2\", \"native_entry_offset\": \"0x40\", \"native_file_len\": 100, \"native_file_sha256\": \"845e09288e0f1d876832dcda553580c6aa64ef17f08b9e529550aefa4db12cd1\", \"native_image_size\": 68, \"native_target_addr\": \"0x93e00000\", \"package_sha256\": \"26307ce6419635b10a944a709b3dec99035ffa994e1e6913fa3db8250a010557\", \"publisher_id\": \"ghost-publisher\", \"publisher_key_sha256\": \"5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3\", \"report_max\": 6144, \"required_exec_region_bytes\": 68, \"required_host_abi\": \"0x00040000\", \"required_host_caps\": \"0x3ff\", \"required_psram_mib\": 64, \"result\": \"PASS\", \"run_profile\": 3, \"signature_len\": 70, \"snapshot_max\": 1024, \"state_quota\": 4096, \"target_board_id\": \"0x00003010\", \"tbs_len\": 324}"
+      },
+      {
+        "name": "sig.tbs_mutation_without_resign_rejected",
+        "expected": "SIGNATURE_INVALID",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"ECDSA P-256/SHA-256 verification failed over the exact TBS\", \"package_len\": 394, \"package_sha256\": \"9fe9f526fb6bce8d016662e39949d2d38539ebac2059d5d5e222fde36f77ce3f\", \"result\": \"SIGNATURE_INVALID\"}"
+      },
+      {
+        "name": "sig.signature_flip_rejected",
+        "expected": "SIGNATURE_INVALID",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"ECDSA P-256/SHA-256 verification failed over the exact TBS\", \"package_len\": 394, \"package_sha256\": \"666012a02c6a739179f40ab4bb90a51d58e3457abe07b46a211cb34585ea2038\", \"result\": \"SIGNATURE_INVALID\"}"
+      },
+      {
+        "name": "pack.caps_bit10_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: capability/quota declaration rejected at pack time: required_host_caps has unknown bits: 0x400"
+      },
+      {
+        "name": "pack.bit8_without_bit4_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: capability/quota declaration rejected at pack time: ENABLE_CONTROL (bit8) requires the same package to declare app_state (bit4)"
+      },
+      {
+        "name": "pack.bit9_without_bit5_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: capability/quota declaration rejected at pack time: v4 run_profile 3 requires the session_lifecycle capability (bit5)"
+      },
+      {
+        "name": "pack.bit9_track64_below_closure_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: capability/quota declaration rejected at pack time: live_publish_max 9007 is below the worst-case ACTIVE_TRACKS_SNAPSHOT closure 9008 (48 + 64 * 140, Host #104 F9)"
+      },
+      {
+        "name": "pack.live_quota_without_bit9_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: capability/quota declaration rejected at pack time: without LIVE_PUBLISH (bit9) both live_publish_max and live_track_max must be 0 (got 312/1)"
+      },
+      {
+        "name": "pack.board_override_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: v4 evidence baseline supports only board 0x00003010"
+      },
+      {
+        "name": "pack.psram_override_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: v4 evidence baseline supports only 64 MiB PSRAM"
+      },
+      {
+        "name": "pack.v3_abi_image_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: native header abi_version 0x00030000 != requested host ABI 0x00040000 (v4 pins 0x00040000)"
+      },
+      {
+        "name": "pack.wrong_target_image_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: native header target_addr != requested exec base"
+      },
+      {
+        "name": "pack.broken_crc_image_refused",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: payload CRC-32 mismatch"
+      },
+      {
+        "name": "admission.host_without_bit9_refuses_emit",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: target-Host admission simulation (/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/v4-cases/policy-no-bit9.json) rejected the package: ABI_INCOMPATIBLE: Host does not provide capability bits 0x200 (package requests 0x3ff, Host provides 0x1ff); ENABLE_CONTROL/LIVE_PUBLISH without an actual Host grant are UNAVAILABLE/UNAUTHORIZED at runtime, never downgraded"
+      },
+      {
+        "name": "admission.live_capacity_below_declaration_refuses_emit",
+        "expected": "refused rc=2",
+        "ok": true,
+        "detail": "ERROR: target-Host admission simulation (/Users/harryhua/Documents/GitHub/ne30x-app/.worktree/36/tests/package-vnext/work/v4-cases/policy-tight-live.json) rejected the package: RESOURCE_LIMIT: live_publish_max 1168 exceeds the Host live capacity 1000; the live capability is refused whole rather than degraded"
+      },
+      {
+        "name": "old.v1_verifier_rejects_v4_package",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline verification only; no device install/execution claim\", \"detail\": \"container magic is not NEAPP v1 (4e45415050 01 00 00)\", \"package_len\": 394, \"package_sha256\": \"e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "old.v2_verifier_rejects_v4_package",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline verification only; no device install/execution/PKA claim\", \"detail\": \"container magic is not NEAPP v2 (4e45415050 02 00 00); unknown container versions are rejected, never negotiated (\\u00a71.3/\\u00a78 M2)\", \"package_len\": 394, \"package_sha256\": \"e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "old.v3_verifier_rejects_v4_package",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline verification only; no NE301 admission/install/execution/hot-config claim\", \"detail\": \"container magic is not NEAPP v3 (4e45415050 03 00 00); unknown container versions are rejected, never negotiated (\\u00a71.3, \\u00a710 M2/M3/M4/M5)\", \"package_len\": 394, \"package_sha256\": \"e6a7fedc8cda9f3900311bc077de2a3ea79002d10b23241d1690c9e28ee46e0e\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "new.v4_verifier_rejects_committed_v3_golden",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"container magic is not NEAPP v4 (4e45415050 04 00 00); v1/v2/v3 and any other container major is foreign input, never negotiated\", \"package_len\": 314, \"package_sha256\": \"c74f7e468a9b63403bbaa8d36816bfd5250ffd68f66ebffc7d994440f1e22342\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "new.v4_verifier_rejects_committed_v2_golden",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"container magic is not NEAPP v4 (4e45415050 04 00 00); v1/v2/v3 and any other container major is foreign input, never negotiated\", \"package_len\": 314, \"package_sha256\": \"3766e8afc39b267c26bece857e4177248f847aab265ce1b9c3dbf18b27c9eb3e\", \"result\": \"BAD_PACKAGE\"}"
+      },
+      {
+        "name": "new.v4_verifier_rejects_committed_v1_golden",
+        "expected": "BAD_PACKAGE",
+        "ok": true,
+        "detail": "{\"boundary\": \"offline signed-format verification only; no Host admission, install, execution, floor, or live-delivery claim\", \"detail\": \"container magic is not NEAPP v4 (4e45415050 04 00 00); v1/v2/v3 and any other container major is foreign input, never negotiated\", \"package_len\": 284, \"package_sha256\": \"9a212324132c0f26e2878384904f1af4abd3090a6ae5806ef32da2d3b4c80679\", \"result\": \"BAD_PACKAGE\"}"
+      }
+    ]
+  },
+  "zero_degradation": {
+    "legacy_suites_rerun": [
+      "tests/spec-v2/run_all_tests.py (exit 0, committed evidence byte-identical)",
+      "tests/spec-v3/run_all_tests.py (exit 0, committed evidence byte-identical)"
+    ],
+    "legacy_tool_reproduction": {
+      "v2_golden_tbs_rebuilt_byte_identical": true,
+      "v3_golden_rebuilt_byte_identical": true,
+      "v1_golden_verified_pass": "PASS",
+      "verifiers": "unmodified package/neapp_pack_v2.py, neapp_pack_v3.py, neapp_verify.py, neapp_verify_v2.py, neapp_verify_v3.py"
+    },
+    "cross_major_fail_closed": {
+      "old_verifiers_reject_v4_golden": [
+        "BAD_PACKAGE",
+        "BAD_PACKAGE",
+        "BAD_PACKAGE"
+      ],
+      "v4_verifier_rejects_committed_v1_v2_v3_goldens": [
+        "BAD_PACKAGE",
+        "BAD_PACKAGE",
+        "BAD_PACKAGE"
+      ],
+      "nfc3_rejected_by_v4_control_parser": true
+    },
+    "canonical_heavyweight_command": "bash tests/package-v3/run_checks.sh (pre-existing #20 suite; transitively runs the v1/v2 chains and refreshes its own committed p6 evidence by design)"
+  },
+  "pass_not_run_matrix": {
+    "PASS_offline": [
+      "v4 golden generation byte-identical across two independent implementations",
+      "strict-DER ECDSA P-256 signing/verification (RFC-6979; OpenSSL + cryptography cross-proof)",
+      "container/manifest/native/table/policy rejection matrix (tooling + spec suites)",
+      "trust fail-closed (unknown publisher, fingerprint mismatch; package keys never self-trust)",
+      "bit8/bit9 capability prerequisites and live quota closure (312 / 48+140*tracks)",
+      "NFC4 ENABLE_SET/ENR1 receipt and LVN4 packet/GAP vector coverage (frozen bytes)",
+      "legacy v1/v2/v3 suites byte-stable; cross-major fail-closed both directions",
+      "same App-signed v4 bytes verified by pinned Host C parser: 12/12 joint outcomes and categories match"
+    ],
+    "NOT_RUN": [
+      {
+        "item": "device flash/NVS/LittleFS, board install or execution",
+        "reason": "no device"
+      },
+      {
+        "item": "production keys, real issuance, production trust roots",
+        "reason": "out of scope; non-production only"
+      },
+      {
+        "item": "App #30 Enable/Paused business semantics",
+        "reason": "owned by #30; non-goal here"
+      },
+      {
+        "item": "Host #91 producer-ingest / live read path, App #27 tracker",
+        "reason": "Host #91 live_publish returns APP_SESSION_ERR_UNAVAILABLE; producer-ingest/live runtime path and App #27 tracker remain unimplemented"
+      },
+      {
+        "item": "ARM target build static asserts (sizeof(void*)==4, Thumb)",
+        "reason": "target-build proof, not offline tooling"
+      },
+      {
+        "item": "real RAM/CPU/live-queue capacity on hardware",
+        "reason": "device measurement"
+      },
+      {
+        "item": "remaining #104 bytes (control/live wire final freeze beyond F5/F8/F9)",
+        "reason": "A freeze in progress at Host #104"
+      }
+    ]
+  },
+  "joint_interop": {
+    "status": "PASS",
+    "app_signer_source_sha": "71f1850063f022b86f3b027e27eaabb992de60b0",
+    "app_candidate_sha_at_run": "76cf1fccd49e8911f4fa385e90e582a44bdd2b29",
+    "host_parser_source_sha": "f6a851a3c1c116f85d9a2609c9d8b63b1d0a66f1",
+    "matrix_cases": 12,
+    "matrix_passed": 12,
+    "host_integration_checks": 77,
+    "host_integration_failures": 0,
+    "host_session_checks": 592,
+    "host_session_failures": 0,
+    "runtime_live_authorization": "APP_SESSION_ERR_UNAVAILABLE; Host #91 producer-ingest is not implemented",
+    "evidence": "joint-interop.json, joint-interop.log, joint-interoperability.md"
+  }
+}

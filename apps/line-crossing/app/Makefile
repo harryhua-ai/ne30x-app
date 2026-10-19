@@ -160,3 +160,26 @@ package-v3: $(V3_IMAGE) $(V3_WORK)/keys/dev-signer.pem
 
 clean-v3:
 	rm -f $(V3_OBJS) $(V3_ELF) $(V3_PAYLOAD) $(V3_IMAGE)
+
+V4_APP_VERSION ?= 4.0.0
+V4_ELF := $(BUILD)/lc-line-crossing-v4.elf
+V4_APP_SRCS := lc_app_entry_v4.c lc_bus.c lc_bus_config.c lc_stateblob.c \
+               lc_ctrl.c lc_cfgcodec.c lc_json.c lc_arena.c lc_libc_mini.c
+V4_OBJS := $(patsubst $(APP_DIR)/src/%.c,$(BUILD)/core_%.o,$(CORE_SRCS)) \
+           $(patsubst %.c,$(BUILD)/v4_%.o,$(V4_APP_SRCS))
+
+.PHONY: elf-v4 clean-v4
+
+$(BUILD)/v4_%.o: PKG_VERSION = $(V4_APP_VERSION)
+
+$(BUILD)/v4_%.o: %.c $(wildcard *.h) | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(V4_ELF): $(V4_OBJS) lc_app.ld
+	$(CC) $(CFLAGS) -o $@ $(V4_OBJS) $(LDFLAGS)
+
+elf-v4: $(V4_ELF)
+	@echo "line-crossing-app: v4 ELF ready -> $(V4_ELF)"
+
+clean-v4:
+	rm -f $(V4_OBJS) $(V4_ELF)

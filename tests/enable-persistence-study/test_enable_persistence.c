@@ -405,7 +405,7 @@ static void test_candidate_crash_unknown_conflict_and_reinstall(void)
           "clean uninstall purge followed by reinstall starts a new Enabled state");
 }
 
-static void test_v3_rejects_new_command_but_downgrade_counts(void)
+static void test_v3_rejects_new_command_and_fails_closed(void)
 {
     setup_app(NULL, 0u, 0u);
     uint8_t command[LC_CTRL_MSG_BUF_CAP];
@@ -430,8 +430,12 @@ static void test_v3_rejects_new_command_but_downgrade_counts(void)
     check(bus.persist_state == LCBUS_PERSIST_CORRUPT,
           "current v3 sees the candidate schema as corrupt");
     feed_crossing(1, 1u, 100u);
-    check(bus.total_in == 1u,
-          "current v3 still counts FRAME after unsupported paused schema");
+    check(bus.total_in == 0u && bus.window_in == 0u,
+          "current v3 does not count FRAME after unsupported paused schema");
+    lcstub_set_tick(stub, 400000u);
+    lcbus_on_idle(&bus);
+    check(bus.report_seq == 0u && stub->report_count == 0,
+          "current v3 does not submit a window after unsupported paused schema");
     teardown_app();
 }
 
@@ -444,7 +448,7 @@ int main(void)
     test_real_frame_and_idle_report_paths();
     test_candidate_pause_resume_and_both_gates();
     test_candidate_crash_unknown_conflict_and_reinstall();
-    test_v3_rejects_new_command_but_downgrade_counts();
+    test_v3_rejects_new_command_and_fails_closed();
     if (failures != 0) {
         printf("ENABLE-PERSISTENCE-STUDY RESULT: FAIL (%d/%d checks failed)\n",
                failures, checks);
