@@ -7,4 +7,7 @@ pnpm install --offline --frozen-lockfile --ignore-scripts
 npm --prefix browser-runner ci --offline --ignore-scripts
 node browser-runner/build.mjs
 node --test contract.test.mjs browser.test.mjs
+if [ "${LC_SAVE_DIAGNOSTIC_MODE:-}" = "matrix" ]; then
+    LC_SAVE_DIAGNOSTIC_PHASE=matrix node --test --test-name-pattern='line-save diagnostic matrix' browser.test.mjs
+fi
 sh "$REPO_ROOT/tests/line-crossing-runtime/run.sh"
