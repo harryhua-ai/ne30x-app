@@ -399,11 +399,10 @@ test('real H.264 playback, line editing, separate saves, reconnect and revoked v
   await page.getByTestId('lc-reset-line-dialog').waitFor()
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 0)
   await page.locator('[data-testid="lc-reset-line-dialog"] button').first().click()
-  const stage = await page.getByTestId('lc-stage').boundingBox()
   const endpoint = page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]')
-  const endpointBox = await endpoint.boundingBox()
-  assert.ok(stage && endpointBox)
-  await page.mouse.move(endpointBox.x + endpointBox.width / 2, endpointBox.y + endpointBox.height / 2)
+  await endpoint.hover()
+  const stage = await page.getByTestId('lc-stage').boundingBox()
+  assert.ok(stage)
   await page.mouse.down()
   await page.mouse.move(stage.x + stage.width * 0.7, stage.y + stage.height * 0.6, { steps: 6 })
   await page.mouse.up()
@@ -411,10 +410,11 @@ test('real H.264 playback, line editing, separate saves, reconnect and revoked v
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 0)
 
   await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
-  const activeEndpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
-  const activeStage = await page.getByTestId('lc-stage').boundingBox()
+  const activeEndpoint = page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]')
   await observeSavePointerEvents(page)
-  await page.mouse.move(activeEndpoint.x + activeEndpoint.width / 2, activeEndpoint.y + activeEndpoint.height / 2)
+  await activeEndpoint.hover()
+  const activeStage = await page.getByTestId('lc-stage').boundingBox()
+  assert.ok(activeStage)
   await page.mouse.down()
   await page.mouse.move(activeStage.x + activeStage.width * 0.7, activeStage.y + activeStage.height * 0.6, { steps: 6 })
   await page.mouse.up()
@@ -640,10 +640,10 @@ test('line-save diagnostic matrix isolates freshness, fixture observation and po
   }
 
   const dragEndpoint = async page => {
-    const endpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
+    const endpoint = page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]')
+    await endpoint.hover()
     const stage = await page.getByTestId('lc-stage').boundingBox()
-    assert.ok(endpoint && stage)
-    await page.mouse.move(endpoint.x + endpoint.width / 2, endpoint.y + endpoint.height / 2)
+    assert.ok(stage)
     await page.mouse.down()
     await page.mouse.move(stage.x + stage.width * 0.7, stage.y + stage.height * 0.6, { steps: 6 })
     await page.mouse.up()
@@ -705,11 +705,8 @@ test('line-save diagnostic matrix isolates freshness, fixture observation and po
 
   {
     const { page, scenario } = await openDiagnosticPage('pointer-down-up-without-drag')
-    const endpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
-    assert.ok(endpoint)
-    const x = endpoint.x + endpoint.width / 2
-    const y = endpoint.y + endpoint.height / 2
-    await page.mouse.move(x, y)
+    const endpoint = page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]')
+    await endpoint.hover()
     await page.mouse.down()
     await page.mouse.up()
     const before = await recordBoundary(page, 'before-save', scenario, 'pointer-move-omitted-after-down')
@@ -734,9 +731,7 @@ test('line-save diagnostic matrix isolates freshness, fixture observation and po
   {
     const { page, scenario } = await openDiagnosticPage('pointer-cancel-before-drag')
     const endpoint = page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]')
-    const box = await endpoint.boundingBox()
-    assert.ok(box)
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await endpoint.hover()
     await page.mouse.down()
     await endpoint.dispatchEvent('pointercancel', { bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1 })
     await page.mouse.up()
