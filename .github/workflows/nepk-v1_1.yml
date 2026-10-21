@@ -1,0 +1,151 @@
+name: NEPK v1.1 TEST ONLY
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/nepk-v1_1.yml'
+      - 'apps/line-crossing/app/**'
+      - 'apps/line-crossing/ui/**'
+      - 'package/vnext/**'
+      - 'package/sidecar/neui_sidecar_format.py'
+      - 'package/neapp_format.py'
+      - 'tests/line-crossing-ui/**'
+      - 'tests/line-crossing-runtime/**'
+      - 'tests/nepk-v1_1/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nepk-v1_1.yml'
+      - 'apps/line-crossing/app/**'
+      - 'apps/line-crossing/ui/**'
+      - 'package/vnext/**'
+      - 'package/sidecar/neui_sidecar_format.py'
+      - 'package/neapp_format.py'
+      - 'tests/line-crossing-ui/**'
+      - 'tests/line-crossing-runtime/**'
+      - 'tests/nepk-v1_1/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-verify-test-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.3'
+
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@11.5.2
+
+      - name: Install ARM compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi
+
+      - name: Install Python verifier dependency
+        run: python -m pip install --disable-pip-version-check cryptography==48.0.0
+
+      - name: Prepare browser test dependencies
+        run: |
+          pnpm --dir tests/line-crossing-ui install --frozen-lockfile --ignore-scripts
+          npm ci --prefix tests/line-crossing-ui/browser-runner --ignore-scripts
+          npx --yes playwright@1.64.0 install --with-deps chromium
+
+      - name: Run UI, runtime, bridge, and NEPK negative vectors
+        run: |
+          pnpm --dir tests/line-crossing-ui test
+          python -m unittest discover -s tests/nepk-v1_1 -v
+
+      - name: Build production Line Crossing v4 ELF
+        shell: bash
+        run: |
+          run_number=$((10#${GITHUB_RUN_NUMBER}))
+          minor=$((run_number / 65536))
+          patch=$((run_number % 65536))
+          native_version="4.${minor}.${patch}"
+          ui_version="1.${minor}.${patch}"
+          printf 'NEPK_NATIVE_VERSION=%s\n' "$native_version" >> "$GITHUB_ENV"
+          printf 'NEPK_UI_VERSION=%s\n' "$ui_version" >> "$GITHUB_ENV"
+          make -C apps/line-crossing/app elf-v4 V4_APP_VERSION="$native_version"
+
+      - name: Build and independently verify TEST ONLY package
+        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          NEPK_TEST_ONLY_ISSUER_KEY: ${{ secrets.NEPK_TEST_ONLY_ISSUER_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${NEPK_TEST_ONLY_ISSUER_KEY:-}" ]]; then
+            printf '%s\n' 'Required TEST ONLY issuer secret is unavailable.' >&2
+            exit 1
+          fi
+          umask 077
+          key_file="$RUNNER_TEMP/nepk-test-only-issuer.pem"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s' "$NEPK_TEST_ONLY_ISSUER_KEY" > "$key_file"
+          unset NEPK_TEST_ONLY_ISSUER_KEY
+          artifact_dir="$RUNNER_TEMP/nepk-v1-1-artifact"
+          mkdir -p "$artifact_dir"
+          trust_file="$RUNNER_TEMP/nepk-test-only-trust.json"
+          python - "$key_file" "$trust_file" <<'PY'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+          from cryptography.hazmat.primitives import serialization
+
+          key = serialization.load_pem_private_key(Path(sys.argv[1]).read_bytes(), password=None)
+          spki = key.public_key().public_bytes(
+              serialization.Encoding.DER,
+              serialization.PublicFormat.SubjectPublicKeyInfo,
+          )
+          digest = hashlib.sha256(spki).hexdigest()
+          expected = "06e732b1b94daeeef433297f7a8e797bf72b2fd3b882a4ec6a5490352931ebda"
+          if digest != expected:
+              raise SystemExit("TEST ONLY signing key does not match the pinned Host test SPKI")
+          Path(sys.argv[2]).write_text(json.dumps({
+              "version": 1,
+              "publishers": {
+                  "ne301-exp-pub": {"spki_der_hex": spki.hex(), "spki_sha256": digest}
+              },
+          }, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+          run_number=$((10#${GITHUB_RUN_NUMBER}))
+          native_version="$NEPK_NATIVE_VERSION"
+          ui_version="$NEPK_UI_VERSION"
+          package_file="$artifact_dir/line-crossing-v${native_version}-ui-${ui_version}-seq-${run_number}.neapp"
+          python package/vnext/nepk_v1_1_pack.py \
+            --elf apps/line-crossing/app/build/lc-line-crossing-v4.elf \
+            --ui-assets tests/line-crossing-ui/.build/production \
+            --key "$key_file" \
+            --out "$package_file" \
+            --native-version "$native_version" \
+            --ui-version "$ui_version" \
+            --release-seq "$run_number" \
+            --source-commit "$GITHUB_SHA"
+          python package/vnext/nepk_v1_1_verify.py \
+            --bundle "$package_file" \
+            --trust "$trust_file" \
+            --expect-publisher-id ne301-exp-pub \
+            --expect-app-id line-crossing \
+            --compact > "$artifact_dir/independent-verification.json"
+          sha256sum "$package_file"
+
+      - uses: actions/upload-artifact@v4
+        if: success() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        with:
+          name: nepk-v1.1-test-only-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/nepk-v1-1-artifact/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

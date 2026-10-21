@@ -1,19 +1,19 @@
 {
-  "app_entry": "apps/line-crossing/ui/src/main.tsx (production build served from the committed signed NEUI-equivalent asset set)",
+  "app_entry": "apps/line-crossing/ui/src/main.tsx (production build served from the current source tree)",
   "signed_bundle": {
     "bundle_path": "docs/evidence/line-crossing-ui/line-crossing.neui",
     "bundle_sha256": "a9117afcfeae8f3295352a00531c46284a9120799d41a825cd6d307eb4af77bc",
     "ui_tbs_sha256": "fc8bd17703aec3a9b6f0e2875e99731fcbe59be4e68efee6083c6e5553ecb92e",
     "source_commit": "539af692b998c7f27b15501a0c2f8fd1217a22cd",
     "signer_spki_sha256": "5cd252fb0ce8932436faf8ccd1040981b89ee4ad6b9fe9e2a2b7e71aacb27cd3",
-    "production_asset_equality": "tests/line-crossing-ui/contract.test.mjs compares every committed signed NEUI file path, length, and SHA-256 with the rebuilt production output served by this browser fixture."
+    "production_asset_equality": "The historical signed NEUI bundle is checked against its own asset records; the current source build is exercised directly and packaged separately by NEPK v1.1."
   },
   "bridge_limits": {
     "max_message_bytes": 16384,
     "max_pending_requests": 4,
     "request_deadline_ms": 10000
   },
-  "browser": "Google Chrome with local resolver rules mapping host.example.test and app.other.test to 127.0.0.1",
+  "browser": "Chrome or Chromium with local resolver rules mapping host.example.test and app.other.test to 127.0.0.1",
   "cases": [
     {
       "id": "authorized-session",
@@ -31,8 +31,8 @@
       "outcome": "pass"
     },
     {
-      "id": "enable-round-trip",
-      "title": "a granted Enable capability round-trips real outcomes while absent stays read-only",
+      "id": "enable-control-hidden",
+      "title": "a granted business Enable capability stays non-interactive while normal config writes remain available",
       "outcome": "pass"
     },
     {

@@ -15,7 +15,7 @@ const productionRoot = path.join(buildRoot, 'production')
 const browserRoot = path.join(buildRoot, 'browser')
 const signedRoot = path.join(buildRoot, 'signed')
 const h264Path = path.join(buildRoot, 'line-crossing-test.h264')
-const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const chromePath = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : chromium.executablePath())
 let browser
 let server
 let serverUrl
@@ -125,7 +125,7 @@ const extractSignedBundle = () => {
 }
 
 before(async () => {
-  assert.equal(existsSync(chromePath), true, 'Google Chrome is required for the offline browser fixture')
+  assert.equal(existsSync(chromePath), true, 'Chrome or Chromium is required for the offline browser fixture')
   const generated = spawnSync('ffmpeg', [
     '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25',
     '-t', '2', '-an', '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-tune', 'zerolatency',
@@ -365,108 +365,25 @@ test('unknown outcomes, stale snapshots, session generation changes and worker f
   await brokenPage.close()
 })
 
-test('trusted Enable capability toggles with real outcomes while absent, revoked, unknown and stale stay read-only', async () => {
+test('available business Enable capability never exposes a pause or disable control', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
   await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
   await page.getByTestId('lc-module').waitFor()
   await page.getByTestId('lc-tab-config').click()
   await page.getByTestId('lc-page-config').waitFor()
 
-  const absentSwitch = page.locator('[data-testid="lc-business-enable-switch"]')
-  assert.equal(await absentSwitch.count(), 0)
-  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Unavailable/)
-  assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 0)
-
   await page.evaluate(() => window.__lineCrossingTest.grantEnableControl(false))
-  const enableSwitch = page.getByTestId('lc-business-enable-switch')
-  await enableSwitch.waitFor()
-  assert.equal(await enableSwitch.isDisabled(), false)
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
-  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Disabled/)
-
-  await enableSwitch.click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 1)
-  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[0]), { sessionGeneration: 8, value: true })
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-business-enable-switch"]')?.getAttribute('aria-checked') === 'true')
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Applied')
-  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Running/)
-
-  await page.evaluate(() => window.__lineCrossingTest.setNextEnableOutcome('UNKNOWN'))
-  await enableSwitch.click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 2)
-  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[1]), { sessionGeneration: 8, value: false })
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Outcome unknown; no automatic retry was sent')
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
-
-  await page.evaluate(() => window.__lineCrossingTest.delayNextEnableApply())
-  await enableSwitch.click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 3)
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
-  await page.evaluate(() => window.__lineCrossingTest.revokeEnableWrite())
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-business-enable-switch"]')?.disabled === true)
-  await page.evaluate(() => {
-    window.__lineCrossingTest.setNextEnableOutcome('APPLIED')
-    window.__lineCrossingTest.resolvePendingEnableApply()
+  await page.waitForFunction(() => {
+    const capability = window.__lineCrossingTest.getState().businessEnable
+    return capability.state === 'available' && capability.value === false
   })
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Save capability unavailable')
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
-  assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 3)
-
-  await page.evaluate(() => window.__lineCrossingTest.restoreEnableWrite())
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-business-enable-switch"]')?.disabled === false)
-  await page.evaluate(() => window.__lineCrossingTest.setNextEnableOutcome('CONFLICT'))
-  await enableSwitch.click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 4)
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Conflict; reload the current snapshot')
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
-
-  await page.evaluate(() => window.__lineCrossingTest.makeBusinessEnableStale())
-  await absentSwitch.waitFor({ state: 'detached' })
-  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Stale/)
-  assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 4)
-  await page.close()
-})
-
-test('delayed Enable ACK from a superseded session is rejected while the current session APPLIED commits', async () => {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
-  await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
-  await page.getByTestId('lc-module').waitFor()
-  await page.getByTestId('lc-tab-config').click()
-  await page.getByTestId('lc-page-config').waitFor()
-  await page.evaluate(() => window.__lineCrossingTest.grantEnableControl(false))
-  const enableSwitch = page.getByTestId('lc-business-enable-switch')
-  await enableSwitch.waitFor()
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
-
-  await page.evaluate(() => window.__lineCrossingTest.delayNextEnableApply())
-  await enableSwitch.click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 1)
-  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[0]), { sessionGeneration: 8, value: true })
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
-
-  await page.evaluate(() => window.__lineCrossingTest.changeSession())
-  await page.waitForFunction(() => window.__lineCrossingTest.getState().app.value.sessionGeneration === 9)
-  await page.evaluate(() => window.__lineCrossingTest.resolvePendingEnableApply())
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'App session changed; reload the current snapshot')
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
-  assert.equal(await page.evaluate(() => {
-    const enable = window.__lineCrossingTest.getState().businessEnable
-    return enable.state === 'available' && enable.value === false
-  }), true)
-  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Disabled/)
-  assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 1)
-
-  await page.evaluate(() => window.__lineCrossingTest.setNextEnableOutcome('APPLIED'))
-  await enableSwitch.click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().enable.length === 2)
-  assert.deepEqual(await page.evaluate(() => window.__lineCrossingTest.getCalls().enable[1]), { sessionGeneration: 9, value: true })
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-business-enable-switch"]')?.getAttribute('aria-checked') === 'true')
-  await page.waitForFunction(() => document.querySelector('[data-testid="lc-enable-status"]')?.textContent === 'Applied')
-  assert.equal(await page.evaluate(() => {
-    const enable = window.__lineCrossingTest.getState().businessEnable
-    return enable.state === 'available' && enable.value === true
-  }), true)
-  assert.match(await page.getByTestId('lc-business-enable-state').textContent(), /Running/)
+  assert.equal(await page.getByTestId('lc-business-enable').count(), 0)
+  assert.equal(await page.getByTestId('lc-business-enable-switch').count(), 0)
+  assert.equal(await page.getByRole('switch').count(), 0)
+  assert.equal(await page.getByRole('checkbox').count(), 0)
+  assert.equal(await page.getByText(/pause business|pause counting|disable counting|disable statistics/i).count(), 0)
+  assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().enable)).length, 0)
+  assert.equal(await page.getByTestId('lc-counter-name').inputValue(), 'Counter Test')
   await page.close()
 })
 
