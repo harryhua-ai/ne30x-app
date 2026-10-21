@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import copy
 import hashlib
 import json
 import os
 import re
 import stat
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -22,6 +25,9 @@ VERSION_PATTERN = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][
 IDENTIFIER_PATTERN = re.compile(r"[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
 COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
+SEQUENCE_LEDGER_BRANCH = "nepk-production-sequence-ledger"
+SEQUENCE_LEDGER_REF = f"refs/heads/{SEQUENCE_LEDGER_BRANCH}"
+SEQUENCE_LEDGER_PATH = "sequence-ledger.json"
 
 
 class ReleaseError(ValueError):
@@ -44,12 +50,571 @@ def canonical_json_bytes(value: dict) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
+def _append_sequence_event(ledger: dict, fields: dict) -> dict:
+    event = {**fields, "previous_digest": ledger["events"][-1]["digest"]}
+    event["digest"] = canonical_json_sha256(event)
+    ledger["events"].append(event)
+    return event
+
+
+def initialize_sequence_ledger(publisher_id: str, app_id: str, publisher_spki_sha256: str) -> dict:
+    if IDENTIFIER_PATTERN.fullmatch(publisher_id or "") is None or IDENTIFIER_PATTERN.fullmatch(app_id or "") is None:
+        raise ReleaseError("ledger publisher_id and app_id must be canonical identifiers")
+    if SHA256_PATTERN.fullmatch(publisher_spki_sha256 or "") is None:
+        raise ReleaseError("ledger initialization requires the production SPKI SHA-256")
+    genesis = {
+        "kind": "genesis",
+        "version": 1,
+        "publisher_id": publisher_id,
+        "app_id": app_id,
+        "publisher_spki_sha256": publisher_spki_sha256,
+        "release_seq": 0,
+        "previous_digest": "0" * 64,
+    }
+    genesis["digest"] = canonical_json_sha256(genesis)
+    return {"version": 1, "genesis_sha256": genesis["digest"], "events": [genesis], "records": []}
+
+
+def validate_sequence_ledger(
+    ledger: dict,
+    expected_genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+) -> None:
+    if not isinstance(ledger, dict) or ledger.get("version") != 1:
+        raise ReleaseError("production sequence ledger is malformed or unsupported")
+    events = ledger.get("events")
+    records = ledger.get("records")
+    if not isinstance(events, list) or not events or not isinstance(records, list):
+        raise ReleaseError("production sequence ledger has no verifiable event chain")
+    if SHA256_PATTERN.fullmatch(expected_genesis_sha256 or "") is None:
+        raise ReleaseError("protected production ledger genesis fingerprint is missing or malformed")
+    genesis = events[0]
+    if not isinstance(genesis, dict) or genesis.get("kind") != "genesis":
+        raise ReleaseError("production sequence ledger has no genesis event; run the one-time administrator initialization")
+    if genesis.get("digest") != expected_genesis_sha256 or ledger.get("genesis_sha256") != expected_genesis_sha256:
+        raise ReleaseError("production sequence ledger does not match the protected genesis fingerprint")
+    if (
+        genesis.get("publisher_id") != publisher_id
+        or genesis.get("app_id") != app_id
+        or genesis.get("publisher_spki_sha256") != publisher_spki_sha256
+        or genesis.get("release_seq") != 0
+        or genesis.get("previous_digest") != "0" * 64
+        or canonical_json_sha256({key: value for key, value in genesis.items() if key != "digest"}) != expected_genesis_sha256
+    ):
+        raise ReleaseError("production sequence ledger genesis identity or digest is invalid")
+    previous = expected_genesis_sha256
+    reserved_ids = set()
+    reserved_sequences = set()
+    reserved_versions = set()
+    last_reserved_seq = 0
+    reservations = {}
+    authorized_events = {}
+    signed_events = {}
+    published_events = {}
+    for event in events[1:]:
+        if not isinstance(event, dict) or event.get("previous_digest") != previous:
+            raise ReleaseError("production sequence ledger hash chain is broken")
+        digest = event.get("digest")
+        if not isinstance(digest, str) or canonical_json_sha256({key: value for key, value in event.items() if key != "digest"}) != digest:
+            raise ReleaseError("production sequence ledger event digest is invalid")
+        if event.get("publisher_id") != publisher_id or event.get("app_id") != app_id:
+            raise ReleaseError("production sequence ledger contains a foreign publisher or app")
+        kind = event.get("kind")
+        if kind not in {"reserved", "authorized", "signed", "published", "abandoned"}:
+            raise ReleaseError("production sequence ledger contains an unknown event")
+        seq = event.get("release_seq")
+        if isinstance(seq, bool) or not isinstance(seq, int) or not 1 <= seq <= 0xFFFFFFFFFFFFFFFF:
+            raise ReleaseError("production sequence ledger event has an invalid release_seq")
+        if kind == "reserved":
+            record_id = event.get("record_id")
+            if not isinstance(record_id, str) or not record_id or record_id in reserved_ids:
+                raise ReleaseError("production sequence ledger reservation IDs are missing or duplicated")
+            if (publisher_id, app_id, seq) in reserved_sequences:
+                raise ReleaseError("production sequence ledger reuses a publisher/app release_seq")
+            batch_version = event.get("batch_version")
+            _version_tuple(batch_version, "ledger batch_version")
+            if batch_version in reserved_versions:
+                raise ReleaseError("production sequence ledger binds one release version more than once")
+            if seq <= last_reserved_seq:
+                raise ReleaseError("production sequence ledger reservation order moved backward")
+            if COMMIT_PATTERN.fullmatch(event.get("source_sha", "")) is None:
+                raise ReleaseError("production sequence ledger reservation has an invalid source SHA")
+            if SHA256_PATTERN.fullmatch(event.get("build_input_sha256", "")) is None:
+                raise ReleaseError("production sequence ledger reservation has no build-input fingerprint")
+            if not isinstance(event.get("run_id"), str) or not event["run_id"]:
+                raise ReleaseError("production sequence ledger reservation has no workflow run ID")
+            if isinstance(event.get("run_attempt"), bool) or not isinstance(event.get("run_attempt"), int) or event["run_attempt"] < 1:
+                raise ReleaseError("production sequence ledger reservation has an invalid workflow attempt")
+            run_url = urllib.parse.urlsplit(event.get("run_url", ""))
+            if run_url.scheme != "https" or run_url.hostname != "github.com" or run_url.port not in {None, 443} or run_url.username or run_url.password:
+                raise ReleaseError("production sequence ledger reservation has an invalid workflow run URL")
+            reserved_ids.add(record_id)
+            reserved_sequences.add((publisher_id, app_id, seq))
+            reserved_versions.add(batch_version)
+            last_reserved_seq = seq
+            reservations[record_id] = event
+        else:
+            record_id = event.get("record_id")
+            reservation = reservations.get(record_id)
+            if reservation is None or reservation.get("release_seq") != seq:
+                raise ReleaseError("production sequence ledger event has no matching prior reservation")
+            if any(event.get(field) != reservation.get(field) for field in ("publisher_id", "app_id", "batch_version", "source_sha")):
+                raise ReleaseError("production sequence ledger event conflicts with its reservation")
+            if not isinstance(event.get("run_id"), str) or not event["run_id"].isdigit():
+                raise ReleaseError("production sequence ledger event has an invalid workflow run ID")
+            if isinstance(event.get("run_attempt"), bool) or not isinstance(event.get("run_attempt"), int) or event["run_attempt"] < 1:
+                raise ReleaseError("production sequence ledger event has an invalid workflow attempt")
+            run_url = urllib.parse.urlsplit(event.get("run_url", ""))
+            if run_url.scheme != "https" or run_url.hostname != "github.com" or run_url.port not in {None, 443} or run_url.username or run_url.password:
+                raise ReleaseError("production sequence ledger event has an invalid workflow run URL")
+            if kind == "authorized":
+                if record_id in authorized_events:
+                    raise ReleaseError("production sequence ledger duplicates signed package authorization")
+                if any(SHA256_PATTERN.fullmatch(event.get(field, "")) is None for field in ("package_sha256", "native_tbs_sha256", "ui_tbs_sha256", "pair_tbs_sha256", "publisher_spki_sha256")):
+                    raise ReleaseError("production sequence ledger signed package event has invalid digests")
+                authorized_events[record_id] = event
+            elif kind == "signed":
+                if record_id not in authorized_events or record_id in signed_events:
+                    raise ReleaseError("production sequence ledger signed event has no unique authorized package")
+                if event.get("package_sha256") != authorized_events[record_id].get("package_sha256"):
+                    raise ReleaseError("production sequence ledger signed event changes package bytes")
+                release_url = urllib.parse.urlsplit(event.get("release_url", ""))
+                if release_url.scheme != "https" or release_url.hostname != "github.com" or release_url.port not in {None, 443} or release_url.username or release_url.password or release_url.query or release_url.fragment:
+                    raise ReleaseError("production sequence ledger signed event has an invalid Release URL")
+                signed_events[record_id] = event
+            elif kind == "published":
+                release_url = urllib.parse.urlsplit(event.get("release_url", ""))
+                if record_id not in signed_events or record_id in published_events:
+                    raise ReleaseError("production sequence ledger published event has no unique signed package")
+                if release_url.scheme != "https" or release_url.hostname != "github.com" or release_url.port not in {None, 443} or release_url.username or release_url.password or release_url.query or release_url.fragment:
+                    raise ReleaseError("production sequence ledger published event has an invalid Release URL")
+                if event.get("package_sha256") != authorized_events[record_id].get("package_sha256"):
+                    raise ReleaseError("production sequence ledger published event changes package bytes")
+                if event.get("release_url") != signed_events[record_id].get("release_url"):
+                    raise ReleaseError("production sequence ledger published event changes the signed Release URL")
+                published_events[record_id] = event
+        previous = digest
+    record_ids = set()
+    record_sequences = set()
+    previous_high_water = 0
+    for record in records:
+        if not isinstance(record, dict):
+            raise ReleaseError("production sequence ledger contains a malformed issuance record")
+        record_id = record.get("record_id")
+        seq = record.get("release_seq")
+        if not isinstance(record_id, str) or not record_id or record_id in record_ids:
+            raise ReleaseError("production sequence ledger record IDs are missing or duplicated")
+        if isinstance(seq, bool) or not isinstance(seq, int) or not 1 <= seq <= 0xFFFFFFFFFFFFFFFF:
+            raise ReleaseError("production sequence ledger record has an invalid release_seq")
+        if (publisher_id, app_id, seq) in record_sequences:
+            raise ReleaseError("production sequence ledger reuses a publisher/app release_seq")
+        if record.get("publisher_id") != publisher_id or record.get("app_id") != app_id:
+            raise ReleaseError("production sequence ledger contains a foreign issuance record")
+        if record.get("status") not in {"authorized", "signed", "published", "abandoned-signed"}:
+            raise ReleaseError("production sequence ledger record has an invalid status")
+        reservation = reservations.get(record_id)
+        authorized_event = authorized_events.get(record_id)
+        if reservation is None or authorized_event is None:
+            raise ReleaseError("production sequence ledger issuance record lacks a reserved and authorized event")
+        if seq != reservation.get("release_seq") or any(record.get(field) != reservation.get(field) for field in ("batch_version", "source_sha", "build_input_sha256")):
+            raise ReleaseError("production sequence ledger issuance record conflicts with its reservation")
+        if any(record.get(field) != authorized_event.get(field) for field in ("package_sha256", "native_tbs_sha256", "ui_tbs_sha256", "pair_tbs_sha256", "publisher_spki_sha256", "native_version", "ui_version", "run_id", "run_attempt", "run_url")):
+            raise ReleaseError("production sequence ledger issuance record differs from its hashed authorization event")
+        if record.get("previous_high_water") != previous_high_water or seq <= previous_high_water:
+            raise ReleaseError("production sequence ledger issuance order moved backward")
+        if record.get("status") in {"signed", "published", "abandoned-signed"} and record_id not in signed_events:
+            raise ReleaseError("production sequence ledger signed record lacks a signed event")
+        if record.get("status") == "authorized" and record_id in signed_events:
+            raise ReleaseError("production sequence ledger authorized record already has a signed event")
+        if record.get("status") == "signed" and record_id in published_events:
+            raise ReleaseError("production sequence ledger signed record already has a published event")
+        if record.get("status") == "published" and record_id not in published_events:
+            raise ReleaseError("production sequence ledger published record lacks a published event")
+        if any(SHA256_PATTERN.fullmatch(record.get(field, "")) is None for field in ("package_sha256", "native_tbs_sha256", "ui_tbs_sha256", "pair_tbs_sha256", "publisher_spki_sha256")):
+            raise ReleaseError("production sequence ledger issuance record contains invalid signed byte digests")
+        record_ids.add(record_id)
+        record_sequences.add((publisher_id, app_id, seq))
+        previous_high_water = seq
+    if not record_sequences.issubset(reserved_sequences):
+        raise ReleaseError("production sequence ledger contains an issuance without a prior reservation")
+
+
+def initialize_sequence_ledger_ref(
+    client,
+    ledger: dict,
+    expected_genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+) -> dict:
+    validate_sequence_ledger(ledger, expected_genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+    if len(ledger["events"]) != 1 or ledger["records"]:
+        raise ReleaseError("one-time administrator initialization accepts only an empty genesis ledger")
+    head_sha = client.create_initial_sequence_ledger(ledger)
+    return {"ref": "refs/heads/nepk-production-sequence-ledger", "head_sha": head_sha, "genesis_sha256": expected_genesis_sha256}
+
+
+def reserve_release_sequence(
+    client,
+    *,
+    genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+    batch_version: str,
+    source_sha: str,
+    build_input_sha256: str,
+    run_id: str,
+    run_attempt: int,
+    run_url: str,
+    max_attempts: int = 6,
+) -> dict:
+    _version_tuple(batch_version, "batch_version")
+    if COMMIT_PATTERN.fullmatch(source_sha or "") is None:
+        raise ReleaseError("source SHA must be a full lowercase Git commit SHA")
+    if SHA256_PATTERN.fullmatch(build_input_sha256 or "") is None:
+        raise ReleaseError("build-input fingerprint must be a lowercase SHA-256")
+    if isinstance(run_attempt, bool) or not isinstance(run_attempt, int) or run_attempt < 1:
+        raise ReleaseError("workflow run attempt must be a positive integer")
+    if not isinstance(run_id, str) or not run_id.isdigit():
+        raise ReleaseError("workflow run ID must be numeric")
+    run_url_parts = urllib.parse.urlsplit(run_url or "")
+    if run_url_parts.scheme != "https" or run_url_parts.hostname != "github.com" or run_url_parts.port not in {None, 443} or run_url_parts.username or run_url_parts.password or run_url_parts.query or run_url_parts.fragment:
+        raise ReleaseError("workflow run URL must be an HTTPS GitHub Actions URL")
+    for attempt in range(max_attempts):
+        current = client.read_sequence_ledger()
+        if current is None:
+            raise ReleaseError("production sequence ledger is not initialized; run the one-time administrator ledger initialization")
+        head_sha, ledger = current
+        validate_sequence_ledger(ledger, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        same_version = [
+            event for event in ledger["events"]
+            if event.get("kind") == "reserved" and event.get("batch_version") == batch_version
+        ]
+        if same_version:
+            if any(event.get("source_sha") != source_sha or event.get("build_input_sha256") != build_input_sha256 for event in same_version):
+                raise ReleaseError("this version is already bound to different source or build bytes")
+            return copy.deepcopy(same_version[-1])
+        run_record_id = f"run-{run_id}-{run_attempt}"
+        own_reservation = next((
+            event for event in ledger["events"]
+            if event.get("kind") == "reserved" and event.get("record_id") == run_record_id
+        ), None)
+        if own_reservation is not None:
+            if own_reservation.get("batch_version") != batch_version or own_reservation.get("source_sha") != source_sha or own_reservation.get("build_input_sha256") != build_input_sha256:
+                raise ReleaseError("workflow run ID is already bound to another release request")
+            return copy.deepcopy(own_reservation)
+        used_sequences = [
+            event["release_seq"] for event in ledger["events"]
+            if event.get("kind") == "reserved"
+        ] + [record["release_seq"] for record in ledger["records"]]
+        previous_high_water = max(used_sequences, default=0)
+        if previous_high_water >= 0xFFFFFFFFFFFFFFFF:
+            raise ReleaseError("production release sequence reached the u64 limit")
+        event = {
+            "kind": "reserved",
+            "record_id": run_record_id,
+            "publisher_id": publisher_id,
+            "app_id": app_id,
+            "release_seq": previous_high_water + 1,
+            "batch_version": batch_version,
+            "source_sha": source_sha,
+            "build_input_sha256": build_input_sha256,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "run_url": run_url,
+        }
+        updated = copy.deepcopy(ledger)
+        reservation = _append_sequence_event(updated, event)
+        if client.compare_and_swap_sequence_ledger(head_sha, updated):
+            return copy.deepcopy(reservation)
+        if attempt + 1 < max_attempts:
+            time.sleep(min(0.05 * (attempt + 1), 0.4))
+    raise ReleaseError("production sequence ledger kept moving; rerun after concurrent release activity settles")
+
+
+def complete_release_sequence(
+    client,
+    reservation: dict,
+    report: dict,
+    *,
+    genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+    run_id: str,
+    run_attempt: int,
+    run_url: str,
+    max_attempts: int = 6,
+) -> dict:
+    if not isinstance(reservation, dict) or reservation.get("kind") != "reserved":
+        raise ReleaseError("release sequence reservation is malformed")
+    if not isinstance(report, dict):
+        raise ReleaseError("independent package verification report is missing")
+    if (reservation.get("publisher_id"), reservation.get("app_id")) != (publisher_id, app_id):
+        raise ReleaseError("release sequence reservation has a different publisher or app")
+    if report.get("publisher_id") != publisher_id or report.get("app_id") != app_id:
+        raise ReleaseError("signed package identity differs from the reserved publisher or app")
+    if report.get("release_seq") != reservation.get("release_seq"):
+        raise ReleaseError("signed package sequence differs from its ledger reservation")
+    if report.get("publisher_key_sha256") != publisher_spki_sha256:
+        raise ReleaseError("signed package SPKI differs from the configured production Host trust root")
+    version_fields = {}
+    for field in ("native_version", "ui_version"):
+        value = report.get(field)
+        if not isinstance(value, list) or len(value) != 3 or any(isinstance(part, bool) or not isinstance(part, int) for part in value):
+            raise ReleaseError(f"signed package {field} is malformed")
+        _version_tuple(".".join(str(part) for part in value), f"signed package {field}")
+        version_fields[field] = list(value)
+    digest_fields = (
+        "package_sha256",
+        "native_tbs_sha256",
+        "ui_tbs_sha256",
+        "pair_tbs_sha256",
+    )
+    if any(SHA256_PATTERN.fullmatch(report.get(field, "")) is None for field in digest_fields):
+        raise ReleaseError("independent package verification report lacks valid signed byte digests")
+    if SHA256_PATTERN.fullmatch(publisher_spki_sha256 or "") is None:
+        raise ReleaseError("configured production SPKI fingerprint is missing or malformed")
+    run_url_parts = urllib.parse.urlsplit(run_url or "")
+    if run_url_parts.scheme != "https" or run_url_parts.hostname != "github.com" or run_url_parts.port not in {None, 443} or run_url_parts.username or run_url_parts.password or run_url_parts.query or run_url_parts.fragment:
+        raise ReleaseError("workflow run URL must be an HTTPS GitHub Actions URL")
+    for attempt in range(max_attempts):
+        current = client.read_sequence_ledger()
+        if current is None:
+            raise ReleaseError("production sequence ledger disappeared before signed record persistence")
+        head_sha, ledger = current
+        validate_sequence_ledger(ledger, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        prior_record = next((row for row in ledger["records"] if row.get("record_id") == reservation.get("record_id")), None)
+        if prior_record is not None:
+            if any(prior_record.get(field) != report.get(field) for field in digest_fields) or prior_record.get("publisher_spki_sha256") != report.get("publisher_key_sha256"):
+                raise ReleaseError("same release sequence is bound to different signed package bytes")
+            if prior_record.get("release_seq") != reservation.get("release_seq") or prior_record.get("source_sha") != reservation.get("source_sha"):
+                raise ReleaseError("existing signed record conflicts with the release sequence reservation")
+            return copy.deepcopy(prior_record)
+        reserved_event = next((
+            event for event in ledger["events"]
+            if event.get("kind") == "reserved" and event.get("record_id") == reservation.get("record_id")
+        ), None)
+        if reserved_event is None or any(
+            reserved_event.get(field) != reservation.get(field)
+            for field in ("release_seq", "batch_version", "source_sha", "build_input_sha256")
+        ):
+            raise ReleaseError("release sequence reservation is missing or changed in the persistent ledger")
+        previous_high_water = max((row["release_seq"] for row in ledger["records"]), default=0)
+        if reservation["release_seq"] <= previous_high_water:
+            raise ReleaseError("a later sequence was already signed; refusing sequence rollback")
+        record = {
+            "record_id": reservation["record_id"],
+            "status": "authorized",
+            "publisher_id": publisher_id,
+            "app_id": app_id,
+            "release_seq": reservation["release_seq"],
+            "previous_high_water": previous_high_water,
+            "batch_version": reservation["batch_version"],
+            "source_sha": reservation["source_sha"],
+            "build_input_sha256": reservation["build_input_sha256"],
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "run_url": run_url,
+            "native_tbs_sha256": report["native_tbs_sha256"],
+            "ui_tbs_sha256": report["ui_tbs_sha256"],
+            "pair_tbs_sha256": report["pair_tbs_sha256"],
+            "package_sha256": report["package_sha256"],
+            "publisher_spki_sha256": publisher_spki_sha256,
+            **version_fields,
+        }
+        updated = copy.deepcopy(ledger)
+        updated["records"].append(record)
+        _append_sequence_event(updated, {"kind": "authorized", **record})
+        validate_sequence_ledger(updated, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        if client.compare_and_swap_sequence_ledger(head_sha, updated):
+            return copy.deepcopy(record)
+        if attempt + 1 < max_attempts:
+            time.sleep(min(0.05 * (attempt + 1), 0.4))
+    raise ReleaseError("production sequence ledger kept moving while saving signed package evidence; rerun safely")
+
+
+def mark_sequence_signed(
+    client,
+    record_id: str,
+    *,
+    release_url: str,
+    genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+    run_id: str,
+    run_attempt: int,
+    run_url: str,
+    max_attempts: int = 6,
+) -> dict:
+    release_url_parts = urllib.parse.urlsplit(release_url or "")
+    if release_url_parts.scheme != "https" or release_url_parts.hostname != "github.com" or release_url_parts.port not in {None, 443} or release_url_parts.username or release_url_parts.password or release_url_parts.query or release_url_parts.fragment:
+        raise ReleaseError("draft Release URL is not a clean GitHub HTTPS URL")
+    if not isinstance(record_id, str) or not record_id:
+        raise ReleaseError("signed sequence record ID is missing")
+    for attempt in range(max_attempts):
+        current = client.read_sequence_ledger()
+        if current is None:
+            raise ReleaseError("production sequence ledger disappeared before signed-state persistence")
+        head_sha, ledger = current
+        validate_sequence_ledger(ledger, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        index = next((i for i, row in enumerate(ledger["records"]) if row.get("record_id") == record_id), None)
+        if index is None:
+            raise ReleaseError("signed package record is missing from the production sequence ledger")
+        record = ledger["records"][index]
+        if record.get("status") == "signed":
+            event = next((row for row in ledger["events"] if row.get("kind") == "signed" and row.get("record_id") == record_id), None)
+            if event is None or event.get("release_url") != release_url:
+                raise ReleaseError("signed package record is already bound to a different Release")
+            return copy.deepcopy(record)
+        if record.get("status") != "authorized":
+            raise ReleaseError("sequence record cannot transition to signed from its current state")
+        updated = copy.deepcopy(ledger)
+        updated_record = updated["records"][index]
+        updated_record["status"] = "signed"
+        event = {
+            "kind": "signed",
+            "record_id": record_id,
+            "publisher_id": publisher_id,
+            "app_id": app_id,
+            "release_seq": record["release_seq"],
+            "batch_version": record["batch_version"],
+            "source_sha": record["source_sha"],
+            "package_sha256": record["package_sha256"],
+            "release_url": release_url,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "run_url": run_url,
+        }
+        _append_sequence_event(updated, event)
+        validate_sequence_ledger(updated, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        if client.compare_and_swap_sequence_ledger(head_sha, updated):
+            return copy.deepcopy(updated_record)
+        if attempt + 1 < max_attempts:
+            time.sleep(min(0.05 * (attempt + 1), 0.4))
+    raise ReleaseError("production sequence ledger kept moving while saving the signed Release state; rerun safely")
+
+
+def mark_sequence_published(
+    client,
+    record_id: str,
+    *,
+    release_url: str,
+    genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+    run_id: str,
+    run_attempt: int,
+    run_url: str,
+    max_attempts: int = 6,
+) -> dict:
+    parsed_url = urllib.parse.urlsplit(release_url or "")
+    if parsed_url.scheme != "https" or parsed_url.hostname != "github.com" or parsed_url.port not in {None, 443} or parsed_url.username or parsed_url.password or parsed_url.query or parsed_url.fragment:
+        raise ReleaseError("published Release URL is not a clean GitHub HTTPS URL")
+    for attempt in range(max_attempts):
+        current = client.read_sequence_ledger()
+        if current is None:
+            raise ReleaseError("production sequence ledger disappeared before published-state persistence")
+        head_sha, ledger = current
+        validate_sequence_ledger(ledger, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        index = next((i for i, row in enumerate(ledger["records"]) if row.get("record_id") == record_id), None)
+        if index is None:
+            raise ReleaseError("published package record is missing from the production sequence ledger")
+        record = ledger["records"][index]
+        if record.get("status") == "published":
+            event = next((row for row in ledger["events"] if row.get("kind") == "published" and row.get("record_id") == record_id), None)
+            if event is None or event.get("release_url") != release_url:
+                raise ReleaseError("published package record is already bound to a different Release")
+            return copy.deepcopy(record)
+        if record.get("status") != "signed":
+            raise ReleaseError("sequence record cannot transition to published from its current state")
+        updated = copy.deepcopy(ledger)
+        updated["records"][index]["status"] = "published"
+        _append_sequence_event(updated, {
+            "kind": "published",
+            "record_id": record_id,
+            "publisher_id": publisher_id,
+            "app_id": app_id,
+            "release_seq": record["release_seq"],
+            "batch_version": record["batch_version"],
+            "source_sha": record["source_sha"],
+            "package_sha256": record["package_sha256"],
+            "release_url": release_url,
+            "run_id": run_id,
+            "run_attempt": run_attempt,
+            "run_url": run_url,
+        })
+        validate_sequence_ledger(updated, genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+        if client.compare_and_swap_sequence_ledger(head_sha, updated):
+            return copy.deepcopy(updated["records"][index])
+        if attempt + 1 < max_attempts:
+            time.sleep(min(0.05 * (attempt + 1), 0.4))
+    raise ReleaseError("production sequence ledger kept moving while saving the published Release state; rerun safely")
+
+
+def authorization_snapshot_for_record(
+    ledger: dict,
+    record_id: str,
+    expected_genesis_sha256: str,
+    publisher_id: str,
+    app_id: str,
+    publisher_spki_sha256: str,
+) -> dict:
+    validate_sequence_ledger(ledger, expected_genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+    authorization_index = next((
+        index for index, event in enumerate(ledger["events"])
+        if event.get("kind") == "authorized" and event.get("record_id") == record_id
+    ), None)
+    if authorization_index is None:
+        raise ReleaseError("sequence ledger has no authorization snapshot for this package record")
+    events = copy.deepcopy(ledger["events"][:authorization_index + 1])
+    records = []
+    record_indexes = {}
+    for event in events[1:]:
+        kind = event["kind"]
+        event_record_id = event.get("record_id")
+        if kind == "authorized":
+            record = {key: value for key, value in event.items() if key not in {"kind", "previous_digest", "digest"}}
+            record["status"] = "authorized"
+            record_indexes[event_record_id] = len(records)
+            records.append(record)
+        elif kind == "signed" and event_record_id in record_indexes:
+            records[record_indexes[event_record_id]]["status"] = "signed"
+        elif kind == "published" and event_record_id in record_indexes:
+            records[record_indexes[event_record_id]]["status"] = "published"
+        elif kind == "abandoned" and event_record_id in record_indexes:
+            records[record_indexes[event_record_id]]["status"] = "abandoned-signed"
+    snapshot = {
+        "version": ledger["version"],
+        "genesis_sha256": ledger["genesis_sha256"],
+        "events": events,
+        "records": records,
+    }
+    validate_sequence_ledger(snapshot, expected_genesis_sha256, publisher_id, app_id, publisher_spki_sha256)
+    if not any(record.get("record_id") == record_id and record.get("status") == "authorized" for record in records):
+        raise ReleaseError("sequence authorization snapshot does not contain the selected record")
+    return snapshot
+
+
 def _version_tuple(value: str, field: str) -> tuple[int, int, int]:
     if not isinstance(value, str) or VERSION_PATTERN.fullmatch(value) is None:
         raise ReleaseError(f"{field} must be a canonical X.Y.Z version")
     version = tuple(int(part) for part in value.split("."))
     if any(part > 0xFFFF for part in version):
         raise ReleaseError(f"{field} segments must fit u16")
+    return version
+
+
+def parse_dispatch_version(value: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)", value) is None:
+        raise ReleaseError("version must be one canonical vMAJOR.MINOR.PATCH value such as v1.0.0")
+    version = value[1:]
+    _version_tuple(version, "version")
     return version
 
 
@@ -382,6 +947,8 @@ def _plan_digest(plan: dict) -> str:
 def _verify_release_assets(plan: dict, release: dict, client) -> tuple[int, int]:
     if release.get("tag_name") != plan["tag"] or release.get("name") != plan["title"]:
         raise ReleaseError("existing Release tag or name conflicts with this request")
+    if release.get("prerelease") is not False:
+        raise ReleaseError("formal production Release must not be marked as a prerelease")
     if release.get("body") != plan["release_notes"]:
         raise ReleaseError("existing Release notes conflict with this request")
     assets = release.get("assets")
@@ -459,6 +1026,84 @@ def publish_release(plan: dict, client, *, action: str, authorized: bool, simula
     return {"result": "IDEMPOTENT", "tag": plan["tag"], "release_id": release["id"], "created": False}
 
 
+def publish_one_click_release(plan: dict, client, *, authorized: bool, simulation: bool = False, before_publish=None, after_publish=None) -> dict:
+    _validate_plan(plan)
+    if simulation:
+        if plan.get("action") != "simulate" or getattr(client, "simulation_only", False) is not True:
+            raise ReleaseError("simulation requires an in-memory Release adapter and a simulation-only plan")
+    elif not authorized or plan.get("action") != "publish":
+        raise ReleaseError("one-click production release requires authorization from the protected production job")
+    tag_ref = client.get_tag(plan["tag"])
+    release = client.get_release_by_tag(plan["tag"])
+    created = False
+    if tag_ref is None:
+        try:
+            client.create_tag(plan["tag"], plan["source_sha"])
+        except ReleaseError:
+            tag_ref = client.get_tag(plan["tag"])
+            if tag_ref is None:
+                raise
+        tag_ref = client.get_tag(plan["tag"])
+    if tag_ref is None or client.tag_commit(tag_ref) != plan["source_sha"]:
+        raise ReleaseError("release tag is missing or points to a different source SHA; refusing to publish")
+    if release is None:
+        release = client.create_draft_release(plan)
+        created = True
+    if release.get("draft") not in {True, False}:
+        raise ReleaseError("GitHub returned a Release with an invalid publication state")
+    existing_count, expected_count = _verify_release_assets(plan, release, client)
+    if release.get("draft") is False and existing_count != expected_count:
+        raise ReleaseError("published Release is incomplete; refusing to modify public assets")
+    if existing_count == 0:
+        if release.get("draft") is False:
+            raise ReleaseError("published Release is missing the verified asset")
+        for app in plan["apps"]:
+            package_path = Path(app["package_path"])
+            try:
+                if not stat.S_ISREG(package_path.lstat().st_mode):
+                    raise ReleaseError("release package must be a regular non-symlink file")
+                data = package_path.read_bytes()
+            except OSError as error:
+                raise ReleaseError("release package is unavailable") from error
+            if hashlib.sha256(data).hexdigest() != app["package_sha256"] or len(data) != app["package_len"]:
+                raise ReleaseError("release package bytes changed after verification")
+            client.upload_asset(release, app["asset_name"], data)
+        release = client.get_release_by_tag(plan["tag"])
+        if release is None:
+            raise ReleaseError("GitHub draft Release disappeared after asset upload")
+        existing_count, expected_count = _verify_release_assets(plan, release, client)
+    if existing_count != expected_count:
+        raise ReleaseError("Release is incomplete; public publication is forbidden")
+    tag_ref = client.get_tag(plan["tag"])
+    if tag_ref is None or client.tag_commit(tag_ref) != plan["source_sha"]:
+        raise ReleaseError("release tag changed during draft verification; publication is forbidden")
+    if release.get("draft") is False:
+        if after_publish is not None:
+            if not callable(after_publish):
+                raise ReleaseError("post-publication sequence-ledger callback is invalid")
+            after_publish(release)
+        return {"result": "IDEMPOTENT", "tag": plan["tag"], "release_id": release["id"], "release_url": release.get("html_url"), "created": False}
+    if before_publish is not None:
+        if not callable(before_publish):
+            raise ReleaseError("pre-publication sequence-ledger callback is invalid")
+        before_publish(release)
+    client.publish_release(release)
+    release = client.get_release_by_tag(plan["tag"])
+    if release is None or release.get("draft") is not False:
+        raise ReleaseError("GitHub did not confirm the complete Release as published")
+    count, total = _verify_release_assets(plan, release, client)
+    if count != total:
+        raise ReleaseError("published Release lost a verified asset")
+    tag_ref = client.get_tag(plan["tag"])
+    if tag_ref is None or client.tag_commit(tag_ref) != plan["source_sha"]:
+        raise ReleaseError("published release tag does not point to the accepted source SHA")
+    if after_publish is not None:
+        if not callable(after_publish):
+            raise ReleaseError("post-publication sequence-ledger callback is invalid")
+        after_publish(release)
+    return {"result": "PUBLISHED", "tag": plan["tag"], "release_id": release["id"], "release_url": release.get("html_url"), "created": created}
+
+
 class GitHubReleaseClient:
     def __init__(self, repository: str, token: str, api_url: str = "https://api.github.com"):
         if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
@@ -496,8 +1141,124 @@ class GitHubReleaseClient:
     def _repo_url(self, suffix: str) -> str:
         return f"{self.api_url}/repos/{self.repository}/{suffix}"
 
+    def _sequence_ledger_ref(self):
+        return self._request("GET", self._repo_url(f"git/ref/heads/{SEQUENCE_LEDGER_BRANCH}"))
+
+    def read_sequence_ledger(self):
+        reference = self._sequence_ledger_ref()
+        if reference is None:
+            return None
+        ref_object = reference.get("object") if isinstance(reference, dict) else None
+        head_sha = ref_object.get("sha") if isinstance(ref_object, dict) and ref_object.get("type") == "commit" else None
+        if not isinstance(head_sha, str) or COMMIT_PATTERN.fullmatch(head_sha) is None:
+            raise ReleaseError("production sequence ledger ref does not point to a commit")
+        commit = self._request("GET", self._repo_url(f"git/commits/{head_sha}"))
+        tree_ref = commit.get("tree") if isinstance(commit, dict) else None
+        tree_sha = tree_ref.get("sha") if isinstance(tree_ref, dict) else None
+        if not isinstance(tree_sha, str) or COMMIT_PATTERN.fullmatch(tree_sha) is None:
+            raise ReleaseError("production sequence ledger commit has no readable tree")
+        tree = self._request("GET", self._repo_url(f"git/trees/{tree_sha}?recursive=1"))
+        entries = tree.get("tree") if isinstance(tree, dict) else None
+        ledger_entry = next((
+            entry for entry in entries or []
+            if isinstance(entry, dict) and entry.get("path") == SEQUENCE_LEDGER_PATH and entry.get("type") == "blob"
+        ), None)
+        if not isinstance(ledger_entry, dict) or not isinstance(ledger_entry.get("sha"), str):
+            raise ReleaseError("production sequence ledger ref exists without sequence-ledger.json; refusing implicit initialization")
+        blob = self._request("GET", self._repo_url(f"git/blobs/{ledger_entry['sha']}"))
+        if not isinstance(blob, dict) or blob.get("encoding") != "base64" or not isinstance(blob.get("content"), str):
+            raise ReleaseError("production sequence ledger blob is not readable as base64 JSON")
+        try:
+            raw = base64.b64decode("".join(blob["content"].split()), validate=True)
+            ledger = json.loads(raw.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ReleaseError("production sequence ledger JSON is malformed") from error
+        if not isinstance(ledger, dict):
+            raise ReleaseError("production sequence ledger JSON must be an object")
+        return head_sha, ledger
+
+    def _create_sequence_ledger_commit(self, ledger: dict, *, parent_sha: str | None = None, base_tree_sha: str | None = None) -> str:
+        content = json.dumps(ledger, sort_keys=True, indent=2, ensure_ascii=False).encode("utf-8") + b"\n"
+        blob = self._request("POST", self._repo_url("git/blobs"), {
+            "content": base64.b64encode(content).decode("ascii"),
+            "encoding": "base64",
+        })
+        if not isinstance(blob, dict) or COMMIT_PATTERN.fullmatch(blob.get("sha", "")) is None:
+            raise ReleaseError("GitHub did not create the sequence ledger blob")
+        tree_payload = {"tree": [{"path": SEQUENCE_LEDGER_PATH, "mode": "100644", "type": "blob", "sha": blob["sha"]}]}
+        if base_tree_sha is not None:
+            tree_payload["base_tree"] = base_tree_sha
+        tree = self._request("POST", self._repo_url("git/trees"), tree_payload)
+        if not isinstance(tree, dict) or COMMIT_PATTERN.fullmatch(tree.get("sha", "")) is None:
+            raise ReleaseError("GitHub did not create the sequence ledger tree")
+        commit_payload = {
+            "message": "Update production NEPK sequence ledger",
+            "tree": tree["sha"],
+            "parents": [parent_sha] if parent_sha is not None else [],
+        }
+        commit = self._request("POST", self._repo_url("git/commits"), commit_payload)
+        if not isinstance(commit, dict) or COMMIT_PATTERN.fullmatch(commit.get("sha", "")) is None:
+            raise ReleaseError("GitHub did not create the sequence ledger commit")
+        return commit["sha"]
+
+    def create_initial_sequence_ledger(self, ledger: dict) -> str:
+        if self._sequence_ledger_ref() is not None:
+            raise ReleaseError("production sequence ledger ref already exists; initialization is one-time")
+        commit_sha = self._create_sequence_ledger_commit(ledger)
+        try:
+            result = self._request("POST", self._repo_url("git/refs"), {"ref": SEQUENCE_LEDGER_REF, "sha": commit_sha})
+        except ReleaseError as error:
+            if self._sequence_ledger_ref() is not None:
+                raise ReleaseError("production sequence ledger ref was initialized concurrently; verify its genesis fingerprint") from error
+            raise
+        if not isinstance(result, dict):
+            raise ReleaseError("GitHub did not confirm one-time sequence ledger initialization")
+        ref_object = result.get("object")
+        if not isinstance(ref_object, dict) or ref_object.get("sha") != commit_sha:
+            raise ReleaseError("GitHub initialized the sequence ledger ref to an unexpected commit")
+        return commit_sha
+
+    def compare_and_swap_sequence_ledger(self, expected_head_sha: str, ledger: dict) -> bool:
+        reference = self._sequence_ledger_ref()
+        ref_object = reference.get("object") if isinstance(reference, dict) else None
+        current_sha = ref_object.get("sha") if isinstance(ref_object, dict) and ref_object.get("type") == "commit" else None
+        if current_sha != expected_head_sha:
+            return False
+        commit = self._request("GET", self._repo_url(f"git/commits/{expected_head_sha}"))
+        tree_ref = commit.get("tree") if isinstance(commit, dict) else None
+        base_tree_sha = tree_ref.get("sha") if isinstance(tree_ref, dict) else None
+        if not isinstance(base_tree_sha, str) or COMMIT_PATTERN.fullmatch(base_tree_sha) is None:
+            raise ReleaseError("current sequence ledger commit has no readable tree")
+        commit_sha = self._create_sequence_ledger_commit(ledger, parent_sha=expected_head_sha, base_tree_sha=base_tree_sha)
+        try:
+            updated = self._request("PATCH", self._repo_url(f"git/refs/heads/{SEQUENCE_LEDGER_BRANCH}"), {
+                "sha": commit_sha,
+                "force": False,
+            })
+        except ReleaseError as error:
+            current = self._sequence_ledger_ref()
+            current_object = current.get("object") if isinstance(current, dict) else None
+            if isinstance(current_object, dict) and current_object.get("sha") != expected_head_sha:
+                return False
+            raise ReleaseError("GitHub refused the non-force sequence ledger ref update; check ledger branch write rules") from error
+        if not isinstance(updated, dict):
+            raise ReleaseError("GitHub did not confirm the sequence ledger ref update")
+        updated_object = updated.get("object")
+        if not isinstance(updated_object, dict) or updated_object.get("sha") != commit_sha:
+            raise ReleaseError("GitHub moved the sequence ledger ref to an unexpected commit")
+        return True
+
     def get_tag(self, tag: str):
         return self._request("GET", self._repo_url(f"git/ref/tags/{urllib.parse.quote(tag, safe='')}"))
+
+    def create_tag(self, tag: str, source_sha: str):
+        result = self._request("POST", self._repo_url("git/refs"), {
+            "ref": f"refs/tags/{tag}",
+            "sha": source_sha,
+        })
+        if not isinstance(result, dict):
+            raise ReleaseError("GitHub did not confirm creation of the release tag")
+        return result
 
     def tag_commit(self, reference: dict) -> str | None:
         if not isinstance(reference, dict):
