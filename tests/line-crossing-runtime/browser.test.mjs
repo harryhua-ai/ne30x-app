@@ -17,7 +17,7 @@ const fixtureRoot = path.join(testRoot, 'fixture')
 const evidencePath = path.join(repoRoot, 'docs/evidence/line-crossing-runtime/runtime-fixture-evidence.json')
 const signedProvenancePath = path.join(repoRoot, 'docs/evidence/line-crossing-ui/line-crossing.neui.provenance.json')
 const signedProvenance = JSON.parse(readFileSync(signedProvenancePath, 'utf8'))
-const chromePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+const chromePath = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : chromium.executablePath())
 const HOST_HOSTNAME = 'host.example.test'
 const APP_HOSTNAME = 'app.other.test'
 const SIGNED_IDENTITY = {
@@ -37,7 +37,7 @@ const CASES = [
   { id: 'authorized-session', title: 'authorized bridge session drives the real counting UI with real H264 workers and generation-checked writes', outcome: 'pass' },
   { id: 'fail-closed-variants', title: 'absent grants, wrong app identity, limited whitelists and opaque origins keep the App honest', outcome: 'pass' },
   { id: 'negative-traffic', title: 'rolled back, oversized, late and cross-generation results never pollute the bridge session', outcome: 'pass' },
-  { id: 'enable-round-trip', title: 'a granted Enable capability round-trips real outcomes while absent stays read-only', outcome: 'pass' },
+  { id: 'enable-control-hidden', title: 'a granted business Enable capability stays non-interactive while normal config writes remain available', outcome: 'pass' },
   { id: 'sibling-forgery', title: 'a hostile sibling iframe cannot forge bridge traffic or reach App storage', outcome: 'pass' },
   { id: 'cross-site-isolation', title: 'the cross-site signed App cannot read Host DOM or storage or perform a cookie-authenticated admin write', outcome: 'pass' },
   { id: 'same-origin-relaxation', title: 'the same-origin control exposes Host DOM and storage to the signed App', outcome: 'negative-control' },
@@ -45,17 +45,17 @@ const CASES = [
 ]
 
 const EVIDENCE = {
-  app_entry: 'apps/line-crossing/ui/src/main.tsx (production build served from the committed signed NEUI-equivalent asset set)',
+  app_entry: 'apps/line-crossing/ui/src/main.tsx (production build served from the current source tree)',
   signed_bundle: {
     bundle_path: signedProvenance.bundle_path,
     bundle_sha256: signedProvenance.bundle_sha256,
     ui_tbs_sha256: signedProvenance.ui_tbs_sha256,
     source_commit: signedProvenance.source_commit,
     signer_spki_sha256: signedProvenance.signer_spki_sha256,
-    production_asset_equality: 'tests/line-crossing-ui/contract.test.mjs compares every committed signed NEUI file path, length, and SHA-256 with the rebuilt production output served by this browser fixture.',
+    production_asset_equality: 'The historical signed NEUI bundle is checked against its own asset records; the current source build is exercised directly and packaged separately by NEPK v1.1.',
   },
   bridge_limits: { max_message_bytes: 16384, max_pending_requests: 4, request_deadline_ms: 10000 },
-  browser: 'Google Chrome with local resolver rules mapping host.example.test and app.other.test to 127.0.0.1',
+  browser: 'Chrome or Chromium with local resolver rules mapping host.example.test and app.other.test to 127.0.0.1',
   cases: CASES,
   origin_topology: {
     host: 'http://host.example.test:<ephemeral-port>',
@@ -187,7 +187,7 @@ const completeCase = id => completedCaseIds.push(id)
 
 before(async () => {
   assert.equal(existsSync(productionRoot), true, 'production build is missing; run the line-crossing-ui build first')
-  assert.equal(existsSync(chromePath), true, 'Google Chrome is required for the offline browser fixture')
+  assert.equal(existsSync(chromePath), true, 'Chrome or Chromium is required for the offline browser fixture')
   const generated = spawnSync('ffmpeg', [
     '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25',
     '-t', '2', '-an', '-c:v', 'libx264', '-profile:v', 'baseline', '-preset', 'ultrafast', '-tune', 'zerolatency',
@@ -365,7 +365,7 @@ test(CASES[0].title, async () => {
   await frame.getByTestId('lc-page-config').waitFor()
   assert.equal(await frame.getByTestId('lc-counter-name').inputValue(), 'Counter Bridge')
   assert.equal(await frame.getByTestId('lc-business-enable-switch').count(), 0)
-  assert.match(await frame.getByTestId('lc-business-enable-state').textContent(), /Unavailable/)
+  assert.equal(await frame.getByTestId('lc-business-enable').count(), 0)
 
   await frame.getByTestId('lc-tab-realtime').click()
   assert.ok(await frame.getByTestId('lc-stat-cell').count() >= 4)
@@ -523,28 +523,19 @@ test(CASES[3].title, async () => {
   const { page, frame } = await authorize('scenario=normal&enable=available')
   await frame.getByTestId('lc-tab-config').click()
   await frame.getByTestId('lc-page-config').waitFor()
-  const enableSwitch = frame.getByTestId('lc-business-enable-switch')
-  await enableSwitch.waitFor()
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'false')
-  assert.match(await frame.getByTestId('lc-business-enable-state').textContent(), /Disabled/)
+  await waitFor(async () => (await brokerReceived(page)).some(item => item.op === 'enable.read'), 20000, 'the available Enable capability was not read by the runtime')
+  assert.equal((await page.evaluate(() => window.__broker.state())).enable, false)
+  assert.equal(await frame.getByTestId('lc-business-enable').count(), 0)
+  assert.equal(await frame.getByTestId('lc-business-enable-switch').count(), 0)
+  assert.equal(await frame.getByRole('switch').count(), 0)
+  assert.equal(await frame.getByRole('checkbox').count(), 0)
+  assert.equal(await frame.getByText(/pause|disable counting|stop counting/i).count(), 0)
+  assert.equal((await brokerReceived(page)).some(item => item.op === 'enable.apply'), false)
 
-  await enableSwitch.click()
-  await waitFor(async () => (await brokerReceived(page)).some(item => item.op === 'enable.apply'), 20000, 'enable.apply never reached the broker')
-  const enableApply = (await brokerReceived(page)).find(item => item.op === 'enable.apply')
-  assert.deepEqual(enableApply.payload, { session_generation: 8, value: true })
-  await waitFor(async () => (await enableSwitch.getAttribute('aria-checked')) === 'true', 20000, 'Enable switch never reflected the APPLIED outcome')
-  await waitFrameText(frame, 'lc-enable-status', 'Applied')
-  assert.match(await frame.getByTestId('lc-business-enable-state').textContent(), /Running/)
-
-  await page.evaluate(() => window.__broker.control.setRespondUnknownNext())
-  await enableSwitch.click()
-  await waitFrameText(frame, 'lc-enable-status', 'Outcome unknown; no automatic retry was sent')
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
-
-  await page.evaluate(() => window.__broker.control.setRespondConflictNext())
-  await enableSwitch.click()
-  await waitFrameText(frame, 'lc-enable-status', 'Conflict; reload the current snapshot')
-  assert.equal(await enableSwitch.getAttribute('aria-checked'), 'true')
+  await saveCounterName(frame, 'Counter Still Configurable')
+  await waitFor(async () => (await brokerReceived(page)).some(item => item.op === 'config.apply'), 20000, 'normal config.apply never reached the broker')
+  assert.equal((await brokerReceived(page)).some(item => item.op === 'enable.apply'), false)
+  await waitFrameText(frame, 'lc-save-status', 'Applied')
   completeCase(CASES[3].id)
   await page.close()
 })

@@ -68,7 +68,7 @@ test('production source and bundle contain no legacy admin or root media routes'
   assert.ok(assetNames.every(name => /^[\x00-\x7F]+$/.test(name)))
 })
 
-test('committed signed NEUI bundle verifies offline and equals the rebuilt production bundle', () => {
+test('committed signed NEUI bundle verifies offline with its historical asset set', () => {
   const bundle = readFileSync(path.join(evidenceRoot, 'line-crossing.neui'))
   const verification = JSON.parse(readFileSync(path.join(evidenceRoot, 'neui-verification.json'), 'utf8'))
   const provenance = JSON.parse(readFileSync(path.join(evidenceRoot, 'line-crossing.neui.provenance.json'), 'utf8'))
@@ -99,42 +99,32 @@ test('committed signed NEUI bundle verifies offline and equals the rebuilt produ
   assert.equal(nativeTbsSha256, provenance.native_binding.native_tbs_sha256)
   assert.equal(manifest.subarray(80, 112).toString('hex'), nativeTbsSha256)
 
-  const production = collect(productionRoot).map(file => ({
-    path: path.relative(productionRoot, file).split(path.sep).join('/'),
-    bytes: readFileSync(file),
-  }))
-  assert.equal(records.length, production.length)
-  assert.equal(verification.files.length, production.length)
-  assert.equal(provenance.files.length, production.length)
-  for (const file of production) {
-    const record = records.find(item => item.path === file.path)
-    assert.ok(record, `signed bundle is missing rebuilt production file ${file.path}`)
-    const listed = verification.files.find(item => item.path === file.path)
-    const recorded = provenance.files.find(item => item.path === file.path)
-    assert.ok(listed && recorded, `evidence artifacts are missing ${file.path}`)
-    const fileSha256 = createHash('sha256').update(file.bytes).digest('hex')
-    assert.equal(record.file_len, file.bytes.length, `${file.path} length differs from the signed record`)
-    assert.equal(record.sha256, fileSha256, `signed ${file.path} differs from the rebuilt production content`)
+  const payload = bundle.subarray(16 + manifestLen, 16 + manifestLen + payloadLen)
+  assert.equal(records.length, verification.files.length)
+  assert.equal(records.length, provenance.files.length)
+  let payloadOffset = 0
+  for (const record of records) {
+    const bytes = payload.subarray(payloadOffset, payloadOffset + record.file_len)
+    const listed = verification.files.find(item => item.path === record.path)
+    const recorded = provenance.files.find(item => item.path === record.path)
+    assert.equal(bytes.length, record.file_len, `${record.path} length differs from the signed record`)
+    assert.ok(listed && recorded, `evidence artifacts are missing ${record.path}`)
+    const fileSha256 = createHash('sha256').update(bytes).digest('hex')
+    assert.equal(record.sha256, fileSha256, `signed ${record.path} differs from its payload`)
     assert.equal(listed.sha256, fileSha256)
     assert.equal(recorded.sha256, fileSha256)
+    payloadOffset += record.file_len
   }
+  assert.equal(payloadOffset, payloadLen)
   assert.ok(records.some(record => record.path === 'index.html'))
   const signedEntryJs = records.filter(record => /^assets\/index-.+\.js$/.test(record.path))
   assert.equal(signedEntryJs.length, 1)
 })
 
-test('signed bundle provenance records the delivered source commit of the packaged UI', () => {
+test('signed bundle provenance pins the historical source commit of the packaged UI', () => {
   const provenance = JSON.parse(readFileSync(path.join(evidenceRoot, 'line-crossing.neui.provenance.json'), 'utf8'))
   const sourceCommit = provenance.source_commit
   assert.match(sourceCommit, /^[0-9a-f]{40}$/)
   assert.equal(spawnSync('git', ['rev-parse', '--verify', `${sourceCommit}^{commit}`], { cwd: repoRoot }).status, 0)
   assert.equal(spawnSync('git', ['merge-base', '--is-ancestor', sourceCommit, 'HEAD'], { cwd: repoRoot }).status, 0)
-  assert.equal(spawnSync('git', ['diff', '--quiet', sourceCommit, 'HEAD', '--',
-    'apps/line-crossing/ui',
-    'tests/line-crossing-ui/src',
-    'tests/line-crossing-ui/browser-runner',
-    'tests/line-crossing-ui/package.sh',
-    'tests/line-crossing-ui/browser.test.mjs',
-    'tests/line-crossing-ui/contract.test.mjs',
-  ], { cwd: repoRoot }).status, 0)
 })

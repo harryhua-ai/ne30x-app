@@ -9,7 +9,6 @@ import {
     uiConfigToCandidate,
     type AppSnapshot,
     type Capability,
-    type EnableApplyOutcome,
     type HostPolicyConfig,
     type HostPolicySnapshot,
     type LineCountingConfig,
@@ -96,13 +95,10 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
     const [confirmTarget, setConfirmTarget] = useState(false);
     const [appFeedback, setAppFeedback] = useState<SaveResult | null>(null);
     const [hostFeedback, setHostFeedback] = useState<SaveResult | null>(null);
-    const [enableSaving, setEnableSaving] = useState(false);
-    const [enableFeedback, setEnableFeedback] = useState<SaveResult | null>(null);
     const draftRef = useRef<LineCountingConfig | null>(null);
     const activeAppRef = useRef<AppSnapshot | null>(null);
     const appGenerationRef = useRef<string | null>(null);
     const hostGenerationRef = useRef<string | null>(null);
-    const enableBusyRef = useRef(false);
 
     const publishState = useCallback((next: LineCrossingUiState) => {
         const current = stateRef.current;
@@ -147,22 +143,6 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
         && now - (hostCapability.state === 'available' ? hostCapability.value.observedAtMs : now) <= FRESH_FOR_MS;
     const hostWriteCapability = capabilityOrUnavailable(state?.hostPolicyWrite);
     const hostWriteAllowed = hostPolicyFresh && isFresh(hostWriteCapability, now) && hostWriteCapability.value;
-    const businessEnable = capabilityOrUnavailable(state?.businessEnable);
-    const effectiveBusinessEnable = isFresh(businessEnable, now)
-        ? businessEnable
-        : businessEnable.state === 'available'
-            ? { state: 'stale' as const, reason: 'Business Enable observation is stale' }
-            : businessEnable;
-    const enableWriteCapability = capabilityOrUnavailable(state?.enableWrite);
-    const enableWrite: Capability<boolean> = enableWriteCapability.state === 'available' && !isFresh(enableWriteCapability, now)
-        ? { state: 'stale', reason: 'Enable write capability observation is stale' }
-        : enableWriteCapability;
-    const enableInteractive = appSnapshot !== null
-        && typeof capabilities.setBusinessEnable === 'function'
-        && effectiveBusinessEnable.state === 'available'
-        && enableWrite.state === 'available'
-        && enableWrite.value === true
-        && !enableSaving;
 
     draftRef.current = draft;
     activeAppRef.current = appSnapshot;
@@ -452,56 +432,6 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
         }
     };
 
-    const handleEnableChange = async (value: boolean) => {
-        const consumer = capabilities.setBusinessEnable;
-        const current = stateRef.current;
-        const currentSnapshot = current?.app.state === 'available' ? current.app.value : null;
-        const currentEnable = current ? capabilityOrUnavailable(current.businessEnable) : null;
-        const currentWrite = current ? capabilityOrUnavailable(current.enableWrite) : null;
-        if (!consumer || enableBusyRef.current || !currentSnapshot
-            || !currentEnable || currentEnable.state !== 'available'
-            || !currentWrite || currentWrite.state !== 'available' || currentWrite.value !== true) return;
-        const requestedSession = currentSnapshot.sessionGeneration;
-        enableBusyRef.current = true;
-        setEnableSaving(true);
-        setEnableFeedback(null);
-        try {
-            const outcome: EnableApplyOutcome = await consumer({ sessionGeneration: requestedSession, value });
-            const latest = stateRef.current;
-            if (!sameSessionState(latest, requestedSession)) {
-                setEnableFeedback('lineCrossing.sessionChanged');
-                return;
-            }
-            const latestEnable = latest ? capabilityOrUnavailable(latest.businessEnable) : null;
-            const latestWrite = latest ? capabilityOrUnavailable(latest.enableWrite) : null;
-            if (!latestEnable || latestEnable.state !== 'available'
-                || !latestWrite || latestWrite.state !== 'available' || latestWrite.value !== true) {
-                setEnableFeedback('lineCrossing.saveUnavailable');
-                return;
-            }
-            if (outcome.outcome !== 'APPLIED') {
-                setEnableFeedback(resultMessage(outcome.outcome));
-                if (outcome.outcome === 'UNKNOWN') toast.error(i18n._('lineCrossing.unknownOutcome'));
-                return;
-            }
-            if (outcome.sessionGeneration !== requestedSession || outcome.value !== value || outcome.observedAtMs > Date.now()) {
-                setEnableFeedback('lineCrossing.unknownOutcome');
-                return;
-            }
-            updateState((current) => ({
-                ...current,
-                revision: current.revision + 1,
-                businessEnable: { state: 'available', value: outcome.value, observedAtMs: outcome.observedAtMs },
-            }));
-            setEnableFeedback('lineCrossing.applied');
-        } catch {
-            setEnableFeedback('lineCrossing.unknownOutcome');
-        } finally {
-            enableBusyRef.current = false;
-            setEnableSaving(false);
-        }
-    };
-
     const requestVideo = async () => {
         const currentState = stateRef.current;
         const currentSnapshot = currentState?.app.state === 'available' ? currentState.app.value : null;
@@ -622,13 +552,8 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
                     ? <ConfigPage
                         config={draft ?? activeConfig}
                         status={appSnapshot.status}
-                        businessEnable={effectiveBusinessEnable}
-                        enableInteractive={enableInteractive}
-                        enableBusy={enableSaving}
-                        enableFeedback={enableFeedback}
                         writeAllowed={writeAllowed}
                         onChange={handleDraftChange}
-                        onEnableChange={handleEnableChange}
                     />
                     : <p data-testid="lc-config-unavailable">{i18n._('lineCrossing.unavailable')}</p>}
                 <div className="flex justify-end gap-2 pt-1" data-testid="lc-save-bar">
