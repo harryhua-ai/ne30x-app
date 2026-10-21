@@ -12,7 +12,31 @@
  "heartbeat_at": "2026-10-21T08:04:15Z",
  "supersedes": null,
  "contract_digest": "0785674a57d1e8fca8cbe7c93c728d64a438bff5031d55fbb07620150e48fcbd",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/42/49c74056",
+  "sha": "38051418e1ffa0186ea58b7c35dc45b742d21d48",
+  "scope": {
+   "pass": true,
+   "paths": {
+    ".github/workflows/nepk-v1_1-release.yml": "ALLOWED",
+    ".github/workflows/nepk-v1_1.yml": "ALLOWED",
+    "docs/nepk-release.md": "ALLOWED",
+    "package/vnext/nepk_v1_1_pack.py": "ALLOWED",
+    "package/vnext/nepk_v1_1_release.py": "ALLOWED",
+    "scripts/nepk_v1_1_production_release.py": "ALLOWED",
+    "tests/line-crossing-ui/browser.test.mjs": "ALLOWED",
+    "tests/nepk-v1_1/test_release.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 8,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-21T08:05:55Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
