@@ -278,7 +278,7 @@ def _ledger_history(ledger: dict, expected_ledger_sha256: str, record_id: str,
     high_water = max((row["release_seq"] for row in prior), default=0)
     if selected.get("previous_high_water") != high_water or release_seq <= high_water:
         raise PackError("authorized release_seq is not above the pinned per-app high-water mark")
-    history_rows = [row for row in prior if row.get("status") in {"signed", "published", "abandoned-signed"}]
+    history_rows = [row for row in prior if row.get("status") in {"authorized", "signed", "published", "abandoned-signed"}]
     history = None
     if history_rows:
         latest = max(history_rows, key=lambda row: row["release_seq"])

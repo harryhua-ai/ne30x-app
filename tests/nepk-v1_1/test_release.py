@@ -57,6 +57,7 @@ class MemoryReleaseApi:
             "name": plan["title"],
             "body": plan["release_notes"],
             "draft": True,
+            "prerelease": False,
             "assets": [],
         }
         self.tags[plan["tag"]] = {"object": {"sha": plan["source_sha"], "type": "commit"}}

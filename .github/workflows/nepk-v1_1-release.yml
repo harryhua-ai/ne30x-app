@@ -3,19 +3,16 @@ name: NEPK v1.1 Production Release
 on:
   workflow_dispatch:
     inputs:
-      action:
-        description: Draft a release or publish a previously authorized complete release
-        required: true
-        type: choice
-        options:
-          - draft
-          - publish
-      release_request_json:
-        description: Authorized release request JSON including the sequence ledger
+      version:
+        description: Release version, for example v1.0.0
         required: true
         type: string
 
 permissions: {}
+
+concurrency:
+  group: nepk-oneclick-production
+  cancel-in-progress: false
 
 jobs:
   preflight:
@@ -27,8 +24,7 @@ jobs:
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_ACTION: ${{ inputs.action }}
-      RELEASE_REQUEST_JSON: ${{ inputs.release_request_json }}
+      RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,6 +38,17 @@ jobs:
       - name: Install verifier dependency
         run: python -m pip install --disable-pip-version-check cryptography==48.0.0
 
+      - name: Validate the release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - "$RELEASE_VERSION" <<'PY'
+          import sys
+          sys.path.insert(0, "package/vnext")
+          from nepk_v1_1_release import parse_dispatch_version
+          print(parse_dispatch_version(sys.argv[1]))
+          PY
+
       - name: Check exact main SHA, accepted verification run, and production Environment
         shell: bash
         run: |
@@ -50,18 +57,6 @@ jobs:
             printf '%s\n' 'Production release dispatch must target refs/heads/main.' >&2
             exit 1
           fi
-          python - "$RUNNER_TEMP/release-request.json" <<'PY'
-          import json
-          import os
-          import sys
-          from pathlib import Path
-
-          raw = os.environ.get("RELEASE_REQUEST_JSON", "")
-          if not raw or len(raw.encode("utf-8")) > 65535:
-              raise SystemExit("release_request_json is missing or exceeds the workflow input limit")
-          request = json.loads(raw)
-          Path(sys.argv[1]).write_text(json.dumps(request, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
-          PY
           gh api "repos/$GITHUB_REPOSITORY/commits/main" > "$RUNNER_TEMP/main-commit.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nepk_v1_1.yml/runs?branch=main&head_sha=$GITHUB_SHA&status=completed&per_page=100" > "$RUNNER_TEMP/verification-runs.json"
           gh api "repos/$GITHUB_REPOSITORY/environments/production" > "$RUNNER_TEMP/production-environment.json"
@@ -71,7 +66,6 @@ jobs:
           import os
           import sys
           from pathlib import Path
-
           main_sha = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("sha")
           if main_sha != os.environ["GITHUB_SHA"]:
               raise SystemExit("workflow SHA is not the current main SHA")
@@ -93,29 +87,6 @@ jobs:
           python package/vnext/nepk_v1_1_release.py check-environment \
             --environment "$RUNNER_TEMP/production-environment.json" \
             --branch-policies "$RUNNER_TEMP/production-branch-policies.json"
-          python - "$RUNNER_TEMP/production-environment.json" "$RUNNER_TEMP/production-branch-policies.json" <<'PY'
-          import json
-          import sys
-          from pathlib import Path
-
-          environment = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          policies = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-          protection_rules = environment.get("protection_rules", [])
-          required_review_rules = [rule for rule in protection_rules if isinstance(rule, dict) and rule.get("type") == "required_reviewers"]
-          print(json.dumps({
-              "environment": environment.get("name"),
-              "required_reviewer_rule_count": len(required_review_rules),
-              "self_review_blocked": any(rule.get("prevent_self_review") is True for rule in required_review_rules),
-              "required_reviewer_count": max((len(rule.get("reviewers", [])) for rule in required_review_rules), default=0),
-              "deployment_branch_policy": environment.get("deployment_branch_policy"),
-              "branch_policies": policies.get("branch_policies"),
-          }, sort_keys=True))
-          PY
-          python package/vnext/nepk_v1_1_release.py preflight \
-            --request "$RUNNER_TEMP/release-request.json" \
-            --source-sha "$GITHUB_SHA" \
-            --action "$RELEASE_ACTION" \
-            --structural-only
 
   release:
     needs: preflight
@@ -129,9 +100,8 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_ACTION: ${{ inputs.action }}
-      RELEASE_REQUEST_JSON: ${{ inputs.release_request_json }}
-      NEPK_PRODUCTION_SEQUENCE_LEDGER_SHA256: ${{ vars.NEPK_PRODUCTION_SEQUENCE_LEDGER_SHA256 }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      NEPK_PRODUCTION_SEQUENCE_LEDGER_GENESIS_SHA256: ${{ vars.NEPK_PRODUCTION_SEQUENCE_LEDGER_GENESIS_SHA256 }}
       NEPK_PRODUCTION_PUBLISHER_ID: ${{ vars.NEPK_PRODUCTION_PUBLISHER_ID }}
       NEPK_PRODUCTION_SPKI_DER_HEX: ${{ vars.NEPK_PRODUCTION_SPKI_DER_HEX }}
       NEPK_PRODUCTION_SPKI_SHA256: ${{ vars.NEPK_PRODUCTION_SPKI_SHA256 }}
@@ -165,7 +135,7 @@ jobs:
           pnpm --dir tests/line-crossing-ui install --frozen-lockfile --ignore-scripts
           npm ci --prefix tests/line-crossing-ui/browser-runner --ignore-scripts
 
-      - name: Recheck accepted source, Environment protection, and pinned request
+      - name: Recheck source, accepted verification run, and Environment after approval
         shell: bash
         run: |
           set -euo pipefail
@@ -173,18 +143,6 @@ jobs:
             printf '%s\n' 'Production release job is restricted to main.' >&2
             exit 1
           fi
-          python - "$RUNNER_TEMP/release-request.json" <<'PY'
-          import json
-          import os
-          import sys
-          from pathlib import Path
-
-          raw = os.environ.get("RELEASE_REQUEST_JSON", "")
-          if not raw or len(raw.encode("utf-8")) > 65535:
-              raise SystemExit("release_request_json is missing or exceeds the workflow input limit")
-          request = json.loads(raw)
-          Path(sys.argv[1]).write_text(json.dumps(request, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
-          PY
           gh api "repos/$GITHUB_REPOSITORY/commits/main" > "$RUNNER_TEMP/main-commit.json"
           gh api "repos/$GITHUB_REPOSITORY/actions/workflows/nepk_v1_1.yml/runs?branch=main&head_sha=$GITHUB_SHA&status=completed&per_page=100" > "$RUNNER_TEMP/verification-runs.json"
           gh api "repos/$GITHUB_REPOSITORY/environments/production" > "$RUNNER_TEMP/production-environment.json"
@@ -194,7 +152,6 @@ jobs:
           import os
           import sys
           from pathlib import Path
-
           main_sha = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8")).get("sha")
           if main_sha != os.environ["GITHUB_SHA"]:
               raise SystemExit("main advanced after preflight; refusing to sign another SHA")
@@ -216,23 +173,23 @@ jobs:
           python package/vnext/nepk_v1_1_release.py check-environment \
             --environment "$RUNNER_TEMP/production-environment.json" \
             --branch-policies "$RUNNER_TEMP/production-branch-policies.json"
-          python package/vnext/nepk_v1_1_release.py preflight \
-            --request "$RUNNER_TEMP/release-request.json" \
-            --source-sha "$GITHUB_SHA" \
-            --action "$RELEASE_ACTION" \
-            --ledger-sha256 "$NEPK_PRODUCTION_SEQUENCE_LEDGER_SHA256"
+          python - "$RELEASE_VERSION" <<'PY'
+          import sys
+          sys.path.insert(0, "package/vnext")
+          from nepk_v1_1_release import parse_dispatch_version
+          print(parse_dispatch_version(sys.argv[1]))
+          PY
 
-      - name: Build, sign, independently verify, and release approved App bytes
-        id: production-release
+      - name: Build, sign, verify, and publish the approved version
         env:
           GITHUB_TOKEN: ${{ github.token }}
           NEPK_PRODUCTION_ISSUER_KEY: ${{ secrets.NEPK_PRODUCTION_ISSUER_KEY }}
         run: |
           mkdir -p "$RUNNER_TEMP/nepk-release-evidence"
-          python scripts/nepk_v1_1_production_release.py \
-            --request "$RUNNER_TEMP/release-request.json" \
-            --action "$RELEASE_ACTION" \
-            --evidence "$RUNNER_TEMP/nepk-release-evidence/release-evidence.json"
+          python scripts/nepk_v1_1_production_release.py release \
+            --version "$RELEASE_VERSION" \
+            --evidence "$RUNNER_TEMP/nepk-release-evidence/release-evidence.json" \
+            --repository "$GITHUB_REPOSITORY"
 
       - name: Upload non-secret release evidence
         if: always()
