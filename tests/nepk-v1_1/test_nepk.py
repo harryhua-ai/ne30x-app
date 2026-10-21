@@ -153,6 +153,7 @@ class NePKVerifierTests(unittest.TestCase):
         self.assertEqual(report["ui_tbs_sha256"], hashlib.sha256(self.ui[:member_tbs_len(self.ui)]).hexdigest())
         pair_tbs_len = 32 + len(self.native) + len(self.ui)
         self.assertEqual(report["pair_tbs_sha256"], hashlib.sha256(self.package[:pair_tbs_len]).hexdigest())
+        self.assertEqual(report["history"]["pair_tbs_sha256"], report["pair_tbs_sha256"])
         self.assertEqual(report["transition"], "FRESH_INSTALL")
         self.assertTrue(report["native_signature_sha256"])
         self.assertTrue(report["ui_signature_sha256"])
@@ -269,7 +270,9 @@ class NePKVerifierTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "ABI_INCOMPATIBLE")
 
     def test_trusted_history_schema_is_validated_before_policy_comparison(self):
-        history = history_from_report(self.verify())
+        report = self.verify()
+        history = history_from_report(report)
+        self.assertEqual(history.pair_tbs_sha256, report["pair_tbs_sha256"])
         with self.assertRaises(NePKError) as raised:
             self.verify(trusted_history=replace(history, release_seq=0))
         self.assertEqual(raised.exception.code, "BAD_HISTORY")
@@ -278,6 +281,9 @@ class NePKVerifierTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "BAD_HISTORY")
         with self.assertRaises(NePKError) as raised:
             self.verify(trusted_history=replace(history, native_tbs_sha256=" " + history.native_tbs_sha256))
+        self.assertEqual(raised.exception.code, "BAD_HISTORY")
+        with self.assertRaises(NePKError) as raised:
+            self.verify(trusted_history=replace(history, pair_tbs_sha256=" " + history.pair_tbs_sha256))
         self.assertEqual(raised.exception.code, "BAD_HISTORY")
         self.assertEqual(self.verify(trusted_history=replace(history, native_version=list(history.native_version)))
                          ["transition"], "IDEMPOTENT")
@@ -291,9 +297,30 @@ class NePKVerifierTests(unittest.TestCase):
         self.expect_reject(same_seq_pair, "CONTENT_CONFLICT", trusted_history=previous)
         lower_seq = pair_member(self.native, self.ui, 6, self.key)
         self.expect_reject(lower_seq, "DOWNGRADE", trusted_history=previous)
+        higher_seq = pair_member(self.native, self.ui, 8, self.key)
+        self.assertEqual(self.verify(higher_seq, trusted_history=previous)["transition"], "UPGRADE")
         lower_native = native_member(self.key, version=(3, 9, 9), payload=b"LOWR")
         lower_ui = ui_member(self.key, lower_native, version=(1, 0, 1))
         self.expect_reject(pair_member(lower_native, lower_ui, 8, self.key), "NATIVE_VERSION_DOWNGRADE", trusted_history=previous)
+
+    def test_same_release_sequence_rejects_different_resigned_member_der(self):
+        previous_report = self.verify()
+        previous = history_from_report(previous_report)
+        native_tbs = self.native[:member_tbs_len(self.native)]
+        ui_tbs = self.ui[:member_tbs_len(self.ui)]
+        resigned_native = native_tbs + self.key.sign(native_tbs, ec.ECDSA(hashes.SHA256()))
+        resigned_ui = ui_tbs + self.key.sign(ui_tbs, ec.ECDSA(hashes.SHA256()))
+        self.assertNotEqual(resigned_native, self.native)
+        self.assertNotEqual(resigned_ui, self.ui)
+        candidate = pair_member(resigned_native, resigned_ui, 7, self.key)
+        candidate_report = self.verify(candidate)
+        self.assertEqual(candidate_report["native_tbs_sha256"], previous_report["native_tbs_sha256"])
+        self.assertEqual(candidate_report["ui_tbs_sha256"], previous_report["ui_tbs_sha256"])
+        self.assertEqual(candidate_report["release_seq"], previous_report["release_seq"])
+        self.assertEqual(candidate_report["native_version"], previous_report["native_version"])
+        self.assertEqual(candidate_report["ui_version"], previous_report["ui_version"])
+        self.assertNotEqual(candidate_report["pair_tbs_sha256"], previous_report["pair_tbs_sha256"])
+        self.expect_reject(candidate, "CONTENT_CONFLICT", trusted_history=previous)
 
     def test_cross_native_ui_floor_and_same_version_content_conflicts(self):
         previous = history_from_report(self.verify())

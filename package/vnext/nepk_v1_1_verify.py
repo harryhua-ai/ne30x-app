@@ -45,6 +45,7 @@ class TrustedHistory:
     release_seq: int
     native_tbs_sha256: str
     ui_tbs_sha256: str
+    pair_tbs_sha256: str
     native_version: tuple[int, int, int]
     ui_version: tuple[int, int, int]
 
@@ -58,6 +59,7 @@ def history_from_report(report: dict) -> TrustedHistory:
         release_seq=history["release_seq"],
         native_tbs_sha256=history["native_tbs_sha256"],
         ui_tbs_sha256=history["ui_tbs_sha256"],
+        pair_tbs_sha256=history["pair_tbs_sha256"],
         native_version=tuple(history["native_version"]),
         ui_version=tuple(history["ui_version"]),
     )
@@ -73,7 +75,8 @@ def _validate_history(history: TrustedHistory) -> None:
         raise NePKError("BAD_HISTORY", "trusted history publisher/app identity is malformed") from error
     for name, value in (("publisher_key_sha256", history.publisher_key_sha256),
                         ("native_tbs_sha256", history.native_tbs_sha256),
-                        ("ui_tbs_sha256", history.ui_tbs_sha256)):
+                        ("ui_tbs_sha256", history.ui_tbs_sha256),
+                        ("pair_tbs_sha256", history.pair_tbs_sha256)):
         if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
             raise NePKError("BAD_HISTORY", f"trusted history {name} must be canonical lowercase SHA-256")
     if isinstance(history.release_seq, bool) or not isinstance(history.release_seq, int):
@@ -103,10 +106,11 @@ def evaluate_history(previous: TrustedHistory | None, current: TrustedHistory) -
         raise NePKError("DOWNGRADE", "release_seq is below the trusted high-water mark")
     same_native = current.native_tbs_sha256 == previous.native_tbs_sha256
     same_ui = current.ui_tbs_sha256 == previous.ui_tbs_sha256
+    same_pair = current.pair_tbs_sha256 == previous.pair_tbs_sha256
     if current.release_seq == previous.release_seq:
-        if same_native and same_ui:
+        if same_native and same_ui and same_pair:
             return "IDEMPOTENT"
-        raise NePKError("CONTENT_CONFLICT", "release_seq is reused for different native or UI content")
+        raise NePKError("CONTENT_CONFLICT", "release_seq is reused for a different authenticated Pair identity")
     previous_native_version = tuple(previous.native_version)
     previous_ui_version = tuple(previous.ui_version)
     if current.native_version < previous_native_version:
@@ -242,6 +246,7 @@ def verify_nepk(
         release_seq=release_seq,
         native_tbs_sha256=native_tbs_sha256,
         ui_tbs_sha256=ui_report["ui_tbs_sha256"],
+        pair_tbs_sha256=hashlib.sha256(pair_tbs).hexdigest(),
         native_version=(native_manifest.version_major, native_manifest.version_minor, native_manifest.version_patch),
         ui_version=ui_manifest.version_tuple,
     )
@@ -263,7 +268,7 @@ def verify_nepk(
         "ui_signature_sha256": hashlib.sha256(ui_signature).hexdigest(),
         "ui_signature_len": len(ui_signature),
         "ui_version": list(identity.ui_version),
-        "pair_tbs_sha256": hashlib.sha256(pair_tbs).hexdigest(),
+        "pair_tbs_sha256": identity.pair_tbs_sha256,
         "pair_signature_sha256": hashlib.sha256(pair_signature).hexdigest(),
         "pair_signature_len": len(pair_signature),
         "release_seq": release_seq,
@@ -290,6 +295,7 @@ def _history_from_json(path: Path) -> TrustedHistory:
         release_seq=raw["release_seq"],
         native_tbs_sha256=raw["native_tbs_sha256"],
         ui_tbs_sha256=raw["ui_tbs_sha256"],
+        pair_tbs_sha256=raw["pair_tbs_sha256"],
         native_version=tuple(raw["native_version"]) if isinstance(raw["native_version"], list) else raw["native_version"],
         ui_version=tuple(raw["ui_version"]) if isinstance(raw["ui_version"], list) else raw["ui_version"],
     )
