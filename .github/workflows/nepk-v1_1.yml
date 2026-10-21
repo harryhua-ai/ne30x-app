@@ -1,38 +1,20 @@
-name: NEPK v1.1 TEST ONLY
+name: NEPK v1.1 Verification
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - '.github/workflows/nepk-v1_1.yml'
-      - 'apps/line-crossing/app/**'
-      - 'apps/line-crossing/ui/**'
-      - 'package/vnext/**'
-      - 'package/sidecar/neui_sidecar_format.py'
-      - 'package/neapp_format.py'
-      - 'tests/line-crossing-ui/**'
-      - 'tests/line-crossing-runtime/**'
-      - 'tests/nepk-v1_1/**'
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/nepk-v1_1.yml'
-      - 'apps/line-crossing/app/**'
-      - 'apps/line-crossing/ui/**'
-      - 'package/vnext/**'
-      - 'package/sidecar/neui_sidecar_format.py'
-      - 'package/neapp_format.py'
-      - 'tests/line-crossing-ui/**'
-      - 'tests/line-crossing-runtime/**'
-      - 'tests/nepk-v1_1/**'
+  workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
-  build-verify-test-package:
+  verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -46,10 +28,13 @@ jobs:
         with:
           node-version: '22.22.3'
 
+      - name: Prepare evidence directory
+        run: mkdir -p "$RUNNER_TEMP/nepk-v1-1-evidence"
+
       - name: Install pinned pnpm
         run: npm install --global pnpm@11.5.2
 
-      - name: Install ARM compiler
+      - name: Install ARM compiler and H.264 tools
         run: |
           sudo apt-get update
           sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi ffmpeg
@@ -63,91 +48,126 @@ jobs:
           npm ci --prefix tests/line-crossing-ui/browser-runner --ignore-scripts
           npx --yes playwright@1.64.0 install --with-deps chromium
 
-      - name: Run UI, runtime, bridge, and NEPK negative vectors
+      - name: Build real Line Crossing v4 ELF
         run: |
-          pnpm --dir tests/line-crossing-ui test
-          python -m unittest discover -s tests/nepk-v1_1 -v
+          make -C apps/line-crossing/app elf-v4 V4_APP_VERSION=4.0.0
+          sha256sum apps/line-crossing/app/build/lc-line-crossing-v4.elf > "$RUNNER_TEMP/nepk-v1-1-evidence/real-elf-sha256.txt"
 
-      - name: Build production Line Crossing v4 ELF
+      - name: Run UI, H.264, runtime, bridge, and NEPK positive and negative acceptance
         shell: bash
         run: |
-          run_number=$((10#${GITHUB_RUN_NUMBER}))
-          minor=$((run_number / 65536))
-          patch=$((run_number % 65536))
-          native_version="4.${minor}.${patch}"
-          ui_version="1.${minor}.${patch}"
-          printf 'NEPK_NATIVE_VERSION=%s\n' "$native_version" >> "$GITHUB_ENV"
-          printf 'NEPK_UI_VERSION=%s\n' "$ui_version" >> "$GITHUB_ENV"
-          make -C apps/line-crossing/app elf-v4 V4_APP_VERSION="$native_version"
+          set -o pipefail
+          pnpm --dir tests/line-crossing-ui test 2>&1 | tee "$RUNNER_TEMP/nepk-v1-1-evidence/ui-runtime-bridge.log"
+          python -m unittest discover -s tests/nepk-v1_1 -v 2>&1 | tee "$RUNNER_TEMP/nepk-v1-1-evidence/nepk-positive-negative.log"
 
-      - name: Build and independently verify TEST ONLY package
-        if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-        env:
-          NEPK_TEST_ONLY_ISSUER_KEY: ${{ secrets.NEPK_TEST_ONLY_ISSUER_KEY }}
+      - name: Build and independently verify transient TEST ONLY package
+        if: success()
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "${NEPK_TEST_ONLY_ISSUER_KEY:-}" ]]; then
-            printf '%s\n' 'Required TEST ONLY issuer secret is unavailable.' >&2
-            exit 1
-          fi
-          umask 077
-          key_file="$RUNNER_TEMP/nepk-test-only-issuer.pem"
-          trap 'rm -f "$key_file"' EXIT
-          printf '%s' "$NEPK_TEST_ONLY_ISSUER_KEY" > "$key_file"
-          unset NEPK_TEST_ONLY_ISSUER_KEY
-          artifact_dir="$RUNNER_TEMP/nepk-v1-1-artifact"
-          mkdir -p "$artifact_dir"
-          trust_file="$RUNNER_TEMP/nepk-test-only-trust.json"
-          python - "$key_file" "$trust_file" <<'PY'
+          private_dir="$RUNNER_TEMP/nepk-v1-1-transient"
+          evidence_dir="$RUNNER_TEMP/nepk-v1-1-evidence"
+          mkdir -m 700 -p "$private_dir"
+          python - "$private_dir" "$evidence_dir/trust.json" "$evidence_dir/test-only-key.json" <<'PY'
           import hashlib
           import json
           import sys
           from pathlib import Path
           from cryptography.hazmat.primitives import serialization
+          from cryptography.hazmat.primitives.asymmetric import ec
 
-          key = serialization.load_pem_private_key(Path(sys.argv[1]).read_bytes(), password=None)
+          private_dir = Path(sys.argv[1])
+          key = ec.derive_private_key(1, ec.SECP256R1())
           spki = key.public_key().public_bytes(
               serialization.Encoding.DER,
               serialization.PublicFormat.SubjectPublicKeyInfo,
           )
-          digest = hashlib.sha256(spki).hexdigest()
-          expected = "06e732b1b94daeeef433297f7a8e797bf72b2fd3b882a4ec6a5490352931ebda"
-          if digest != expected:
-              raise SystemExit("TEST ONLY signing key does not match the pinned Host test SPKI")
+          fingerprint = hashlib.sha256(spki).hexdigest()
+          key_path = private_dir / "test-only.pem"
+          key_path.write_bytes(key.private_bytes(
+              serialization.Encoding.PEM,
+              serialization.PrivateFormat.PKCS8,
+              serialization.NoEncryption(),
+          ))
+          key_path.chmod(0o600)
           Path(sys.argv[2]).write_text(json.dumps({
               "version": 1,
               "publishers": {
-                  "ne301-exp-pub": {"spki_der_hex": spki.hex(), "spki_sha256": digest}
+                  "test-publisher": {
+                      "spki_der_hex": spki.hex(),
+                      "spki_sha256": fingerprint,
+                  }
               },
           }, sort_keys=True) + "\n", encoding="utf-8")
+          Path(sys.argv[3]).write_text(json.dumps({
+              "artifact_type": "TEST ONLY transient verification package",
+              "private_key_included": False,
+              "publisher_id": "test-publisher",
+              "publisher_spki_sha256": fingerprint,
+          }, sort_keys=True) + "\n", encoding="utf-8")
           PY
-          run_number=$((10#${GITHUB_RUN_NUMBER}))
-          native_version="$NEPK_NATIVE_VERSION"
-          ui_version="$NEPK_UI_VERSION"
-          package_file="$artifact_dir/line-crossing-v${native_version}-ui-${ui_version}-seq-${run_number}.neapp"
           python package/vnext/nepk_v1_1_pack.py \
+            --mode test-only \
+            --test-only-key-profile public-d1 \
             --elf apps/line-crossing/app/build/lc-line-crossing-v4.elf \
             --ui-assets tests/line-crossing-ui/.build/production \
-            --key "$key_file" \
-            --out "$package_file" \
-            --native-version "$native_version" \
-            --ui-version "$ui_version" \
-            --release-seq "$run_number" \
+            --key "$private_dir/test-only.pem" \
+            --out "$private_dir/line-crossing-test-only.neapp" \
+            --provenance-out "$private_dir/provenance.json" \
+            --publisher-id test-publisher \
+            --app-id line-crossing \
+            --native-version 4.0.0 \
+            --ui-version 1.0.0 \
+            --release-seq 1 \
             --source-commit "$GITHUB_SHA"
           python package/vnext/nepk_v1_1_verify.py \
-            --bundle "$package_file" \
-            --trust "$trust_file" \
-            --expect-publisher-id ne301-exp-pub \
+            --bundle "$private_dir/line-crossing-test-only.neapp" \
+            --trust "$evidence_dir/trust.json" \
+            --expect-publisher-id test-publisher \
             --expect-app-id line-crossing \
-            --compact > "$artifact_dir/independent-verification.json"
-          sha256sum "$package_file"
+            --compact > "$evidence_dir/test-only-package-verification.json"
+          sha256sum "$private_dir/line-crossing-test-only.neapp" > "$evidence_dir/test-only-package-sha256.txt"
+          python - "$evidence_dir/test-only-package-verification.json" "$evidence_dir/test-only-package-sha256.txt" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if report.get("result") != "PASS":
+              raise SystemExit("transient TEST ONLY NEPK package failed independent verification")
+          Path(sys.argv[1]).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Record verification run metadata
+        if: always()
+        env:
+          VERIFICATION_RESULT: ${{ job.status }}
+        run: |
+          python - "$RUNNER_TEMP/nepk-v1-1-evidence/ci-summary.json" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[1]).write_text(json.dumps({
+              "workflow": "NEPK v1.1 Verification",
+              "result": os.environ["VERIFICATION_RESULT"],
+              "source_sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "no_production_secret": True,
+              "installable_neapp_artifact_uploaded": False,
+          }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
 
       - uses: actions/upload-artifact@v4
-        if: success() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: always()
         with:
-          name: nepk-v1.1-test-only-${{ github.run_number }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/nepk-v1-1-artifact/*
-          if-no-files-found: error
+          name: nepk-v1.1-verification-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/nepk-v1-1-evidence/*.json
+            ${{ runner.temp }}/nepk-v1-1-evidence/*.log
+            ${{ runner.temp }}/nepk-v1-1-evidence/*.txt
+          if-no-files-found: warn
           retention-days: 14
           compression-level: 0

@@ -15,6 +15,10 @@ const productionRoot = path.join(buildRoot, 'production')
 const browserRoot = path.join(buildRoot, 'browser')
 const signedRoot = path.join(buildRoot, 'signed')
 const h264Path = path.join(buildRoot, 'line-crossing-test.h264')
+const lineCountingSource = readFileSync(path.join(repoRoot, 'apps/line-crossing/ui/src/LineCountingModule.tsx'), 'utf8')
+const freshnessMatch = lineCountingSource.match(/const FRESH_FOR_MS\s*=\s*(\d+)\s*;/)
+if (!freshnessMatch) throw new Error('could not read the production capability freshness interval')
+const capabilityFreshForMs = Number(freshnessMatch[1])
 const chromePath = process.env.CHROME_PATH || (process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : chromium.executablePath())
 let browser
 let server
@@ -23,6 +27,51 @@ let streamEnabled = true
 let frameUnits = []
 const streams = new Map()
 const requests = []
+
+const captureSaveBoundary = page => page.evaluate((freshForMs) => {
+  const testApi = window.__lineCrossingTest
+  const state = testApi.getState()
+  const now = Date.now()
+  const describe = capability => {
+    if (!capability || capability.state !== 'available') return { state: capability?.state ?? 'missing' }
+    const observedAtMs = capability.observedAtMs ?? capability.value?.observedAtMs ?? null
+    const ageMs = observedAtMs === null ? null : now - observedAtMs
+    return {
+      state: capability.state,
+      observedAtMs,
+      ageMs,
+      expiresAtMs: observedAtMs === null ? null : observedAtMs + freshForMs,
+      remainingMs: ageMs === null ? null : freshForMs - ageMs,
+    }
+  }
+  const finishButton = document.querySelector('[data-testid="lc-line-toolbar"] button')
+  const discardButton = document.querySelector('[data-testid="lc-discard"]')
+  const appSnapshot = state.app?.state === 'available' ? state.app.value : null
+  const lineSaveButton = document.querySelector('[data-testid="lc-line-toolbar"] button')
+  return {
+    capturedAtMs: now,
+    editMode: Boolean(document.querySelector('[data-testid="lc-toolbar-hint"]')),
+    dirty: discardButton ? !discardButton.disabled : false,
+    writeAllowed: Boolean(finishButton && !finishButton.disabled),
+    lineSaveButtonDisabled: lineSaveButton?.disabled ?? null,
+    appWriteCallCount: testApi.getCalls().app.length,
+    saveClickEvents: window.__lineCrossingSaveClicks ?? [],
+    appState: document.querySelector('[data-testid="lc-app-state"]')?.getAttribute('data-state') ?? null,
+    appCapability: describe(state.app),
+    appSnapshot: describe(appSnapshot ? { state: 'available', value: appSnapshot } : null),
+    configWriteCapability: describe(state.configWrite),
+    pointerEvents: window.__lineCrossingPointerEvents ?? [],
+  }
+}, capabilityFreshForMs)
+
+const recordSaveBoundary = evidence => {
+  const evidencePath = process.env.LC_SAVE_EVIDENCE_PATH
+  if (!evidencePath) return
+  const records = existsSync(evidencePath) ? JSON.parse(readFileSync(evidencePath, 'utf8')) : {}
+  records[evidence.phase] = evidence
+  mkdirSync(path.dirname(evidencePath), { recursive: true })
+  writeFileSync(evidencePath, `${JSON.stringify(records, null, 2)}\n`)
+}
 
 const locateAccessUnits = bytes => {
   const starts = []
@@ -269,12 +318,44 @@ test('real H.264 playback, line editing, separate saves, reconnect and revoked v
   await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
   const activeEndpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
   const activeStage = await page.getByTestId('lc-stage').boundingBox()
+  await page.evaluate(() => {
+    window.__lineCrossingPointerEvents = []
+    window.__lineCrossingSaveClicks = []
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+      window.addEventListener(type, event => {
+        const target = event.target instanceof Element ? event.target.closest('[data-testid]') : null
+        window.__lineCrossingPointerEvents.push({
+          type,
+          pointerType: event.pointerType,
+          button: event.button,
+          isPrimary: event.isPrimary,
+          clientX: Math.round(event.clientX),
+          clientY: Math.round(event.clientY),
+          targetTestId: target?.getAttribute('data-testid') ?? null,
+        })
+      }, true)
+    }
+    document.addEventListener('click', event => {
+      const button = event.target instanceof Element ? event.target.closest('[data-testid="lc-line-toolbar"] button') : null
+      if (button) window.__lineCrossingSaveClicks.push({ isTrusted: event.isTrusted, detail: event.detail })
+    }, true)
+  })
   await page.mouse.move(activeEndpoint.x + activeEndpoint.width / 2, activeEndpoint.y + activeEndpoint.height / 2)
   await page.mouse.down()
   await page.mouse.move(activeStage.x + activeStage.width * 0.7, activeStage.y + activeStage.height * 0.6, { steps: 6 })
   await page.mouse.up()
+  const beforeLineSave = { phase: 'before-line-save', ...await captureSaveBoundary(page) }
+  recordSaveBoundary(beforeLineSave)
+  console.log(`LC_SAVE_BEFORE ${JSON.stringify(beforeLineSave)}`)
   await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
-  await page.waitForFunction(() => window.__lineCrossingTest.getCalls().app.length === 1)
+  try {
+    await page.waitForFunction(() => window.__lineCrossingTest.getCalls().app.length === 1)
+  } catch (error) {
+    const timeoutState = { phase: 'line-save-timeout', ...await captureSaveBoundary(page) }
+    recordSaveBoundary(timeoutState)
+    console.log(`LC_SAVE_TIMEOUT ${JSON.stringify(timeoutState)}`)
+    throw error
+  }
   const lineApply = (await page.evaluate(() => window.__lineCrossingTest.getCalls().app))[0]
   assert.ok(lineApply.candidate.line.x2 >= 680 && lineApply.candidate.line.x2 <= 720)
   assert.ok(lineApply.candidate.line.y2 >= 580 && lineApply.candidate.line.y2 <= 620)
