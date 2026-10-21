@@ -12,7 +12,37 @@
  "heartbeat_at": "2026-10-21T02:51:50Z",
  "supersedes": null,
  "contract_digest": "cd95425be87bdbf9ef215b3739a4366b68cc25e55a639f25f8a7e9864454e75a",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/40/c5d3c697",
+  "sha": "667ae02b8bdf57caa0f74bbff07f02d9490d0d63",
+  "scope": {
+   "pass": true,
+   "paths": {
+    ".github/workflows/nepk-v1_1.yml": "ALLOWED",
+    "apps/line-crossing/ui/src/LineCountingModule.tsx": "ALLOWED",
+    "apps/line-crossing/ui/src/lineCounting/ConfigPage.tsx": "ALLOWED",
+    "docs/evidence/line-crossing-runtime/runtime-fixture-evidence.json": "ALLOWED",
+    "package/vnext/neapp_v4_image.py": "ALLOWED",
+    "package/vnext/nepk_v1_1_pack.py": "ALLOWED",
+    "package/vnext/nepk_v1_1_verify.py": "ALLOWED",
+    "tests/line-crossing-runtime/browser.test.mjs": "ALLOWED",
+    "tests/line-crossing-ui/browser.test.mjs": "ALLOWED",
+    "tests/line-crossing-ui/contract.test.mjs": "ALLOWED",
+    "tests/nepk-v1_1/host_interop.py": "ALLOWED",
+    "tests/nepk-v1_1/test_image.py": "ALLOWED",
+    "tests/nepk-v1_1/test_nepk.py": "ALLOWED",
+    "tests/nepk-v1_1/test_pack.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 14,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-21T02:56:18Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
