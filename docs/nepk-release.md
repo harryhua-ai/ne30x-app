@@ -6,7 +6,7 @@
 
 The transient `.neapp` and private test key stay under the runner temporary directory. The uploaded Actions artifact contains only test logs, JSON verification reports, hashes, and run metadata; it never contains a `.neapp`. The test package uses a fixed test sequence value and is not an issuance or release sequence. `GITHUB_RUN_NUMBER` is not used as a release sequence.
 
-The browser test records `LC_SAVE_BEFORE` immediately before the first save attempt, including edit/dirty/write state, capability age and remaining validity, and pointer events. On a timeout it records `LC_SAVE_TIMEOUT`. The test does not alter the UI's capability lifetime or write policy. A flaky Linux failure is classified from that pre-save evidence before changing test timing or fixtures.
+The browser test records capability timestamps and freshness, edit/dirty/write state, pointer events, the trusted save click, and apply-wait samples at 1, 5, and 10 seconds plus the final outcome. `LC_SAVE_DIAGNOSTIC_MODE=matrix` runs controlled freshness, fixture-observation, and pointer-sequence injections after the normal H.264 browser suite; `LC_SAVE_EVIDENCE_PATH` writes the observations as JSON for the Actions artifact. The injected pointer sequence that omits movement deliberately exercises the unchanged 30-second wait. The investigation and evidence boundary are recorded in [the save-flake report](evidence/line-crossing-ui/save-flake-r2.md). No product freshness, write policy, H.264 coverage, or timeout was changed.
 
 ## Production workflow gates
 

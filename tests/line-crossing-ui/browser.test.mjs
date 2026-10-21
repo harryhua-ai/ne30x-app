@@ -48,29 +48,124 @@ const captureSaveBoundary = page => page.evaluate((freshForMs) => {
   const discardButton = document.querySelector('[data-testid="lc-discard"]')
   const appSnapshot = state.app?.state === 'available' ? state.app.value : null
   const lineSaveButton = document.querySelector('[data-testid="lc-line-toolbar"] button')
+  const appAgeMs = appSnapshot ? now - appSnapshot.observedAtMs : null
+  const appCapabilityAgeMs = state.app?.state === 'available' ? now - state.app.observedAtMs : null
+  const configWriteAgeMs = state.configWrite?.state === 'available' ? now - state.configWrite.observedAtMs : null
+  const computedWriteAllowed = appSnapshot !== null
+    && appAgeMs <= freshForMs
+    && appCapabilityAgeMs <= freshForMs
+    && state.configWrite?.state === 'available'
+    && configWriteAgeMs <= freshForMs
+    && state.configWrite.value === true
   return {
     capturedAtMs: now,
     editMode: Boolean(document.querySelector('[data-testid="lc-toolbar-hint"]')),
     dirty: discardButton ? !discardButton.disabled : false,
-    writeAllowed: Boolean(finishButton && !finishButton.disabled),
+    writeAllowed: computedWriteAllowed,
+    appCapabilityAgeMs,
+    appSnapshotAgeMs: appAgeMs,
+    configWriteAgeMs,
+    toolbarDisabled: finishButton?.disabled ?? null,
     lineSaveButtonDisabled: lineSaveButton?.disabled ?? null,
     appWriteCallCount: testApi.getCalls().app.length,
     saveClickEvents: window.__lineCrossingSaveClicks ?? [],
+    saveStatus: document.querySelector('[data-testid="lc-app-save-status"]')?.textContent ?? null,
     appState: document.querySelector('[data-testid="lc-app-state"]')?.getAttribute('data-state') ?? null,
     appCapability: describe(state.app),
     appSnapshot: describe(appSnapshot ? { state: 'available', value: appSnapshot } : null),
     configWriteCapability: describe(state.configWrite),
     pointerEvents: window.__lineCrossingPointerEvents ?? [],
+    videoState: document.querySelector('[data-testid="lc-video-state"]')?.getAttribute('data-state') ?? null,
   }
 }, capabilityFreshForMs)
 
 const recordSaveBoundary = evidence => {
   const evidencePath = process.env.LC_SAVE_EVIDENCE_PATH
   if (!evidencePath) return
-  const records = existsSync(evidencePath) ? JSON.parse(readFileSync(evidencePath, 'utf8')) : {}
-  records[evidence.phase] = evidence
+  const records = existsSync(evidencePath) ? JSON.parse(readFileSync(evidencePath, 'utf8')) : []
+  records.push(evidence)
   mkdirSync(path.dirname(evidencePath), { recursive: true })
   writeFileSync(evidencePath, `${JSON.stringify(records, null, 2)}\n`)
+}
+
+const observeSavePointerEvents = page => page.evaluate(() => {
+  window.__lineCrossingPointerEvents = []
+  window.__lineCrossingSaveClicks = []
+  for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
+    window.addEventListener(type, event => {
+      const target = event.target instanceof Element ? event.target.closest('[data-testid]') : null
+      window.__lineCrossingPointerEvents.push({
+        type,
+        pointerType: event.pointerType,
+        button: event.button,
+        isPrimary: event.isPrimary,
+        clientX: Math.round(event.clientX),
+        clientY: Math.round(event.clientY),
+        targetTestId: target?.getAttribute('data-testid') ?? null,
+      })
+    }, true)
+  }
+  document.addEventListener('click', event => {
+    const button = event.target instanceof Element ? event.target.closest('[data-testid="lc-line-toolbar"] button') : null
+    if (button) window.__lineCrossingSaveClicks.push({ isTrusted: event.isTrusted, detail: event.detail })
+  }, true)
+})
+
+const waitForFirstLineApply = async (page, scenario, injection, expectTimeout = false) => {
+  const startedAtMs = Date.now()
+  await page.evaluate(() => {
+    window.__lineCrossingSaveWait = { startedAt: performance.now(), nextStage: 0, stages: [] }
+  })
+  try {
+    await page.waitForFunction(() => {
+      const tracker = window.__lineCrossingSaveWait
+      const elapsedMs = performance.now() - tracker.startedAt
+      const thresholds = [1000, 5000, 10000]
+      while (tracker.nextStage < thresholds.length && elapsedMs >= thresholds[tracker.nextStage]) {
+        const state = window.__lineCrossingTest.getState()
+        const now = Date.now()
+        const app = state.app?.state === 'available' ? state.app.value : null
+        const write = state.configWrite
+        const appAgeMs = app ? now - app.observedAtMs : null
+        const appCapabilityAgeMs = state.app?.state === 'available' ? now - state.app.observedAtMs : null
+        const writeAgeMs = write?.state === 'available' ? now - write.observedAtMs : null
+        const button = document.querySelector('[data-testid="lc-line-toolbar"] button')
+        const discard = document.querySelector('[data-testid="lc-discard"]')
+        tracker.stages.push({
+          elapsedMs: Math.round(elapsedMs),
+          capturedAtMs: now,
+          appWriteCallCount: window.__lineCrossingTest.getCalls().app.length,
+          editMode: Boolean(document.querySelector('[data-testid="lc-toolbar-hint"]')),
+          dirty: discard ? !discard.disabled : false,
+          writeAllowed: app !== null && appAgeMs <= 10000 && appCapabilityAgeMs <= 10000 && write?.state === 'available' && writeAgeMs <= 10000 && write.value === true,
+          toolbarDisabled: button?.disabled ?? null,
+          appAgeMs,
+          appCapabilityAgeMs,
+          appRemainingMs: appAgeMs === null ? null : 10000 - appAgeMs,
+          configWriteAgeMs: writeAgeMs,
+          configWriteRemainingMs: writeAgeMs === null ? null : 10000 - writeAgeMs,
+          saveClickEvents: window.__lineCrossingSaveClicks ?? [],
+          pointerEvents: window.__lineCrossingPointerEvents ?? [],
+        })
+        tracker.nextStage += 1
+      }
+      return window.__lineCrossingTest.getCalls().app.length === 1
+    }, null, { timeout: 30000, polling: 100 })
+  } catch (error) {
+    const elapsedMs = Date.now() - startedAtMs
+    const waitStages = await page.evaluate(() => window.__lineCrossingSaveWait.stages)
+    const timeoutState = { phase: 'apply-timeout', scenario, injection, elapsedMs, waitStages, ...await captureSaveBoundary(page) }
+    recordSaveBoundary(timeoutState)
+    console.log(`LC_SAVE_TIMEOUT ${JSON.stringify(timeoutState)}`)
+    if (expectTimeout && /Timeout 30000ms exceeded/.test(String(error))) return { timedOut: true, elapsedMs, error, evidence: timeoutState }
+    throw error
+  }
+  const elapsedMs = Date.now() - startedAtMs
+  const waitStages = await page.evaluate(() => window.__lineCrossingSaveWait.stages)
+  const applied = { phase: 'apply-observed', scenario, injection, elapsedMs, waitStages, ...await captureSaveBoundary(page) }
+  recordSaveBoundary(applied)
+  console.log(`LC_SAVE_APPLY ${JSON.stringify(applied)}`)
+  return { timedOut: false, elapsedMs, evidence: applied }
 }
 
 const locateAccessUnits = bytes => {
@@ -318,44 +413,25 @@ test('real H.264 playback, line editing, separate saves, reconnect and revoked v
   await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
   const activeEndpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
   const activeStage = await page.getByTestId('lc-stage').boundingBox()
-  await page.evaluate(() => {
-    window.__lineCrossingPointerEvents = []
-    window.__lineCrossingSaveClicks = []
-    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
-      window.addEventListener(type, event => {
-        const target = event.target instanceof Element ? event.target.closest('[data-testid]') : null
-        window.__lineCrossingPointerEvents.push({
-          type,
-          pointerType: event.pointerType,
-          button: event.button,
-          isPrimary: event.isPrimary,
-          clientX: Math.round(event.clientX),
-          clientY: Math.round(event.clientY),
-          targetTestId: target?.getAttribute('data-testid') ?? null,
-        })
-      }, true)
-    }
-    document.addEventListener('click', event => {
-      const button = event.target instanceof Element ? event.target.closest('[data-testid="lc-line-toolbar"] button') : null
-      if (button) window.__lineCrossingSaveClicks.push({ isTrusted: event.isTrusted, detail: event.detail })
-    }, true)
-  })
+  await observeSavePointerEvents(page)
   await page.mouse.move(activeEndpoint.x + activeEndpoint.width / 2, activeEndpoint.y + activeEndpoint.height / 2)
   await page.mouse.down()
   await page.mouse.move(activeStage.x + activeStage.width * 0.7, activeStage.y + activeStage.height * 0.6, { steps: 6 })
   await page.mouse.up()
-  const beforeLineSave = { phase: 'before-line-save', ...await captureSaveBoundary(page) }
+  const beforeLineSave = { phase: 'before-line-save', scenario: 'normal-suite', ...await captureSaveBoundary(page) }
   recordSaveBoundary(beforeLineSave)
   console.log(`LC_SAVE_BEFORE ${JSON.stringify(beforeLineSave)}`)
+  assert.equal(beforeLineSave.editMode, true, 'line edit mode must remain active before the apply click')
+  assert.equal(beforeLineSave.dirty, true, 'pointer drag must produce a draft before the apply click')
+  assert.equal(beforeLineSave.writeAllowed, true, 'fresh write capability must remain available before the apply click')
+  assert.ok(beforeLineSave.pointerEvents.some(event => event.type === 'pointerdown' && event.targetTestId === 'lc-line-endpoint'))
+  assert.ok(beforeLineSave.pointerEvents.some(event => event.type === 'pointermove' && event.targetTestId === 'lc-line-endpoint'))
+  assert.ok(beforeLineSave.pointerEvents.some(event => event.type === 'pointerup' && event.targetTestId === 'lc-line-endpoint'))
   await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
-  try {
-    await page.waitForFunction(() => window.__lineCrossingTest.getCalls().app.length === 1)
-  } catch (error) {
-    const timeoutState = { phase: 'line-save-timeout', ...await captureSaveBoundary(page) }
-    recordSaveBoundary(timeoutState)
-    console.log(`LC_SAVE_TIMEOUT ${JSON.stringify(timeoutState)}`)
-    throw error
-  }
+  const afterLineSaveClick = { phase: 'after-save-click', scenario: 'normal-suite', ...await captureSaveBoundary(page) }
+  recordSaveBoundary(afterLineSaveClick)
+  console.log(`LC_SAVE_AFTER_CLICK ${JSON.stringify(afterLineSaveClick)}`)
+  await waitForFirstLineApply(page, 'normal-suite', 'normal-pointer-sequence')
   const lineApply = (await page.evaluate(() => window.__lineCrossingTest.getCalls().app))[0]
   assert.ok(lineApply.candidate.line.x2 >= 680 && lineApply.candidate.line.x2 <= 720)
   assert.ok(lineApply.candidate.line.y2 >= 580 && lineApply.candidate.line.y2 <= 620)
@@ -550,6 +626,130 @@ test('independent App and Host saves keep isolated outcomes across partial failu
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 5)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().host)).length, 4)
   await page.close()
+})
+
+test('line-save diagnostic matrix isolates freshness, fixture observation and pointer-sequence failures', { skip: process.env.LC_SAVE_DIAGNOSTIC_PHASE !== 'matrix' }, async () => {
+  const openDiagnosticPage = async scenario => {
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+    await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
+    await page.getByTestId('lc-module').waitFor()
+    await page.waitForFunction(() => document.querySelector('[data-testid="lc-video-state"]')?.getAttribute('data-state') === 'live', null, { timeout: 20000 })
+    await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
+    await observeSavePointerEvents(page)
+    return { page, scenario }
+  }
+
+  const dragEndpoint = async page => {
+    const endpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
+    const stage = await page.getByTestId('lc-stage').boundingBox()
+    assert.ok(endpoint && stage)
+    await page.mouse.move(endpoint.x + endpoint.width / 2, endpoint.y + endpoint.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(stage.x + stage.width * 0.7, stage.y + stage.height * 0.6, { steps: 6 })
+    await page.mouse.up()
+  }
+
+  const recordBoundary = async (page, phase, scenario, injection) => {
+    const evidence = { phase, scenario, injection, ...await captureSaveBoundary(page) }
+    recordSaveBoundary(evidence)
+    console.log(`LC_SAVE_DIAGNOSTIC ${JSON.stringify(evidence)}`)
+    return evidence
+  }
+
+  streamEnabled = true
+
+  {
+    const { page, scenario } = await openDiagnosticPage('normal-control')
+    await dragEndpoint(page)
+    const before = await recordBoundary(page, 'before-save', scenario, 'normal-pointer-sequence')
+    assert.equal(before.editMode, true)
+    assert.equal(before.dirty, true)
+    assert.equal(before.writeAllowed, true)
+    assert.ok(before.pointerEvents.some(event => event.type === 'pointermove' && event.targetTestId === 'lc-line-endpoint'))
+    await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
+    await recordBoundary(page, 'after-save-click', scenario, 'normal-pointer-sequence')
+    const result = await waitForFirstLineApply(page, scenario, 'normal-pointer-sequence')
+    assert.equal(result.timedOut, false)
+    assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 1)
+    await page.close()
+  }
+
+  {
+    const { page, scenario } = await openDiagnosticPage('capability-expired-before-apply')
+    await dragEndpoint(page)
+    await page.evaluate(() => window.__lineCrossingTest.makeAppStale())
+    await page.waitForFunction(() => document.querySelector('[data-testid="lc-line-toolbar"] button')?.disabled === true)
+    const expired = await recordBoundary(page, 'capability-expired', scenario, 'app-observation-aged-past-freshness')
+    assert.ok(expired.appCapabilityAgeMs > capabilityFreshForMs)
+    assert.ok(expired.appSnapshotAgeMs > capabilityFreshForMs)
+    assert.equal(expired.writeAllowed, false)
+    assert.equal(expired.toolbarDisabled, true)
+    assert.equal(expired.appWriteCallCount, 0)
+    await page.close()
+  }
+
+  {
+    const { page, scenario } = await openDiagnosticPage('fixture-observation-not-refreshed')
+    await dragEndpoint(page)
+    const before = await recordBoundary(page, 'fixture-observation-before-wait', scenario, 'no-fixture-refresh')
+    const originalObservedAtMs = before.appSnapshot.observedAtMs
+    await page.waitForTimeout(Math.max(0, originalObservedAtMs + capabilityFreshForMs + 250 - Date.now()))
+    await page.waitForFunction(() => document.querySelector('[data-testid="lc-line-toolbar"] button')?.disabled === true, null, { timeout: 3000 })
+    const expired = await recordBoundary(page, 'fixture-observation-expired', scenario, 'no-fixture-refresh')
+    assert.equal(expired.appSnapshot.observedAtMs, originalObservedAtMs)
+    assert.ok(expired.appSnapshotAgeMs > capabilityFreshForMs)
+    assert.equal(expired.writeAllowed, false)
+    assert.equal(expired.appWriteCallCount, 0)
+    await page.close()
+  }
+
+  {
+    const { page, scenario } = await openDiagnosticPage('pointer-down-up-without-drag')
+    const endpoint = await page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]').boundingBox()
+    assert.ok(endpoint)
+    const x = endpoint.x + endpoint.width / 2
+    const y = endpoint.y + endpoint.height / 2
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.up()
+    const before = await recordBoundary(page, 'before-save', scenario, 'pointer-move-omitted-after-down')
+    assert.equal(before.editMode, true)
+    assert.equal(before.dirty, false)
+    assert.equal(before.writeAllowed, true)
+    const downAt = before.pointerEvents.findIndex(event => event.type === 'pointerdown')
+    const upAt = before.pointerEvents.findIndex((event, index) => index > downAt && event.type === 'pointerup')
+    assert.ok(downAt >= 0 && upAt > downAt)
+    assert.equal(before.pointerEvents.slice(downAt + 1, upAt).some(event => event.type === 'pointermove'), false)
+    await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
+    const afterClick = await recordBoundary(page, 'after-save-click', scenario, 'pointer-move-omitted-after-down')
+    assert.equal(afterClick.appWriteCallCount, 0)
+    const result = await waitForFirstLineApply(page, scenario, 'pointer-move-omitted-after-down', true)
+    assert.equal(result.timedOut, true)
+    assert.ok(result.elapsedMs >= 29500)
+    assert.match(result.error.message, /Timeout 30000ms exceeded/)
+    assert.equal(result.evidence.appWriteCallCount, 0)
+    await page.close()
+  }
+
+  {
+    const { page, scenario } = await openDiagnosticPage('pointer-cancel-before-drag')
+    const endpoint = page.locator('[data-testid="lc-line-endpoint"][data-endpoint="end"]')
+    const box = await endpoint.boundingBox()
+    assert.ok(box)
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    await endpoint.dispatchEvent('pointercancel', { bubbles: true, pointerId: 1, pointerType: 'mouse', isPrimary: true, button: -1 })
+    await page.mouse.up()
+    const before = await recordBoundary(page, 'before-save', scenario, 'pointer-cancel-before-move')
+    assert.equal(before.editMode, true)
+    assert.equal(before.dirty, false)
+    assert.ok(before.pointerEvents.some(event => event.type === 'pointercancel'))
+    await page.locator('[data-testid="lc-line-toolbar"] button').first().click()
+    await page.waitForTimeout(250)
+    const afterClick = await recordBoundary(page, 'after-save-click', scenario, 'pointer-cancel-before-move')
+    assert.equal(afterClick.appWriteCallCount, 0)
+    await page.close()
+  }
 })
 
 test('touch pointer drags the start endpoint as draft only and authorized APPLIED commits it', async () => {

@@ -57,6 +57,8 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          export LC_SAVE_DIAGNOSTIC_MODE=matrix
+          export LC_SAVE_EVIDENCE_PATH="$RUNNER_TEMP/nepk-v1-1-evidence/line-save-diagnostics.json"
           pnpm --dir tests/line-crossing-ui test 2>&1 | tee "$RUNNER_TEMP/nepk-v1-1-evidence/ui-runtime-bridge.log"
           python -m unittest discover -s tests/nepk-v1_1 -v 2>&1 | tee "$RUNNER_TEMP/nepk-v1-1-evidence/nepk-positive-negative.log"
 
