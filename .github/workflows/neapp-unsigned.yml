@@ -1,0 +1,127 @@
+name: NEAPP Unsigned Verification
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.3'
+
+      - name: Prepare evidence directory
+        run: mkdir -p "$RUNNER_TEMP/neapp-unsigned-evidence"
+
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@11.5.2
+
+      - name: Install ARM compiler and H.264 tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes gcc-arm-none-eabi binutils-arm-none-eabi ffmpeg
+
+      - name: Install Python verifier dependency
+        run: python -m pip install --disable-pip-version-check cryptography==48.0.0
+
+      - name: Prepare browser test dependencies
+        run: |
+          pnpm --dir tests/line-crossing-ui install --frozen-lockfile --ignore-scripts
+          npm ci --prefix tests/line-crossing-ui/browser-runner --ignore-scripts
+          npx --yes playwright@1.64.0 install --with-deps chromium
+
+      - name: Build real Line Crossing v4 ELF
+        run: |
+          make -C apps/line-crossing/app elf-v4 V4_APP_VERSION=4.0.0
+          sha256sum apps/line-crossing/app/build/lc-line-crossing-v4.elf > "$RUNNER_TEMP/neapp-unsigned-evidence/real-elf-sha256.txt"
+
+      - name: Run UI, H.264, runtime, bridge, and unsigned-package positive and negative acceptance
+        shell: bash
+        run: |
+          set -o pipefail
+          export LC_SAVE_DIAGNOSTIC_MODE=matrix
+          export LC_SAVE_EVIDENCE_PATH="$RUNNER_TEMP/neapp-unsigned-evidence/line-save-diagnostics.json"
+          pnpm --dir tests/line-crossing-ui test 2>&1 | tee "$RUNNER_TEMP/neapp-unsigned-evidence/ui-runtime-bridge.log"
+          python -m unittest discover -s tests/unsigned -v 2>&1 | tee "$RUNNER_TEMP/neapp-unsigned-evidence/unsigned-format.log"
+          python -m unittest discover -s tests/nepk-v1_1 -v 2>&1 | tee "$RUNNER_TEMP/neapp-unsigned-evidence/legacy-signed-format-regression.log"
+
+      - name: Build and independently verify the real unsigned package
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/neapp-unsigned-evidence"
+          python package/unsigned/neapp_pack_v5.py \
+            --elf apps/line-crossing/app/build/lc-line-crossing-v4.elf \
+            --ui-assets tests/line-crossing-ui/.build/production \
+            --out "$RUNNER_TEMP/line-crossing-4.0.0.neapp" \
+            --app-id line-crossing \
+            --native-version 4.0.0 \
+            --ui-version 1.0.0 \
+            --source-commit "$GITHUB_SHA"
+          python package/unsigned/neapp_verify_v5.py \
+            --package "$RUNNER_TEMP/line-crossing-4.0.0.neapp" \
+            --compact > "$evidence_dir/unsigned-package-verification.json"
+          sha256sum "$RUNNER_TEMP/line-crossing-4.0.0.neapp" > "$evidence_dir/unsigned-package-sha256.txt"
+          python - "$evidence_dir/unsigned-package-verification.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          if report.get("result") != "PASS":
+              raise SystemExit("unsigned NEAPP v5 package failed independent verification")
+          Path(sys.argv[1]).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Record verification run metadata
+        if: always()
+        env:
+          VERIFICATION_RESULT: ${{ job.status }}
+        run: |
+          python - "$RUNNER_TEMP/neapp-unsigned-evidence/ci-summary.json" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          Path(sys.argv[1]).write_text(json.dumps({
+              "workflow": "NEAPP Unsigned Verification",
+              "result": os.environ["VERIFICATION_RESULT"],
+              "source_sha": os.environ["GITHUB_SHA"],
+              "run_id": os.environ["GITHUB_RUN_ID"],
+              "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "signing_inputs_required": False,
+              "installable_neapp_artifact_uploaded": False,
+          }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: neapp-unsigned-verification-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/neapp-unsigned-evidence/*.json
+            ${{ runner.temp }}/neapp-unsigned-evidence/*.log
+            ${{ runner.temp }}/neapp-unsigned-evidence/*.txt
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 0

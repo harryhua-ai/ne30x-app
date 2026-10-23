@@ -184,3 +184,21 @@ elf-v4: $(V4_ELF)
 
 clean-v4:
 	rm -f $(V4_OBJS) $(V4_ELF)
+
+V5_UI_DIR ?= $(ROOT_DIR)/tests/line-crossing-ui/.build/production
+V5_OUT_DIR ?= $(BUILD)/pkg
+V5_UI_VERSION ?= 1.0.0
+
+.PHONY: neapp-v5
+
+neapp-v5: $(V4_ELF)
+	mkdir -p $(V5_OUT_DIR)
+	$(PYTHON) $(ROOT_DIR)/package/unsigned/neapp_pack_v5.py \
+		--elf $(V4_ELF) --ui-assets $(V5_UI_DIR) \
+		--out $(V5_OUT_DIR)/line-crossing-$(V4_APP_VERSION).neapp \
+		--app-id $(APP_ID) --native-version $(V4_APP_VERSION) --ui-version $(V5_UI_VERSION)
+	$(PYTHON) $(ROOT_DIR)/package/unsigned/neapp_verify_v5.py \
+		--package $(V5_OUT_DIR)/line-crossing-$(V4_APP_VERSION).neapp --compact
+
+clean-v5:
+	rm -rf $(V5_OUT_DIR)

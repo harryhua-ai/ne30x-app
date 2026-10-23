@@ -1,0 +1,82 @@
+{
+  "app_id": "line-crossing",
+  "artifact_type": "unsigned NEAPP v5 package",
+  "format": "neapp-v5-unsigned",
+  "generator": "neapp_pack_v5.py 5.0.0",
+  "native_build": {
+    "elf_entry": 2480933493,
+    "elf_sha256": "7cc5d34b46f041241cef2d66018f47a54dc4313be4d3434ccefee39deadb70a3",
+    "entry_offset": 2676,
+    "image_len": 25864,
+    "image_sha256": "04ceafe8317773653c33e8ed3f9edef5880d66f0200773c8c1d80b19e2cfca10",
+    "member_len": 26072,
+    "member_sha256": "603e0bd56905686e96d3dc7b95f6273d74f70b34696a43e9b7954f74cc29d9a0",
+    "payload_len": 25832,
+    "payload_sha256": "48af9318e33fd27883600eca518d73629acbf91a1b3b80fc7d7f4cbb8a42ce37",
+    "target_addr": 2480930816
+  },
+  "native_version": [
+    4,
+    0,
+    0
+  ],
+  "package": {
+    "len": 474854,
+    "sha256": "18f206e78114730dda99df9ea236a01fd2b5f3cc3e8c433bb5e200a1bc1988c7"
+  },
+  "signing_dependencies": "none: no private key, no SPKI, no signature, no sequence ledger",
+  "source_commit": "86894d8c8afb9cec53d53087e9e34535ae52d6fc",
+  "toolchain": {
+    "arm_none_eabi_gcc": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+    "python": "3.14.4"
+  },
+  "ui_build": {
+    "asset_count": 7,
+    "asset_records": [
+      {
+        "file_len": 6939,
+        "path": "assets/FileSaver.min-D428eXCv.js",
+        "sha256": "37ca34e7ab99ebf9a005aaaee56a1004b196411f9410a0cd25c0ebf9024b7aec"
+      },
+      {
+        "file_len": 41608,
+        "path": "assets/index-D-isHcyK.css",
+        "sha256": "caa915f0cbaf7e9b499bebc8b7232cc85b96c359c8a3230040dee379794021f1"
+      },
+      {
+        "file_len": 295715,
+        "path": "assets/index-DyRIIOMz.js",
+        "sha256": "450a3f70dcbe7369bc80fc5bc32d2ddc2476676de6f50be70b7aa07d343dadee"
+      },
+      {
+        "file_len": 100839,
+        "path": "assets/jmuxer.min.js",
+        "sha256": "87b8dac054a9d2e06dacb8eccb1b3580c39af8634180bc36012c1b7d958c7442"
+      },
+      {
+        "file_len": 682,
+        "path": "assets/videoWorker-CwSEKqUk.js",
+        "sha256": "0f07f17eac982a2ff1eeff58b50c41a69d5237363397cd2ce5415a7c9ea0f439"
+      },
+      {
+        "file_len": 2000,
+        "path": "assets/websocket-init-yiJ-u6et.js",
+        "sha256": "9987a6188be31e521fa577338e11d85b2bfaa0ce4b67b263bdbcde3931df6800"
+      },
+      {
+        "file_len": 399,
+        "path": "index.html",
+        "sha256": "d46f6db9f6246ec87bdf0bd6b0b2ef4ddb0022e93334e969ddb27445662c4f88"
+      }
+    ],
+    "asset_tree_sha256": "5160a73ebda81a0e07ae8f74f0d7956eeba3b0c0bf95620f71e48212f7032799",
+    "member_len": 448766,
+    "member_sha256": "659b8c529eda6debf8380cb0cea4dc7279e3fa9c481b7b99139b8a34b1697591"
+  },
+  "ui_version": [
+    1,
+    0,
+    0
+  ],
+  "verification_boundary": "offline unsigned-format verification only: SHA-256 here checks container/member consistency, never publisher authenticity or anti-rollback; NOT Host admission, install, execution, or device acceptance"
+}
