@@ -16,7 +16,7 @@ from neapp_v4_image import ELF_HEADER, ELF_PROGRAM_HEADER
 
 FIXTURE_APP_ID = "line-crossing"
 FIXTURE_NATIVE_VERSION = (4, 0, 0)
-FIXTURE_UI_VERSION = (1, 0, 0)
+FIXTURE_UI_VERSION = (1, 1, 1)
 FIXTURE_MARKER = b"line-crossing-app 4.0.0: v4 session entry"
 FIXTURE_ASSETS = (
     ("index.html", b"<!doctype html><title>line-crossing</title><p>fixture</p>\n"),
@@ -57,7 +57,7 @@ def pack_fixture(elf_path: Path, ui_root: Path, output_path: Path,
         elf_path, ui_root, output_path, FIXTURE_APP_ID,
         FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION,
         v4.CAP_LOG | v4.CAP_TICK_MS | v4.CAP_SESSION_LIFECYCLE | v4.CAP_CONTROL_RECEIVE,
-        0, 0, 0, 256, 0, 0, 0, None,
+        0, 0, 0, 256, 0, 0, 0,
         source_commit="fixture",
         provenance_path=provenance_path,
     )

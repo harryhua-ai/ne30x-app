@@ -9,8 +9,8 @@
     "entry_offset": 0,
     "image_len": 73,
     "image_sha256": "0d4ef7ac4cec1fb6f9c40b1d17ce26e1cb7f96c1cb9c28bb4772b8cb05ab3c21",
-    "member_len": 281,
-    "member_sha256": "fe7b1345e88b10a0b876d525b52e00daf4109bca9f1db52dc5c847a004257cef",
+    "member_len": 297,
+    "member_sha256": "787db29bb3dd0a134f0fd49b75c47c0726b96fb5705a575f7f4e681f2acea3fc",
     "payload_len": 41,
     "payload_sha256": "cd7d7c3e3aff670bba790dda4b30d7145036d738ee414a94739077fed51283e4",
     "target_addr": 2480930816
@@ -21,11 +21,11 @@
     0
   ],
   "package": {
-    "len": 716,
-    "sha256": "0b35833f7fc052de85b99ba7138f2f5db3f9356e2e56e1172cf6675806dc5356"
+    "len": 740,
+    "sha256": "a39d741340be65bc48b980637be6cfba397408b9d45c7c11051438c26fae4191"
   },
   "signing_dependencies": "none: no private key, no SPKI, no signature, no sequence ledger",
-  "source_commit": "fixture-generation",
+  "source_commit": "fixture",
   "toolchain": {
     "arm_none_eabi_gcc": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
     "python": "3.14.4"
@@ -50,13 +50,13 @@
       }
     ],
     "asset_tree_sha256": "96b65f97686f4d0f736a6aff37428e4bcb3d7077a24c5514fd224f700f81d491",
-    "member_len": 419,
-    "member_sha256": "f1937ceb795f145029a458fa75aae24e51e3779bb1b74f96d59ed472ed4c7b72"
+    "member_len": 427,
+    "member_sha256": "d131b73856e17965137f4d75b20b6fb76412413c284fbbe796655465f54ae552"
   },
   "ui_version": [
     1,
-    0,
-    0
+    1,
+    1
   ],
   "verification_boundary": "offline unsigned-format verification only: SHA-256 here checks container/member consistency, never publisher authenticity or anti-rollback; NOT Host admission, install, execution, or device acceptance"
 }

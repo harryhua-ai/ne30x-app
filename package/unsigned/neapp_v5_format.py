@@ -17,24 +17,32 @@ import neui_sidecar_format as ui
 
 CONTAINER_MAGIC = bytes.fromhex("4e45415050050000")
 HEADER_LEN = 16
+NATIVE_MEMBER_MAGIC = CONTAINER_MAGIC
+NATIVE_MEMBER_HEADER_LEN = 16
 MANIFEST_MAGIC = b"NMF5"
 MANIFEST_LEN = 208
 PUBLISHER_SLOT_OFF = 4
 PUBLISHER_SLOT_LEN = 16
 PUBLISHER_KEY_SLOT_OFF = 128
 PUBLISHER_KEY_SLOT_LEN = 32
-MIN_NATIVE_MEMBER_LEN = MANIFEST_LEN + v4.NATIVE_HEADER_SIZE + 1
-MAX_NATIVE_MEMBER_LEN = MANIFEST_LEN + v4.MAX_NATIVE_FILE_LEN
+MIN_NATIVE_MEMBER_LEN = NATIVE_MEMBER_HEADER_LEN + MANIFEST_LEN + v4.NATIVE_HEADER_SIZE
+MAX_NATIVE_MEMBER_LEN = NATIVE_MEMBER_HEADER_LEN + MANIFEST_LEN + v4.MAX_NATIVE_FILE_LEN
 
-UI_MEMBER_MAGIC = bytes.fromhex("4e45554905000000")
+UI_MEMBER_MAGIC = b"NEUI\x02\x00\x00\x00"
 UI_HEADER_LEN = 16
 UI_PUBLISHER_SLOT_OFF = 0
 UI_PUBLISHER_SLOT_LEN = 16
 UI_PUBLISHER_KEY_SLOT_OFF = 48
 UI_PUBLISHER_KEY_SLOT_LEN = 32
 UI_NATIVE_BINDING_OFF = 80
-MIN_UI_MEMBER_LEN = UI_HEADER_LEN + ui.MIN_MANIFEST_LEN + ui.MIN_ASSET_PAYLOAD_LEN
-MAX_UI_MEMBER_LEN = UI_HEADER_LEN + ui.MAX_MANIFEST_LEN + ui.MAX_ASSET_PAYLOAD_LEN
+UI_NATIVE_VERSION_OFF = 124
+UI_RESERVED_TAIL_OFF = 130
+UI_RESERVED_TAIL_LEN = 6
+UI_MANIFEST_FIXED_LEN = 136
+MIN_UI_MANIFEST_LEN = UI_MANIFEST_FIXED_LEN + ui.RECORD_FIXED_LEN + ui.MIN_PATH_LEN
+MAX_UI_MANIFEST_LEN = ui.MAX_MANIFEST_LEN
+MIN_UI_MEMBER_LEN = UI_HEADER_LEN + MIN_UI_MANIFEST_LEN + ui.MIN_ASSET_PAYLOAD_LEN
+MAX_UI_MEMBER_LEN = UI_HEADER_LEN + MAX_UI_MANIFEST_LEN + ui.MAX_ASSET_PAYLOAD_LEN
 
 MIN_PACKAGE_LEN = HEADER_LEN + MIN_NATIVE_MEMBER_LEN + MIN_UI_MEMBER_LEN
 MAX_PACKAGE_LEN = HEADER_LEN + MAX_NATIVE_MEMBER_LEN + MAX_UI_MEMBER_LEN
@@ -87,7 +95,7 @@ class ManifestV5:
     required_psram_mib: int
     required_host_abi: int
     required_host_caps: int
-    required_exec_region_bytes: int
+    native_payload_len: int
     native_file_len: int
     native_image_size: int
     native_entry_offset: int
@@ -122,6 +130,8 @@ def build_manifest_v5(m: ManifestV5) -> bytes:
                              m.snapshot_max, m.live_publish_max, m.live_track_max)
     if m.native_file_len != v4.NATIVE_HEADER_SIZE + m.native_image_size:
         raise v4.BadPackage("native_file_len != 32 + native_image_size")
+    if m.native_payload_len != m.native_image_size:
+        raise v4.BadPackage("native_payload_len != native_image_size")
     if len(m.native_file_sha256) != 32:
         raise v4.BadPackage("native_file_sha256 must be 32 bytes")
     out = bytearray(MANIFEST_LEN)
@@ -135,7 +145,7 @@ def build_manifest_v5(m: ManifestV5) -> bytes:
     out[64:68] = struct.pack("<I", m.required_psram_mib)
     out[68:72] = struct.pack("<I", m.required_host_abi)
     out[72:76] = struct.pack("<I", m.required_host_caps)
-    out[76:80] = struct.pack("<I", m.required_exec_region_bytes)
+    out[76:80] = struct.pack("<I", m.native_payload_len)
     out[80:84] = struct.pack("<I", m.native_file_len)
     out[84:88] = struct.pack("<I", m.native_image_size)
     out[88:92] = struct.pack("<I", m.native_entry_offset)
@@ -176,7 +186,7 @@ def parse_manifest_v5(raw: bytes) -> ManifestV5:
     vmaj, vmin, vpat = struct.unpack_from("<HHH", raw, 52)
     if vmaj < 1:
         raise v4.BadPackage(f"version_major {vmaj} must be >= 1")
-    (board, psram, abi, caps, exec_region, file_len, image_size, entry, target) = (
+    (board, psram, abi, caps, payload_len, file_len, image_size, entry, target) = (
         struct.unpack_from("<9I", raw, 60))
     if abi != v4.HOST_ABI_V4:
         raise v4.BadPackage(
@@ -194,7 +204,7 @@ def parse_manifest_v5(raw: bytes) -> ManifestV5:
         required_psram_mib=psram,
         required_host_abi=abi,
         required_host_caps=caps,
-        required_exec_region_bytes=exec_region,
+        native_payload_len=payload_len,
         native_file_len=file_len,
         native_image_size=image_size,
         native_entry_offset=entry,
@@ -220,20 +230,31 @@ class UiManifestV5:
     version_patch: int
     file_count: int
     host_ui_abi: int
+    native_version_major: int
+    native_version_minor: int
+    native_version_patch: int
     records: tuple[ui.AssetRecord, ...]
 
     @property
     def version_tuple(self) -> tuple[int, int, int]:
         return (self.version_major, self.version_minor, self.version_patch)
 
+    @property
+    def native_version_tuple(self) -> tuple[int, int, int]:
+        return (self.native_version_major, self.native_version_minor, self.native_version_patch)
+
 
 def build_ui_manifest_v5(m: UiManifestV5) -> bytes:
     v4.validate_identifier("app_id", m.app_id.encode("ascii"), 32)
     if not ui.MIN_FILE_COUNT <= m.file_count <= ui.MAX_FILE_COUNT:
         raise v4.BadPackage(f"file_count {m.file_count} outside {ui.MIN_FILE_COUNT}..{ui.MAX_FILE_COUNT}")
-    if m.version_major < 1:
-        raise v4.BadPackage(f"ui_version_major {m.version_major} must be >= 1")
-    for name, v in (("version_minor", m.version_minor), ("version_patch", m.version_patch)):
+    if min(m.version_major, m.version_minor, m.version_patch) < 1:
+        raise v4.BadPackage(
+            f"ui version ({m.version_major},{m.version_minor},{m.version_patch}) segments must all be nonzero")
+    for name, v in (("version_major", m.version_major), ("version_minor", m.version_minor),
+                    ("version_patch", m.version_patch), ("native_version_major", m.native_version_major),
+                    ("native_version_minor", m.native_version_minor),
+                    ("native_version_patch", m.native_version_patch)):
         if not 0 <= v <= 0xFFFF:
             raise v4.BadPackage(f"{name} out of u16 range: {v}")
     if m.host_ui_abi != ui.HOST_UI_ABI_V1:
@@ -242,7 +263,7 @@ def build_ui_manifest_v5(m: UiManifestV5) -> bytes:
         raise v4.BadPackage("file_count does not match the record list")
     if len(m.native_member_sha256) != 32:
         raise v4.BadPackage("native_member_sha256 must be 32 bytes")
-    out = bytearray(ui.MANIFEST_FIXED_LEN)
+    out = bytearray(UI_MANIFEST_FIXED_LEN)
     out[UI_PUBLISHER_SLOT_OFF:UI_PUBLISHER_SLOT_OFF + UI_PUBLISHER_SLOT_LEN] = (
         b"\x00" * UI_PUBLISHER_SLOT_LEN)
     out[16:48] = m.app_id.encode("ascii").ljust(32, b"\x00")
@@ -252,7 +273,8 @@ def build_ui_manifest_v5(m: UiManifestV5) -> bytes:
     struct.pack_into("<HHH", out, 112, m.version_major, m.version_minor, m.version_patch)
     struct.pack_into("<H", out, 118, m.file_count)
     struct.pack_into("<I", out, 120, m.host_ui_abi)
-    struct.pack_into("<I", out, 124, 0)
+    struct.pack_into("<HHH", out, UI_NATIVE_VERSION_OFF,
+                     m.native_version_major, m.native_version_minor, m.native_version_patch)
     for rec in m.records:
         path_bytes = ui.validate_asset_path(rec.path.encode("ascii")).encode("ascii")
         if not ui.MIN_FILE_LEN <= rec.file_len <= ui.MAX_FILE_LEN:
@@ -262,35 +284,39 @@ def build_ui_manifest_v5(m: UiManifestV5) -> bytes:
         if len(rec.sha256) != 32:
             raise v4.BadPackage("record sha256 must be 32 bytes")
         out += struct.pack("<HI", len(path_bytes), rec.file_len) + rec.sha256 + path_bytes
-    if len(out) > ui.MAX_MANIFEST_LEN:
-        raise v4.BadPackage(f"manifest is {len(out)} bytes, above the {ui.MAX_MANIFEST_LEN}-byte cap")
+    if len(out) > MAX_UI_MANIFEST_LEN:
+        raise v4.BadPackage(f"manifest is {len(out)} bytes, above the {MAX_UI_MANIFEST_LEN}-byte cap")
     return bytes(out)
 
 
 def parse_ui_manifest_v5(raw: bytes) -> UiManifestV5:
-    if len(raw) < ui.MANIFEST_FIXED_LEN:
+    if len(raw) < UI_MANIFEST_FIXED_LEN:
         raise v4.BadPackage(
-            f"ui manifest is {len(raw)} bytes, shorter than the {ui.MANIFEST_FIXED_LEN}-byte fixed block")
+            f"ui manifest is {len(raw)} bytes, shorter than the {UI_MANIFEST_FIXED_LEN}-byte fixed block")
     if raw[UI_PUBLISHER_SLOT_OFF:UI_PUBLISHER_SLOT_OFF + UI_PUBLISHER_SLOT_LEN] != (
             b"\x00" * UI_PUBLISHER_SLOT_LEN):
         raise v4.BadPackage("v5 ui manifest publisher_id slot must be all zero (no publisher trust)")
     if raw[UI_PUBLISHER_KEY_SLOT_OFF:UI_PUBLISHER_KEY_SLOT_OFF + UI_PUBLISHER_KEY_SLOT_LEN] != (
             b"\x00" * UI_PUBLISHER_KEY_SLOT_LEN):
         raise v4.BadPackage("v5 ui manifest publisher_key_sha256 slot must be all zero (no key trust)")
+    if raw[UI_RESERVED_TAIL_OFF:UI_RESERVED_TAIL_OFF + UI_RESERVED_TAIL_LEN] != (
+            b"\x00" * UI_RESERVED_TAIL_LEN):
+        raise v4.BadPackage("v5 ui manifest reserved tail (130..135) must be all zero")
     app_id = v4.validate_identifier("app_id", raw[16:48], 32)
     version_major, version_minor, version_patch = struct.unpack_from("<HHH", raw, 112)
-    if version_major < 1:
-        raise v4.BadPackage(f"ui_version_major {version_major} must be >= 1")
+    if min(version_major, version_minor, version_patch) < 1:
+        raise v4.BadPackage(
+            f"ui version ({version_major},{version_minor},{version_patch}) segments must all be nonzero")
     file_count = struct.unpack_from("<H", raw, 118)[0]
     if not ui.MIN_FILE_COUNT <= file_count <= ui.MAX_FILE_COUNT:
         raise v4.BadPackage(f"file_count {file_count} outside {ui.MIN_FILE_COUNT}..{ui.MAX_FILE_COUNT}")
     host_ui_abi = struct.unpack_from("<I", raw, 120)[0]
     if host_ui_abi != ui.HOST_UI_ABI_V1:
         raise v4.BadPackage(f"host_ui_abi {host_ui_abi} is not {ui.HOST_UI_ABI_V1}")
-    if struct.unpack_from("<I", raw, 124)[0] != 0:
-        raise v4.BadPackage("ui manifest reserved_u32 is not zero")
+    native_version_major, native_version_minor, native_version_patch = (
+        struct.unpack_from("<HHH", raw, UI_NATIVE_VERSION_OFF))
     records: list[ui.AssetRecord] = []
-    pos = ui.MANIFEST_FIXED_LEN
+    pos = UI_MANIFEST_FIXED_LEN
     running_len = 0
     for index in range(file_count):
         if pos + ui.RECORD_FIXED_LEN > len(raw):
@@ -337,6 +363,9 @@ def parse_ui_manifest_v5(raw: bytes) -> UiManifestV5:
         version_patch=version_patch,
         file_count=file_count,
         host_ui_abi=host_ui_abi,
+        native_version_major=native_version_major,
+        native_version_minor=native_version_minor,
+        native_version_patch=native_version_patch,
         records=tuple(records),
     )
 
@@ -344,11 +373,14 @@ def parse_ui_manifest_v5(raw: bytes) -> UiManifestV5:
 def build_package_v5(manifest: bytes, image: bytes, ui_manifest: bytes, ui_payload: bytes) -> bytes:
     if len(manifest) != MANIFEST_LEN:
         raise v4.BadPackage("native manifest must be exactly 208 bytes")
-    if not ui.MIN_MANIFEST_LEN <= len(ui_manifest) <= ui.MAX_MANIFEST_LEN:
-        raise v4.BadPackage("ui manifest length is outside the NEUI limits")
+    if not MIN_UI_MANIFEST_LEN <= len(ui_manifest) <= MAX_UI_MANIFEST_LEN:
+        raise v4.BadPackage(f"ui manifest length is outside {MIN_UI_MANIFEST_LEN}..{MAX_UI_MANIFEST_LEN}")
     if not ui.MIN_ASSET_PAYLOAD_LEN <= len(ui_payload) <= ui.MAX_ASSET_PAYLOAD_LEN:
         raise v4.BadPackage("ui payload length is outside the NEUI limits")
-    native_member = manifest + image
+    native_member = (NATIVE_MEMBER_MAGIC
+                     + struct.pack("<II", MANIFEST_LEN, len(image))
+                     + manifest
+                     + image)
     ui_member = (UI_MEMBER_MAGIC
                  + struct.pack("<I", len(ui_manifest))
                  + struct.pack("<I", len(ui_payload))
@@ -411,8 +443,17 @@ def _verify_impl(data, policy, host_admission):
 
     native_member = data[HEADER_LEN:HEADER_LEN + native_len]
     ui_member = data[HEADER_LEN + native_len:total_len]
-    manifest = parse_manifest_v5(native_member[:MANIFEST_LEN])
-    image = native_member[MANIFEST_LEN:]
+    if len(native_member) < NATIVE_MEMBER_HEADER_LEN or native_member[0:8] != NATIVE_MEMBER_MAGIC:
+        raise v4.BadPackage("native member header magic is not the unsigned NEAPP v5 member magic")
+    member_manifest_len, member_image_len = struct.unpack_from("<II", native_member, 8)
+    if member_manifest_len != MANIFEST_LEN or len(native_member) != (
+            NATIVE_MEMBER_HEADER_LEN + member_manifest_len + member_image_len):
+        raise v4.BadPackage(
+            "native member bounds mismatch: expected 16 + manifest_len(208) + image_len, "
+            "the unsigned v5 native member carries no signature trailer")
+    manifest = parse_manifest_v5(
+        native_member[NATIVE_MEMBER_HEADER_LEN:NATIVE_MEMBER_HEADER_LEN + MANIFEST_LEN])
+    image = native_member[NATIVE_MEMBER_HEADER_LEN + MANIFEST_LEN:]
 
     if manifest.native_file_len != len(image):
         raise v4.BadPackage(
@@ -451,9 +492,8 @@ def _verify_impl(data, policy, host_admission):
         raise v4.BadPackage("native payload CRC-32 mismatch")
     if not constant_time_eq(hashlib.sha256(image).digest(), manifest.native_file_sha256):
         raise v4.BadPackage("manifest native_file_sha256 does not match the native image bytes")
-    if manifest.required_exec_region_bytes < manifest.native_image_size:
-        raise v4.BadPackage(
-            "required_exec_region_bytes is smaller than native_image_size (payload residency)")
+    if manifest.native_payload_len != manifest.native_image_size:
+        raise v4.BadPackage("manifest native_payload_len != native_image_size")
     v4.validate_policy_shape(manifest.required_host_caps, manifest.run_profile, manifest.event_max,
                              manifest.state_quota, manifest.report_max, manifest.control_max,
                              manifest.snapshot_max, manifest.live_publish_max, manifest.live_track_max)
@@ -462,13 +502,13 @@ def _verify_impl(data, policy, host_admission):
         raise v4.BadPackage(f"ui member is {len(ui_member)} bytes, shorter than its {UI_HEADER_LEN}-byte header")
     if ui_member[0:8] != UI_MEMBER_MAGIC:
         raise v4.BadPackage(
-            "ui member magic is not unsigned NEUI v5 (4e455549 05 00 00 00); a signed NEUI v1 "
+            "ui member magic is not unsigned NEUI v5 (4e455549 02 00 00 00); a signed NEUI v1 "
             "sidecar is a legacy signed format and is foreign input"
         )
     ui_manifest_len, ui_payload_len = struct.unpack_from("<II", ui_member, 8)
-    if not ui.MIN_MANIFEST_LEN <= ui_manifest_len <= ui.MAX_MANIFEST_LEN:
+    if not MIN_UI_MANIFEST_LEN <= ui_manifest_len <= MAX_UI_MANIFEST_LEN:
         raise v4.BadPackage(
-            f"ui manifest_len {ui_manifest_len} outside {ui.MIN_MANIFEST_LEN}..{ui.MAX_MANIFEST_LEN}")
+            f"ui manifest_len {ui_manifest_len} outside {MIN_UI_MANIFEST_LEN}..{MAX_UI_MANIFEST_LEN}")
     if not ui.MIN_ASSET_PAYLOAD_LEN <= ui_payload_len <= ui.MAX_ASSET_PAYLOAD_LEN:
         raise v4.BadPackage(
             f"ui asset_payload_len {ui_payload_len} outside "
@@ -493,6 +533,12 @@ def _verify_impl(data, policy, host_admission):
         raise MemberMismatch(
             f"ui manifest app_id {ui_manifest.app_id!r} != native manifest app_id "
             f"{manifest.app_id!r} (cross-App binding)")
+    if ui_manifest.native_version_tuple != (
+            manifest.version_major, manifest.version_minor, manifest.version_patch):
+        raise MemberMismatch(
+            f"ui manifest native version {ui_manifest.native_version_tuple} != native manifest "
+            f"version {(manifest.version_major, manifest.version_minor, manifest.version_patch)} "
+            "(Native/UI binding)")
     cursor = 0
     for rec in ui_manifest.records:
         chunk = ui_payload[cursor:cursor + rec.file_len]
@@ -546,9 +592,9 @@ def _verify_impl(data, policy, host_admission):
         raise v4.ResourceLimit(
             f"native target_addr {target:#010x}+{manifest.native_file_len}B outside the Host "
             f"loader range {policy.loader_base:#010x}..{range_hi:#010x}")
-    if host_admission and manifest.required_exec_region_bytes > policy.exec_region_bytes:
+    if host_admission and manifest.native_image_size > policy.exec_region_bytes:
         raise v4.ResourceLimit(
-            f"required_exec_region_bytes {manifest.required_exec_region_bytes} exceeds the Host "
+            f"native_image_size {manifest.native_image_size} exceeds the Host "
             f"actual execution region {policy.exec_region_bytes}")
 
     report = {
@@ -561,6 +607,7 @@ def _verify_impl(data, policy, host_admission):
         "ui_version": (
             f"{ui_manifest.version_major}.{ui_manifest.version_minor}.{ui_manifest.version_patch}"
         ),
+        "ui_native_version": ".".join(str(part) for part in ui_manifest.native_version_tuple),
         "native_member_len": native_len,
         "native_member_sha256": sha256_hex(native_member),
         "native_file_len": manifest.native_file_len,
@@ -573,7 +620,7 @@ def _verify_impl(data, policy, host_admission):
         "required_psram_mib": manifest.required_psram_mib,
         "required_host_abi": f"{manifest.required_host_abi:#010x}",
         "required_host_caps": f"{manifest.required_host_caps:#x}",
-        "required_exec_region_bytes": manifest.required_exec_region_bytes,
+        "native_payload_len": manifest.native_payload_len,
         "run_profile": manifest.run_profile,
         "event_max": manifest.event_max,
         "state_quota": manifest.state_quota,

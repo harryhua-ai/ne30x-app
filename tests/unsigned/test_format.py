@@ -43,7 +43,8 @@ class V5FormatPositiveTests(unittest.TestCase):
         self.assertEqual(report["format"], "neapp-v5-unsigned")
         self.assertEqual(report["app_id"], "line-crossing")
         self.assertEqual(report["native_version"], "4.0.0")
-        self.assertEqual(report["ui_version"], "1.0.0")
+        self.assertEqual(report["ui_version"], "1.1.1")
+        self.assertEqual(report["ui_native_version"], "4.0.0")
         self.assertEqual(report["package_len"], len(self.package))
         self.assertEqual(report["package_sha256"], hashlib.sha256(self.package).hexdigest())
         self.assertEqual(report["ui_file_count"], 3)
@@ -54,13 +55,18 @@ class V5FormatPositiveTests(unittest.TestCase):
         self.assertEqual(self.package[0:8], v5.CONTAINER_MAGIC)
         self.assertEqual(v5.HEADER_LEN + native_len + ui_len, len(self.package))
         native = self.package[16:16 + native_len]
-        self.assertEqual(native[0:4], v5.MANIFEST_MAGIC)
-        self.assertEqual(native[4:20], b"\x00" * 16)
-        self.assertEqual(native[128:160], b"\x00" * 32)
+        self.assertEqual(native[0:8], v5.NATIVE_MEMBER_MAGIC)
+        self.assertEqual(struct.unpack_from("<II", native, 8),
+                         (v5.MANIFEST_LEN, native_len - v5.NATIVE_MEMBER_HEADER_LEN - v5.MANIFEST_LEN))
+        self.assertEqual(native[16:20], v5.MANIFEST_MAGIC)
+        self.assertEqual(native[16 + 4:16 + 20], b"\x00" * 16)
+        self.assertEqual(native[16 + 128:16 + 160], b"\x00" * 32)
         ui_member = self.package[16 + native_len:]
         self.assertEqual(ui_member[0:8], v5.UI_MEMBER_MAGIC)
         self.assertEqual(ui_member[16 + 48:16 + 80], b"\x00" * 32)
         self.assertEqual(ui_member[16 + 80:16 + 112], hashlib.sha256(native).digest())
+        self.assertEqual(ui_member[16 + 124:16 + 130], struct.pack("<HHH", 4, 0, 0))
+        self.assertEqual(ui_member[16 + 130:16 + 136], b"\x00" * 6)
 
     def test_policy_fields_follow_the_frozen_v4_conventions(self):
         report, _ = v5.verify_package_v5(self.package)
@@ -109,7 +115,7 @@ class V5FormatNegativeTests(unittest.TestCase):
 
     def test_native_content_tamper_is_rejected(self):
         data = bytearray(self.package)
-        data[16 + v5.MANIFEST_LEN + v4.NATIVE_HEADER_SIZE] ^= 1
+        data[16 + v5.NATIVE_MEMBER_HEADER_LEN + v5.MANIFEST_LEN + v4.NATIVE_HEADER_SIZE] ^= 1
         _, error = v5.verify_package_v5(bytes(data))
         self.assertIsNotNone(error)
         self.assertEqual(error.code, "BAD_PACKAGE")
@@ -142,7 +148,7 @@ class V5FormatNegativeTests(unittest.TestCase):
                                    (v5.PUBLISHER_KEY_SLOT_OFF, v5.PUBLISHER_KEY_SLOT_LEN)):
             with self.subTest(slot_off=slot_off):
                 data = bytearray(self.package)
-                data[16 + slot_off] = 1
+                data[16 + v5.NATIVE_MEMBER_HEADER_LEN + slot_off] = 1
                 _, error = v5.verify_package_v5(bytes(data))
                 self.assertIsNotNone(error)
                 self.assertEqual(error.code, "BAD_PACKAGE")
@@ -151,6 +157,20 @@ class V5FormatNegativeTests(unittest.TestCase):
     def test_ui_member_trust_slot_is_rejected_when_nonzero(self):
         data = bytearray(self.package)
         data[16 + self.native_len + v5.UI_HEADER_LEN + v5.UI_PUBLISHER_KEY_SLOT_OFF] = 1
+        _, error = v5.verify_package_v5(bytes(data))
+        self.assertIsNotNone(error)
+        self.assertEqual(error.code, "BAD_PACKAGE")
+
+    def test_ui_native_version_mismatch_is_rejected(self):
+        data = bytearray(self.package)
+        data[16 + self.native_len + v5.UI_HEADER_LEN + v5.UI_NATIVE_VERSION_OFF] ^= 1
+        _, error = v5.verify_package_v5(bytes(data))
+        self.assertIsNotNone(error)
+        self.assertEqual(error.code, "MEMBER_MISMATCH")
+
+    def test_ui_reserved_tail_nonzero_is_rejected(self):
+        data = bytearray(self.package)
+        data[16 + self.native_len + v5.UI_HEADER_LEN + v5.UI_RESERVED_TAIL_OFF] = 1
         _, error = v5.verify_package_v5(bytes(data))
         self.assertIsNotNone(error)
         self.assertEqual(error.code, "BAD_PACKAGE")
@@ -164,7 +184,7 @@ class V5FormatNegativeTests(unittest.TestCase):
 
     def test_unknown_capability_bits_are_rejected(self):
         data = bytearray(self.package)
-        struct.pack_into("<I", data, 16 + 72, 0x00000463)
+        struct.pack_into("<I", data, 16 + v5.NATIVE_MEMBER_HEADER_LEN + 72, 0x00000463)
         _, error = v5.verify_package_v5(bytes(data))
         self.assertIsNotNone(error)
         self.assertEqual(error.code, "BAD_PACKAGE")

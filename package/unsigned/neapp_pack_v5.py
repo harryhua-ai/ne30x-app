@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import platform
+import struct
 import subprocess
 import sys
 import tempfile
@@ -39,6 +40,13 @@ def parse_version(value: str) -> tuple[int, int, int]:
     result = tuple(int(p) for p in parts)
     if any(part > 0xFFFF for part in result) or result[0] == 0:
         raise argparse.ArgumentTypeError("version segments must fit u16 and the major must be nonzero")
+    return result
+
+
+def parse_ui_version(value: str) -> tuple[int, int, int]:
+    result = parse_version(value)
+    if not all(result):
+        raise argparse.ArgumentTypeError("ui version segments must all be nonzero")
     return result
 
 
@@ -129,7 +137,6 @@ def build_v5(
     snapshot_max: int,
     live_publish_max: int,
     live_track_max: int,
-    exec_region_bytes: int | None,
     source_commit: str | None = None,
     provenance_path: Path | None = None,
 ) -> dict:
@@ -146,11 +153,6 @@ def build_v5(
                                  live_publish_max, live_track_max)
     except v4.PackageError as exc:
         raise PackError(f"capability/quota declaration rejected at pack time: {exc.detail}") from exc
-    exec_region = exec_region_bytes if exec_region_bytes is not None else image_report["image_len"] - v4.NATIVE_HEADER_SIZE
-    if exec_region < image_report["image_len"] - v4.NATIVE_HEADER_SIZE:
-        raise PackError("required_exec_region_bytes cannot be smaller than the payload")
-    if exec_region > v4.EXEC_REGION_BYTES_V4:
-        raise PackError(f"required_exec_region_bytes exceeds the execution region {v4.EXEC_REGION_BYTES_V4}")
     manifest = v5.build_manifest_v5(v5.ManifestV5(
         app_id=app_id,
         version_major=native_version[0],
@@ -160,7 +162,7 @@ def build_v5(
         required_psram_mib=v4.REQUIRED_PSRAM_MIB_V4,
         required_host_abi=v4.HOST_ABI_V4,
         required_host_caps=host_caps,
-        required_exec_region_bytes=exec_region,
+        native_payload_len=image_report["image_len"] - v4.NATIVE_HEADER_SIZE,
         native_file_len=image_report["image_len"],
         native_image_size=image_report["image_len"] - v4.NATIVE_HEADER_SIZE,
         native_entry_offset=image_report["entry_offset"],
@@ -175,7 +177,9 @@ def build_v5(
         live_publish_max=live_publish_max,
         live_track_max=live_track_max,
     ))
-    native_member = manifest + image
+    native_member = (v5.NATIVE_MEMBER_MAGIC
+                     + struct.pack("<II", v5.MANIFEST_LEN, len(image))
+                     + manifest + image)
     ui_manifest = v5.build_ui_manifest_v5(v5.UiManifestV5(
         app_id=app_id,
         native_member_sha256=hashlib.sha256(native_member).digest(),
@@ -184,6 +188,9 @@ def build_v5(
         version_patch=ui_version[2],
         file_count=len(assets),
         host_ui_abi=ui.HOST_UI_ABI_V1,
+        native_version_major=native_version[0],
+        native_version_minor=native_version[1],
+        native_version_patch=native_version[2],
         records=tuple(ui.AssetRecord(
             path=name,
             file_len=len(blob),
@@ -252,7 +259,7 @@ def main() -> int:
     parser.add_argument("--provenance-out", type=Path)
     parser.add_argument("--app-id", default="line-crossing")
     parser.add_argument("--native-version", required=True, type=parse_version)
-    parser.add_argument("--ui-version", required=True, type=parse_version)
+    parser.add_argument("--ui-version", required=True, type=parse_ui_version)
     parser.add_argument("--host-caps", type=parse_int,
                         default=v4.CAP_LOG | v4.CAP_TICK_MS | v4.CAP_SESSION_LIFECYCLE
                         | v4.CAP_CONTROL_RECEIVE)
@@ -263,7 +270,6 @@ def main() -> int:
     parser.add_argument("--snapshot-max", type=parse_int, default=0)
     parser.add_argument("--live-publish-max", type=parse_int, default=0)
     parser.add_argument("--live-track-max", type=parse_int, default=0)
-    parser.add_argument("--exec-region-bytes", type=parse_int, default=None)
     parser.add_argument("--source-commit", default=None)
     args = parser.parse_args()
     try:
@@ -272,7 +278,7 @@ def main() -> int:
             args.native_version, args.ui_version,
             args.host_caps, args.event_max, args.state_quota, args.report_max,
             args.control_max, args.snapshot_max, args.live_publish_max,
-            args.live_track_max, args.exec_region_bytes,
+            args.live_track_max,
             args.source_commit, args.provenance_out,
         )
     except (OSError, ValueError, RuntimeError) as error:

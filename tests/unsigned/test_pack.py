@@ -53,13 +53,13 @@ class PackerTests(unittest.TestCase):
         first = build_v5(
             self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
             FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-            0, 0, 0, 256, 0, 0, 0, None,
+            0, 0, 0, 256, 0, 0, 0,
         )
         second_out = self.root / "line-crossing-4.0.0.again.neapp"
         build_v5(
             self.elf_path, self.ui_root, second_out, FIXTURE_APP_ID,
             FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-            0, 0, 0, 256, 0, 0, 0, None,
+            0, 0, 0, 256, 0, 0, 0,
         )
         self.assertEqual(self.out.read_bytes(), second_out.read_bytes())
         self.assertEqual(first["package"]["sha256"], hashlib.sha256(self.out.read_bytes()).hexdigest())
@@ -71,7 +71,7 @@ class PackerTests(unittest.TestCase):
         build_v5(
             self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
             FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-            0, 0, 0, 256, 0, 0, 0, None,
+            0, 0, 0, 256, 0, 0, 0,
         )
         self.assertTrue(FIXTURE_PACKAGE_PATH.is_file())
         self.assertEqual(self.out.read_bytes(), FIXTURE_PACKAGE_PATH.read_bytes())
@@ -98,7 +98,7 @@ class PackerTests(unittest.TestCase):
             build_v5(
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-                0, 0, 0, 256, 0, 0, 0, None,
+                0, 0, 0, 256, 0, 0, 0,
             )
 
     def test_ui_tree_without_index_html_is_refused(self):
@@ -107,7 +107,7 @@ class PackerTests(unittest.TestCase):
             build_v5(
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-                0, 0, 0, 256, 0, 0, 0, None,
+                0, 0, 0, 256, 0, 0, 0,
             )
 
     def test_ui_tree_with_symlink_is_refused(self):
@@ -118,7 +118,7 @@ class PackerTests(unittest.TestCase):
             build_v5(
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-                0, 0, 0, 256, 0, 0, 0, None,
+                0, 0, 0, 256, 0, 0, 0,
             )
 
     def test_invalid_policy_declaration_is_refused_at_pack_time(self):
@@ -126,13 +126,13 @@ class PackerTests(unittest.TestCase):
             build_v5(
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x1000,
-                0, 0, 0, 256, 0, 0, 0, None,
+                0, 0, 0, 256, 0, 0, 0,
             )
         with self.assertRaises(PackError):
             build_v5(
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
-                0, 0, 0, 16, 0, 0, 0, None,
+                0, 0, 0, 16, 0, 0, 0,
             )
 
 
@@ -146,7 +146,7 @@ class CliTests(unittest.TestCase):
             out = root / "line-crossing-4.0.0.neapp"
             pack = run_cli(PACKER, "--elf", str(elf_path), "--ui-assets", str(ui_root),
                            "--out", str(out), "--app-id", "line-crossing",
-                           "--native-version", "4.0.0", "--ui-version", "1.0.0")
+                           "--native-version", "4.0.0", "--ui-version", "1.1.1")
             self.assertEqual(pack.returncode, 0, pack.stderr)
             payload = json.loads(pack.stdout)
             self.assertEqual(payload["result"], "PASS")
@@ -157,6 +157,19 @@ class CliTests(unittest.TestCase):
             report = json.loads(verify.stdout)
             self.assertEqual(report["result"], "PASS")
             self.assertEqual(report["app_id"], "line-crossing")
+
+    def test_packer_cli_refuses_ui_version_with_zero_segment(self):
+        with tempfile.TemporaryDirectory(prefix="neapp-v5-cli-uiver-") as raw:
+            root = Path(raw)
+            elf_path = root / "fixture.elf"
+            elf_path.write_bytes(fixture_elf())
+            ui_root = write_fixture_ui_tree(root / "ui")
+            out = root / "line-crossing-4.0.0.neapp"
+            pack = run_cli(PACKER, "--elf", str(elf_path), "--ui-assets", str(ui_root),
+                           "--out", str(out), "--app-id", "line-crossing",
+                           "--native-version", "4.0.0", "--ui-version", "1.0.0")
+            self.assertNotEqual(pack.returncode, 0)
+            self.assertFalse(out.exists())
 
     def test_verifier_cli_rejects_legacy_signed_package_explicitly(self):
         verify = run_cli(VERIFIER, "--package", str(GOLDEN_V3), "--compact")

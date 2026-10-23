@@ -187,7 +187,7 @@ clean-v4:
 
 V5_UI_DIR ?= $(ROOT_DIR)/tests/line-crossing-ui/.build/production
 V5_OUT_DIR ?= $(BUILD)/pkg
-V5_UI_VERSION ?= 1.0.0
+V5_UI_VERSION ?= 1.1.1
 
 .PHONY: neapp-v5
 

@@ -9,8 +9,8 @@
     "entry_offset": 2676,
     "image_len": 25864,
     "image_sha256": "04ceafe8317773653c33e8ed3f9edef5880d66f0200773c8c1d80b19e2cfca10",
-    "member_len": 26072,
-    "member_sha256": "603e0bd56905686e96d3dc7b95f6273d74f70b34696a43e9b7954f74cc29d9a0",
+    "member_len": 26088,
+    "member_sha256": "abe0951263cd77f3454260d77a30b995c16e07ed8fea6c64c3817e192a3ea15e",
     "payload_len": 25832,
     "payload_sha256": "48af9318e33fd27883600eca518d73629acbf91a1b3b80fc7d7f4cbb8a42ce37",
     "target_addr": 2480930816
@@ -21,8 +21,8 @@
     0
   ],
   "package": {
-    "len": 474854,
-    "sha256": "18f206e78114730dda99df9ea236a01fd2b5f3cc3e8c433bb5e200a1bc1988c7"
+    "len": 474878,
+    "sha256": "b65956373ea622879e0cd9f752e529847446de60b98597c1eff9ffe61121a85c"
   },
   "signing_dependencies": "none: no private key, no SPKI, no signature, no sequence ledger",
   "source_commit": "86894d8c8afb9cec53d53087e9e34535ae52d6fc",
@@ -70,13 +70,13 @@
       }
     ],
     "asset_tree_sha256": "5160a73ebda81a0e07ae8f74f0d7956eeba3b0c0bf95620f71e48212f7032799",
-    "member_len": 448766,
-    "member_sha256": "659b8c529eda6debf8380cb0cea4dc7279e3fa9c481b7b99139b8a34b1697591"
+    "member_len": 448774,
+    "member_sha256": "6dccce37c4081fcf6db519ea8128f76b820a1afa11a4399576d202f4a46121fe"
   },
   "ui_version": [
     1,
-    0,
-    0
+    1,
+    1
   ],
   "verification_boundary": "offline unsigned-format verification only: SHA-256 here checks container/member consistency, never publisher authenticity or anti-rollback; NOT Host admission, install, execution, or device acceptance"
 }

@@ -75,7 +75,7 @@ jobs:
             --out "$RUNNER_TEMP/line-crossing-4.0.0.neapp" \
             --app-id line-crossing \
             --native-version 4.0.0 \
-            --ui-version 1.0.0 \
+            --ui-version 1.1.1 \
             --source-commit "$GITHUB_SHA"
           python package/unsigned/neapp_verify_v5.py \
             --package "$RUNNER_TEMP/line-crossing-4.0.0.neapp" \
