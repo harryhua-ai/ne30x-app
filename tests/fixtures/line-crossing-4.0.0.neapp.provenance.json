@@ -1,0 +1,62 @@
+{
+  "app_id": "line-crossing",
+  "artifact_type": "unsigned NEAPP v5 package",
+  "format": "neapp-v5-unsigned",
+  "generator": "neapp_pack_v5.py 5.0.0",
+  "native_build": {
+    "elf_entry": 2480930817,
+    "elf_sha256": "bf3e124e77250ec2b60705ceb517dcef828e64ad7ff27f9b95878f31ebe4eff0",
+    "entry_offset": 0,
+    "image_len": 73,
+    "image_sha256": "0d4ef7ac4cec1fb6f9c40b1d17ce26e1cb7f96c1cb9c28bb4772b8cb05ab3c21",
+    "member_len": 297,
+    "member_sha256": "787db29bb3dd0a134f0fd49b75c47c0726b96fb5705a575f7f4e681f2acea3fc",
+    "payload_len": 41,
+    "payload_sha256": "cd7d7c3e3aff670bba790dda4b30d7145036d738ee414a94739077fed51283e4",
+    "target_addr": 2480930816
+  },
+  "native_version": [
+    4,
+    0,
+    0
+  ],
+  "package": {
+    "len": 740,
+    "sha256": "a39d741340be65bc48b980637be6cfba397408b9d45c7c11051438c26fae4191"
+  },
+  "signing_dependencies": "none: no private key, no SPKI, no signature, no sequence ledger",
+  "source_commit": "fixture",
+  "toolchain": {
+    "arm_none_eabi_gcc": "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1 (Build arm-15.86)) 15.2.1 20251203",
+    "python": "3.14.4"
+  },
+  "ui_build": {
+    "asset_count": 3,
+    "asset_records": [
+      {
+        "file_len": 38,
+        "path": "app.js",
+        "sha256": "3044a3c40b10ff1edd10d03a1d219131547ac834ab89209ec81ce2899f12cfe4"
+      },
+      {
+        "file_len": 34,
+        "path": "assets/logo.txt",
+        "sha256": "c67341c9214b314f63034aa1315a3519213c5bb07f6de4b61566b910b7babf7f"
+      },
+      {
+        "file_len": 58,
+        "path": "index.html",
+        "sha256": "eceb14254a41bd8c5aca241d1ecb4387101d458bda260c18ae5328e8575d932c"
+      }
+    ],
+    "asset_tree_sha256": "96b65f97686f4d0f736a6aff37428e4bcb3d7077a24c5514fd224f700f81d491",
+    "member_len": 427,
+    "member_sha256": "d131b73856e17965137f4d75b20b6fb76412413c284fbbe796655465f54ae552"
+  },
+  "ui_version": [
+    1,
+    1,
+    1
+  ],
+  "verification_boundary": "offline unsigned-format verification only: SHA-256 here checks container/member consistency, never publisher authenticity or anti-rollback; NOT Host admission, install, execution, or device acceptance"
+}
