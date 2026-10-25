@@ -245,6 +245,17 @@ def build_v5(
             "sha256": hashlib.sha256(package).hexdigest(),
             "len": len(package),
         },
+        "host_policy": {
+            "host_caps": host_caps,
+            "event_max": event_max,
+            "state_quota": state_quota,
+            "report_max": report_max,
+            "control_max": control_max,
+            "snapshot_max": snapshot_max,
+            "live_publish_max": live_publish_max,
+            "live_track_max": live_track_max,
+            "run_profile": v4.RUN_PROFILE_V4,
+        },
         "verification_boundary": report["boundary"],
     }
     provenance_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
