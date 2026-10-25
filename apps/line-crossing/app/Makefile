@@ -188,6 +188,14 @@ clean-v4:
 V5_UI_DIR ?= $(ROOT_DIR)/tests/line-crossing-ui/.build/production
 V5_OUT_DIR ?= $(BUILD)/pkg
 V5_UI_VERSION ?= 1.1.1
+V5_HOST_CAPS ?= 0x3ff
+V5_EVENT_MAX ?= 1576
+V5_STATE_QUOTA ?= 512
+V5_REPORT_MAX ?= 6144
+V5_CONTROL_MAX ?= 256
+V5_SNAPSHOT_MAX ?= 1024
+V5_LIVE_PUBLISH_MAX ?= 9008
+V5_LIVE_TRACK_MAX ?= 64
 
 .PHONY: neapp-v5
 
@@ -196,7 +204,11 @@ neapp-v5: $(V4_ELF)
 	$(PYTHON) $(ROOT_DIR)/package/unsigned/neapp_pack_v5.py \
 		--elf $(V4_ELF) --ui-assets $(V5_UI_DIR) \
 		--out $(V5_OUT_DIR)/line-crossing-$(V4_APP_VERSION).neapp \
-		--app-id $(APP_ID) --native-version $(V4_APP_VERSION) --ui-version $(V5_UI_VERSION)
+		--app-id $(APP_ID) --native-version $(V4_APP_VERSION) --ui-version $(V5_UI_VERSION) \
+		--host-caps $(V5_HOST_CAPS) --event-max $(V5_EVENT_MAX) \
+		--state-quota $(V5_STATE_QUOTA) --report-max $(V5_REPORT_MAX) \
+		--control-max $(V5_CONTROL_MAX) --snapshot-max $(V5_SNAPSHOT_MAX) \
+		--live-publish-max $(V5_LIVE_PUBLISH_MAX) --live-track-max $(V5_LIVE_TRACK_MAX)
 	$(PYTHON) $(ROOT_DIR)/package/unsigned/neapp_verify_v5.py \
 		--package $(V5_OUT_DIR)/line-crossing-$(V4_APP_VERSION).neapp --compact
 
