@@ -12,7 +12,26 @@
  "heartbeat_at": "2026-10-26T00:03:48Z",
  "supersedes": null,
  "contract_digest": "75280169bdc808c5573d5e2c8e38c1bd3d0f1c75cbac67086c4fa2aceae03004",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/47/1ea75ec1",
+  "sha": "2b9bdecf8485d33edb02dbc22d49633d70e18769",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "apps/line-crossing/app/lc_arena.c": "ALLOWED",
+    "docs/evidence/arena-alignment-47.md": "ALLOWED",
+    "tests/unsigned/test_arena_alignment.py": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 3,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-10-26T00:05:12Z"
+ },
  "runtime": {
   "digest": "a884f1a0dec1a695560e07eef3beee0b5b1bc20b6e376649c0bda17a7d9380d2",
   "release": "v1.1.6",
