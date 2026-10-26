@@ -10,7 +10,7 @@ typedef union lc_block {
     uint64_t align;
 } lc_block_t;
 
-static uint8_t  lc_arena_pool[LC_ARENA_SIZE];
+static _Alignas(8) uint8_t  lc_arena_pool[LC_ARENA_SIZE];
 static uint8_t  lc_arena_ready;
 static size_t   lc_arena_used_now;
 static size_t   lc_arena_high;
