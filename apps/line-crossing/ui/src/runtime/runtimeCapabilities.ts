@@ -371,10 +371,8 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             emitPatch({ events: unavailable(liveReason), tracks: unavailable(liveReason) });
             return;
         }
-        if (event.payload.status === 'GAP' || event.payload.status === 'STALE' || event.payload.stream_seq <= lastStreamSeq) {
-            livePhase = 'failed';
-            liveReason = 'Live stream sequence gap detected; awaiting Host resync';
-            emitPatch({ events: unavailable(liveReason), tracks: unavailable(liveReason) });
+        if (event.payload.status === 'GAP' || event.payload.status === 'STALE') {
+            liveReason = 'Live stream is stale; retaining last data until the next frame';
             return;
         }
         lastStreamSeq = event.payload.stream_seq;

@@ -832,7 +832,7 @@ test('openVideoStream validates scheme, session and expiry; release stops the me
   assert.match(expiredGrant.reason, /cross-check/)
 })
 
-test('live subscription delivers bounded EVENT data and fails closed on sequence gaps', async () => {
+test('live subscription delivers bounded EVENT data and accepts replayed sequence as resync', async () => {
   const liveEvent = {
     kind: 'event',
     event: {
@@ -857,8 +857,54 @@ test('live subscription delivers bounded EVENT data and fails closed on sequence
   assert.equal(controller.getState().tracks.state, 'available')
   assert.equal(controller.getState().events.value.events.length, 1)
   session.emit({ kind: 'event', event: { payload: { stream: 'live', stream_seq: 1, data: liveEvent.event.payload.data } } })
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.state, 'available')
+  assert.equal(controller.getState().events.value.events.length, 1)
+})
+
+test('STALE and GAP notifications are transient and later frames resync the live view', async () => {
+  const frame = seq => ({
+    kind: 'event',
+    event: {
+      payload: {
+        stream: 'live',
+        stream_seq: seq,
+        data: {
+          server_now_ms: Date.now(),
+          events: [{ sequence: seq, timestamp_ms: Date.now() - 1000, track_id: 12, direction: 'in', target_class: 'person' }],
+          tracks: [{ track_id: 12, points: [{ x: seq * 100, y: 500 }] }],
+        },
+      },
+    },
+  })
+  const status = (name, seq) => ({ kind: 'event', event: { payload: { stream: 'live', stream_seq: seq, status: name } } })
+  const { session, controller } = makeController(op => (op === 'live.subscribe' ? { outcome: 'APPLIED', payload: {} } : { outcome: 'UNAVAILABLE' }), {
+    ops: [...GRANT_OPS, 'live.subscribe'],
+  })
   assert.equal(await settleUntil(() => controller.getState().events.state === 'unavailable'), true)
-  assert.match(controller.getState().events.reason, /gap/)
+  session.emit(frame(1))
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'available'), true)
+  const before = controller.getState().events.value.events
+  session.emit(status('STALE', 1))
+  session.emit(status('GAP', 1))
+  await flushMicrotasks()
+  const retained = controller.getState()
+  assert.equal(retained.events.state, 'available')
+  assert.equal(retained.events.value.events, before)
+  assert.equal(retained.tracks.state, 'available')
+  session.emit({ kind: 'event', event: { payload: { stream: 'live', stream_seq: 1, data: frame(1).event.payload.data } } })
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.state, 'available')
+  session.emit(frame(2))
+  assert.equal(await settleUntil(() => controller.getState().events.value.events[0].sequence === 2), true)
+  assert.equal(controller.getState().events.state, 'available')
+  assert.equal(controller.getState().tracks.state, 'available')
+  session.emit(status('REVOKE', 2))
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'unavailable'), true)
+  assert.match(controller.getState().events.reason, /revoked/)
+  session.emit(frame(3))
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.state, 'unavailable')
 })
 
 test('a missing live producer keeps events and tracks unavailable with the real reason', async () => {
