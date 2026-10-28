@@ -373,8 +373,8 @@ test(CASES[0].title, async () => {
   assert.equal(await frame.getByTestId('lc-events-unavailable').count(), 1)
   assert.equal(await frame.getByTestId('lc-track').count(), 0)
 
-  await waitFrameState(frame, 'lc-video-state', 'unavailable')
-  await frame.getByTestId('lc-video-retry').click()
+  await waitFor(async () => (await brokerReceived(page)).some(item => item.op === 'video.open'), 20000, 'the authorized App never auto-requested the video grant')
+  assert.equal((await brokerReceived(page)).filter(item => item.op === 'video.open').length, 1)
   await waitFrameState(frame, 'lc-video-state', 'live', 30000)
   await waitFor(async () => workers.length >= 2, 10000, 'the signed App did not start both video workers')
   const workerUrls = workers.map(workerUrl => new URL(workerUrl))
@@ -386,6 +386,9 @@ test(CASES[0].title, async () => {
   assert.ok(playback.time > 0)
   const videoOpen = (await brokerReceived(page)).find(item => item.op === 'video.open')
   assert.equal(videoOpen.payload.session_generation, 8)
+  await sleep(6500)
+  assert.equal((await brokerReceived(page)).filter(item => item.op === 'video.close').length, 0)
+  assert.equal((await brokerReceived(page)).filter(item => item.op === 'video.open').length, 1)
 
   await saveCounterName(frame, 'Counter Renamed')
   await waitFor(async () => (await brokerReceived(page)).some(item => item.op === 'config.apply'), 20000, 'config.apply never reached the broker')

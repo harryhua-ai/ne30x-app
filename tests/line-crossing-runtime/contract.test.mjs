@@ -530,6 +530,8 @@ const stubSession = () => {
     requests: [],
     responder: () => ({ outcome: 'UNAVAILABLE', reason: 'stub has no responder' }),
     getPhase: () => stub.phase,
+    getIdentity: () => null,
+    revoke() {},
     subscribe(listener) {
       subscribers.add(listener)
       return () => subscribers.delete(listener)

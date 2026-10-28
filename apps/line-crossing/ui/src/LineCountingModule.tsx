@@ -99,6 +99,7 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
     const activeAppRef = useRef<AppSnapshot | null>(null);
     const appGenerationRef = useRef<string | null>(null);
     const hostGenerationRef = useRef<string | null>(null);
+    const autoVideoGenerationRef = useRef<number | null>(null);
 
     const publishState = useCallback((next: LineCrossingUiState) => {
         const current = stateRef.current;
@@ -451,6 +452,14 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
             updateState((current) => ({ ...current, revision: current.revision + 1, video: { state: 'unavailable', reason: 'Video grant request failed' } }));
         }
     };
+
+    useEffect(() => {
+        if (!appSnapshot || !appFresh) return;
+        if (state?.video.state === 'available') return;
+        if (autoVideoGenerationRef.current === appSnapshot.sessionGeneration) return;
+        autoVideoGenerationRef.current = appSnapshot.sessionGeneration;
+        void requestVideo();
+    }, [appSnapshot?.sessionGeneration, appFresh, state?.video.state]);
 
     const freshCapability = <T,>(capability: Capability<T> | undefined): Capability<T> => {
         const value = capabilityOrUnavailable(capability);

@@ -187,7 +187,7 @@ clean-v4:
 
 V5_UI_DIR ?= $(ROOT_DIR)/tests/line-crossing-ui/.build/production
 V5_OUT_DIR ?= $(BUILD)/pkg
-V5_UI_VERSION ?= 1.1.1
+V5_UI_VERSION ?= 1.1.5
 V5_HOST_CAPS ?= 0x3ff
 V5_EVENT_MAX ?= 1576
 V5_STATE_QUOTA ?= 512

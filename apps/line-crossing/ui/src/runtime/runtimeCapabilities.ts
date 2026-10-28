@@ -677,7 +677,9 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                     });
                 },
             };
-            return { state: 'available', value: grant, observedAtMs: Date.now() };
+            const granted: Capability<VideoStreamGrant> = { state: 'available', value: grant, observedAtMs: Date.now() };
+            emitPatch({ video: granted });
+            return granted;
         },
     };
 

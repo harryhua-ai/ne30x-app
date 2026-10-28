@@ -46,7 +46,7 @@ function createGrant(sessionGeneration: number, url: string, onRelease: () => vo
     };
 }
 
-export function createTestCapabilities(url: URL) {
+export function createTestCapabilities(url: URL, options: { startVideoUnavailable?: boolean } = {}) {
     const appSnapshot: AppSnapshot = {
         sessionGeneration: 8,
         configGeneration: 12,
@@ -87,13 +87,16 @@ export function createTestCapabilities(url: URL) {
         statsReset: available(true),
         hostPolicy: available(hostSnapshot),
         hostPolicyWrite: available(true),
-        video: available(createGrant(8, streamUrl, () => { releasedGrants += 1; })),
+        video: options.startVideoUnavailable === true
+            ? { state: 'unavailable', reason: 'Fixture video grant has not been requested yet' }
+            : available(createGrant(8, streamUrl, () => { releasedGrants += 1; })),
     };
     const listeners = new Set<(next: LineCrossingUiState) => void>();
     const appCalls: unknown[] = [];
     const hostCalls: unknown[] = [];
     const enableCalls: unknown[] = [];
     const resetCalls: unknown[] = [];
+    const videoCalls: Array<{ sessionGeneration: number }> = [];
     let nextOutcome: 'APPLIED' | 'UNKNOWN' | 'CONFLICT' | 'MISMATCH_SESSION' = 'APPLIED';
     let nextHostOutcome: 'APPLIED' | 'UNKNOWN' | 'CONFLICT' = 'APPLIED';
     let nextEnableOutcome: 'APPLIED' | 'UNKNOWN' | 'CONFLICT' = 'APPLIED';
@@ -209,6 +212,7 @@ export function createTestCapabilities(url: URL) {
         },
         openVideoStream: async ({ sessionGeneration }) => {
             if (state.app.state !== 'available' || state.app.value.sessionGeneration !== sessionGeneration) return { state: 'unavailable', reason: 'Fixture App session changed' };
+            videoCalls.push({ sessionGeneration });
             const grant = createGrant(sessionGeneration, streamUrl, () => { releasedGrants += 1; });
             const value = available(grant);
             emit({ video: value });
@@ -217,7 +221,7 @@ export function createTestCapabilities(url: URL) {
     };
 
     const testApi = {
-        getCalls: () => ({ app: appCalls, host: hostCalls, enable: enableCalls, reset: resetCalls }),
+        getCalls: () => ({ app: appCalls, host: hostCalls, enable: enableCalls, reset: resetCalls, video: videoCalls }),
         getState: () => state,
         getReleasedGrants: () => releasedGrants,
         revokeConfigWrite: () => emit({ configWrite: { state: 'unavailable', reason: 'Fixture permission revoked' } }),
