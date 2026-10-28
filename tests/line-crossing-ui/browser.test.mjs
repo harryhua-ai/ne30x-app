@@ -460,7 +460,7 @@ test('real H.264 playback, line editing, separate saves, reconnect and revoked v
   await page.getByTestId('lc-save-app').click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().app.length === 3)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().host)).length, 0)
-  await page.getByTestId('lc-host-backlog-capacity').locator('input').fill('64')
+  await page.getByTestId('lc-host-backlog-capacity').locator('input').fill('8')
   await page.getByTestId('lc-save-host').click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().host.length === 1)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 3)
@@ -556,7 +556,7 @@ test('independent App and Host saves keep isolated outcomes across partial failu
 
   await page.evaluate(() => window.__lineCrossingTest.setNextHostOutcome('UNKNOWN'))
   await page.getByTestId('lc-app-window-minutes').locator('input').fill('100')
-  await page.getByTestId('lc-host-backlog-capacity').locator('input').fill('48')
+  await page.getByTestId('lc-host-backlog-capacity').locator('input').fill('6')
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 0)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().host)).length, 0)
 
@@ -568,14 +568,14 @@ test('independent App and Host saves keep isolated outcomes across partial failu
   await page.getByTestId('lc-save-host').click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().host.length === 1)
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-host-save-status"]')?.textContent === 'Outcome unknown; no automatic retry was sent')
-  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 32)
+  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 4)
   assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().app.value.config.window_minutes), 100)
 
   await page.evaluate(() => window.__lineCrossingTest.setNextHostOutcome('APPLIED'))
   await page.getByTestId('lc-save-host').click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().host.length === 2)
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-host-save-status"]')?.textContent === 'Applied')
-  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 48)
+  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 6)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 1)
 
   await page.evaluate(() => window.__lineCrossingTest.setNextHostOutcome('CONFLICT'))
@@ -583,7 +583,7 @@ test('independent App and Host saves keep isolated outcomes across partial failu
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().host.length === 3)
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-host-save-status"]')?.textContent === 'Conflict; reload the current snapshot')
   assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.generation), 5)
-  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 48)
+  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 6)
 
   await page.evaluate(() => window.__lineCrossingTest.setNextOutcome('UNKNOWN'))
   await page.getByTestId('lc-app-window-minutes').locator('input').fill('120')
@@ -591,7 +591,7 @@ test('independent App and Host saves keep isolated outcomes across partial failu
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().app.length === 2)
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-app-save-status"]')?.textContent === 'Outcome unknown; no automatic retry was sent')
   assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().app.value.config.window_minutes), 100)
-  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 48)
+  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 6)
 
   await page.evaluate(() => window.__lineCrossingTest.setNextOutcome('CONFLICT'))
   await page.getByTestId('lc-save-app').click()
@@ -615,12 +615,12 @@ test('independent App and Host saves keep isolated outcomes across partial failu
   assert.equal(await page.getByTestId('lc-save-app').isDisabled(), true)
   assert.equal(await page.getByTestId('lc-save-host').isDisabled(), false)
 
-  await page.getByTestId('lc-host-backlog-capacity').locator('input').fill('64')
+  await page.getByTestId('lc-host-backlog-capacity').locator('input').fill('8')
   await page.evaluate(() => window.__lineCrossingTest.setNextHostOutcome('APPLIED'))
   await page.getByTestId('lc-save-host').click()
   await page.waitForFunction(() => window.__lineCrossingTest.getCalls().host.length === 4)
   await page.waitForFunction(() => document.querySelector('[data-testid="lc-host-save-status"]')?.textContent === 'Applied')
-  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 64)
+  assert.equal(await page.evaluate(() => window.__lineCrossingTest.getState().hostPolicy.value.config.backlog_capacity), 8)
   assert.equal((await page.evaluate(() => window.__lineCrossingTest.getCalls().app)).length, 5)
 
   await page.evaluate(() => window.__lineCrossingTest.resolvePendingApply())

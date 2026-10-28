@@ -68,7 +68,7 @@ export function createTestCapabilities(url: URL, options: { startVideoUnavailabl
         sessionGeneration: 8,
         generation: 4,
         observedAtMs: observedAtMs(),
-        config: { mqtt_enabled: false, webhook_enabled: true, backlog_capacity: 32 },
+        config: { mqtt_enabled: false, webhook_enabled: true, backlog_capacity: 4 },
     };
     let releasedGrants = 0;
     const streamUrl = `ws://${url.host}/stream?grant=fixture`;

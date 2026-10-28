@@ -88,7 +88,7 @@ if (params.get('scenario') === 'runtime') {
                 respond('APPLIED', {
                     session_generation: sessionGeneration,
                     generation: 4,
-                    config: { mqtt_enabled: false, webhook_enabled: true, backlog_capacity: 32 },
+                    config: { mqtt_enabled: false, webhook_enabled: true, backlog_capacity: 4 },
                 });
                 return;
             }

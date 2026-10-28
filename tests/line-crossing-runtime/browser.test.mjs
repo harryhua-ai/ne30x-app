@@ -403,12 +403,12 @@ test(CASES[0].title, async () => {
 
   await frame.getByTestId('lc-tab-advanced').click()
   await frame.getByTestId('lc-page-advanced').waitFor()
-  await frame.getByTestId('lc-host-backlog-capacity').locator('input').fill('64')
+  await frame.getByTestId('lc-host-backlog-capacity').locator('input').fill('8')
   await frame.getByTestId('lc-save-host').click()
   await waitFor(async () => (await brokerReceived(page)).some(item => item.op === 'report-policy.apply'), 20000, 'report-policy.apply never reached the broker')
   const policyApply = (await brokerReceived(page)).find(item => item.op === 'report-policy.apply')
   assert.equal(policyApply.payload.expected_generation, 4)
-  assert.equal(policyApply.payload.candidate.backlog_capacity, 64)
+  assert.equal(policyApply.payload.candidate.backlog_capacity, 8)
   await waitFrameText(frame, 'lc-host-save-status', 'Applied')
 
   await frame.getByTestId('lc-tab-realtime').click()
@@ -461,7 +461,7 @@ test(CASES[1].title, async () => {
   assert.equal(await frame.getByTestId('lc-reset-stats').isDisabled(), true)
   await frame.getByTestId('lc-tab-advanced').click()
   await frame.getByTestId('lc-page-advanced').waitFor()
-  await frame.getByTestId('lc-host-backlog-capacity').locator('input').fill('40')
+  await frame.getByTestId('lc-host-backlog-capacity').locator('input').fill('5')
   await frame.getByTestId('lc-save-host').click()
   await waitFrameText(frame, 'lc-host-save-status', 'Applied')
   const ops = (await brokerReceived(page)).map(item => item.op)
