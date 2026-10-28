@@ -95,6 +95,61 @@ const validateStats = (value: unknown): Validation<LineCountingStats> => {
     return { ok: true, value: value as unknown as LineCountingStats };
 };
 
+const adaptSnapshotV4 = (value: unknown, sessionGeneration: number): unknown => {
+    if (!isPlainObject(value) || value.schema !== 'line-crossing/1' || !isPlainObject(value.active_config)) {
+        return value;
+    }
+    const model = isPlainObject(value.model) ? value.model : {};
+    const counters = isPlainObject(value.counters) ? value.counters : {};
+    const cumulative = isPlainObject(value.cumulative) ? value.cumulative : {};
+    const cfg = value.active_config;
+    const line = isPlainObject(cfg.line) ? cfg.line : {};
+    const outside = isPlainObject(cfg.outside) ? cfg.outside : {};
+    const targetClass = typeof model.target_class === 'string' ? model.target_class : '';
+    return {
+        session_generation: sessionGeneration,
+        config_generation: value.config_generation,
+        config: {
+            schema: 1,
+            counter_name: cfg.counter_name,
+            target_class_name: cfg.target_class_name,
+            line: {
+                x1: line.x1_permille,
+                y1: line.y1_permille,
+                x2: line.x2_permille,
+                y2: line.y2_permille,
+                outside_x: outside.x_permille,
+                outside_y: outside.y_permille,
+            },
+            conf_threshold_permille: cfg.conf_threshold_permille,
+            max_dist_permille: cfg.max_dist_permille,
+            track_history_k: cfg.track_history_k,
+            max_miss: cfg.max_miss,
+            k_confirm: cfg.k_confirm,
+            tracks_report_enable: cfg.tracks_report_enable,
+            heat_grid_enable: cfg.heat_grid_enable,
+            window_minutes: cfg.window_minutes,
+        },
+        status: {
+            state: value.enable_state === 'disabled'
+                ? 'stopped'
+                : value.app_state === 'running' ? 'running' : 'unknown',
+            target_class: targetClass,
+            model: {
+                name: 'line-crossing',
+                version: '4',
+                postprocess_type: 'unreported',
+                generation: typeof model.generation === 'number' ? model.generation : 0,
+                classes: targetClass ? [{ id: 0, name: targetClass }] : [],
+            },
+        },
+        stats: {
+            window: { in: counters.in ?? 0, out: counters.out ?? 0 },
+            total: { in: cumulative.in ?? 0, out: cumulative.out ?? 0 },
+        },
+    };
+};
+
 const snapshotPayloadKeys = ['session_generation', 'config_generation', 'config', 'status', 'stats'] as const;
 
 const validateSnapshotPayload = (value: unknown): Validation<{
@@ -382,7 +437,9 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             const patch: Partial<LineCrossingUiState> = {};
             const now = Date.now();
             if (snapshotResult.outcome === 'APPLIED') {
-                const payload = validateSnapshotPayload(snapshotResult.payload);
+                const payload = validateSnapshotPayload(adaptSnapshotV4(
+                    snapshotResult.payload,
+                    session.getIdentity()?.native_session_generation ?? 0));
                 if (payload.ok) {
                     const snapshot: AppSnapshot = {
                         sessionGeneration: payload.value.session_generation,
@@ -490,7 +547,11 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             });
             if (result.outcome !== 'APPLIED') return { outcome: result.outcome === 'REJECTED' ? 'UNAVAILABLE' : result.outcome, reason: outcomeReason('config.apply', result) };
             const payload = isPlainObject(result.payload) ? result.payload : null;
-            const snapshot = payload ? validateSnapshotPayload(payload.snapshot) : failure('config result has no snapshot');
+            const snapshot = payload
+                ? validateSnapshotPayload(adaptSnapshotV4(
+                    payload.snapshot,
+                    session.getIdentity()?.native_session_generation ?? 0))
+                : failure('config result has no snapshot');
             if (!payload
                 || !snapshot.ok
                 || !isInt(payload.session_generation, 0, 4294967295)

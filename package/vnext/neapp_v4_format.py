@@ -629,7 +629,7 @@ class DevicePolicyV4:
     event_buffer_bytes: int = 2048
     report_capacity_bytes: int = 6144
     state_quota_bytes: int = 4096
-    control_msg_bytes: int = 256
+    control_msg_bytes: int = 512
     snapshot_ram_bytes: int = 1024
     live_capacity_bytes: int = 16384
     live_capacity_tracks: int = 64
