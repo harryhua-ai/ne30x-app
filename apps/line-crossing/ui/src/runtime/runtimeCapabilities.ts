@@ -372,7 +372,10 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             return;
         }
         if (event.payload.status === 'GAP' || event.payload.status === 'STALE') {
-            liveReason = 'Live stream is stale; retaining last data until the next frame';
+            liveReason = 'Live stream is stale; awaiting the next frame';
+            if (ui.events.state === 'available' || ui.tracks.state === 'available') {
+                emitPatch({ events: { state: 'stale', reason: liveReason }, tracks: { state: 'stale', reason: liveReason } });
+            }
             return;
         }
         lastStreamSeq = event.payload.stream_seq;
