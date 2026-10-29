@@ -225,18 +225,54 @@ test('authorized request emits the exact v1 REQUEST envelope and resolves on the
   assert.equal(request.protocol, 'ne301.sidecar.bridge.v1')
   assert.equal(request.type, 'REQUEST')
   assert.equal(request.seq, 1)
-  assert.equal(request.request_id, 1)
+  assert.ok(Number.isSafeInteger(request.request_id) && request.request_id > 0)
   assert.equal(request.op, 'snapshot.read')
   assert.deepEqual(request.payload, { session_generation: 8 })
   assert.equal(request.grant_id, 'G'.repeat(24))
   assert.deepEqual(request.identity, makeIdentity())
   port.emit({
     protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 3, grant_id: 'G'.repeat(24),
-    identity: makeIdentity(), request_id: 1, op: 'snapshot.read', outcome: 'APPLIED', payload: { ok: 1 },
+    identity: makeIdentity(), request_id: request.request_id, op: 'snapshot.read', outcome: 'APPLIED', payload: { ok: 1 },
   })
   const outcome = await pending
   assert.equal(outcome.outcome, 'APPLIED')
   assert.deepEqual(outcome.payload, { ok: 1 })
+})
+
+test('each session seeds its request ids clear of the small deterministic range and the host live-poll base', async () => {
+  const emitResult = (context, requestId, seq) => context.port.emit({
+    protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq, grant_id: 'G'.repeat(24),
+    identity: makeIdentity(), request_id: requestId, op: 'snapshot.read', outcome: 'APPLIED', payload: { ok: 1 },
+  })
+  const first = authorized({ ops: ['snapshot.read'] }, { randomFn: () => 0x12345678 })
+  const firstPending = first.session.request('snapshot.read')
+  await flushMicrotasks()
+  const firstId = first.port.sent[0].request_id
+  const second = authorized({ ops: ['snapshot.read'] }, { randomFn: () => 0x23456789 })
+  const secondPending = second.session.request('snapshot.read')
+  await flushMicrotasks()
+  const secondId = second.port.sent[0].request_id
+  const third = authorized({ ops: ['snapshot.read'] })
+  const thirdPending = third.session.request('snapshot.read')
+  await flushMicrotasks()
+  const thirdId = third.port.sent[0].request_id
+  assert.ok(firstId > 0x40000000, `first session id ${firstId} must exceed the small deterministic range`)
+  assert.ok(firstId < 0x80000000, `first session id ${firstId} must stay below the host live-poll base`)
+  assert.ok(secondId > 0x40000000 && secondId < 0x80000000)
+  assert.ok(thirdId > 0x40000000 && thirdId < 0x80000000)
+  assert.notEqual(firstId, secondId)
+  assert.notEqual(firstId, thirdId)
+  const followUp = first.session.request('snapshot.read')
+  await flushMicrotasks()
+  assert.equal(first.port.sent[1].request_id, firstId + 1)
+  emitResult(first, firstId, 3)
+  emitResult(first, firstId + 1, 4)
+  emitResult(second, secondId, 3)
+  emitResult(third, thirdId, 3)
+  assert.equal((await firstPending).outcome, 'APPLIED')
+  assert.equal((await followUp).outcome, 'APPLIED')
+  assert.equal((await secondPending).outcome, 'APPLIED')
+  assert.equal((await thirdPending).outcome, 'APPLIED')
 })
 
 test('expired requests resolve UNKNOWN and their late RESULTS are ignored without state changes', async () => {
@@ -245,16 +281,17 @@ test('expired requests resolve UNKNOWN and their late RESULTS are ignored withou
   await new Promise(resolve => setTimeout(resolve, 60))
   const outcome = await pending
   assert.equal(outcome.outcome, 'UNKNOWN')
+  const expiredId = port.sent[0].request_id
   port.emit({
     protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 3, grant_id: 'G'.repeat(24),
-    identity: makeIdentity(), request_id: 1, op: 'snapshot.read', outcome: 'APPLIED', payload: { late: true },
+    identity: makeIdentity(), request_id: expiredId, op: 'snapshot.read', outcome: 'APPLIED', payload: { late: true },
   })
   assert.ok(session.getDroppedInboundCount() >= 1)
   const next = session.request('snapshot.read')
   await flushMicrotasks()
   port.emit({
     protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 4, grant_id: 'G'.repeat(24),
-    identity: makeIdentity(), request_id: 2, op: 'snapshot.read', outcome: 'APPLIED', payload: { fresh: true },
+    identity: makeIdentity(), request_id: port.sent[1].request_id, op: 'snapshot.read', outcome: 'APPLIED', payload: { fresh: true },
   })
   const fresh = await next
   assert.equal(fresh.outcome, 'APPLIED')
@@ -273,7 +310,7 @@ test('pending request concurrency is capped at four without sending the fifth', 
   for (let index = 0; index < 4; index += 1) {
     port.emit({
       protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 3 + index, grant_id: 'G'.repeat(24),
-      identity: makeIdentity(), request_id: index + 1, op: 'snapshot.read', outcome: 'APPLIED', payload: {},
+      identity: makeIdentity(), request_id: port.sent[index].request_id, op: 'snapshot.read', outcome: 'APPLIED', payload: {},
     })
   }
   const settled = await Promise.all(outcomes.slice(0, 4))
@@ -300,15 +337,16 @@ test('replayed sequence numbers are dropped while fresh traffic continues', asyn
   const { session, port } = authorized({ ops: ['snapshot.read'] })
   const first = session.request('snapshot.read')
   await flushMicrotasks()
+  const firstId = port.sent[0].request_id
   port.emit({
     protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 3, grant_id: 'G'.repeat(24),
-    identity: makeIdentity(), request_id: 1, op: 'snapshot.read', outcome: 'APPLIED', payload: { n: 1 },
+    identity: makeIdentity(), request_id: firstId, op: 'snapshot.read', outcome: 'APPLIED', payload: { n: 1 },
   })
   assert.equal((await first).outcome, 'APPLIED')
   const droppedBefore = session.getDroppedInboundCount()
   port.emit({
     protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 3, grant_id: 'G'.repeat(24),
-    identity: makeIdentity(), request_id: 2, op: 'snapshot.read', outcome: 'APPLIED', payload: { replayed: true },
+    identity: makeIdentity(), request_id: firstId + 1, op: 'snapshot.read', outcome: 'APPLIED', payload: { replayed: true },
   })
   assert.equal(session.getDroppedInboundCount(), droppedBefore + 1)
   assert.equal(session.getPhase(), 'authorized')
@@ -316,7 +354,7 @@ test('replayed sequence numbers are dropped while fresh traffic continues', asyn
   await flushMicrotasks()
   port.emit({
     protocol: 'ne301.sidecar.bridge.v1', type: 'RESULT', seq: 4, grant_id: 'G'.repeat(24),
-    identity: makeIdentity(), request_id: 2, op: 'snapshot.read', outcome: 'APPLIED', payload: { n: 2 },
+    identity: makeIdentity(), request_id: port.sent[1].request_id, op: 'snapshot.read', outcome: 'APPLIED', payload: { n: 2 },
   })
   const outcome = await second
   assert.deepEqual(outcome.payload, { n: 2 })
@@ -749,6 +787,60 @@ test('config.apply commits only generation-consistent APPLIED results', async ()
   })
   assert.equal(rejectedOutcome.outcome, 'UNAVAILABLE')
   assert.match(rejectedOutcome.reason, /rejected config\.apply/)
+})
+
+test('config.apply commits the device v4 snapshot echo carried in the result payload', async () => {
+  const v4Snapshot = (configGeneration) => ({
+    schema: 'line-crossing/1',
+    config_generation: configGeneration,
+    state_revision: 147,
+    enable_state: 'enabled',
+    app_state: 'running',
+    model: { valid: true, generation: 1, class_generation: 1, target_class: 'person' },
+    cumulative: { in: 50, out: 20 },
+    counters: { in: 5, out: 2 },
+    active_config: {
+      counter_name: 'Counter Native',
+      target_class_name: 'person',
+      line: { x1_permille: 460, y1_permille: 156, x2_permille: 462, y2_permille: 955 },
+      outside: { x_permille: 311, y_permille: 556 },
+      conf_threshold_permille: 1000,
+      max_dist_permille: 250,
+      track_history_k: 8,
+      max_miss: 5,
+      k_confirm: 5,
+      window_minutes: 5,
+      tracks_report_enable: false,
+      heat_grid_enable: false,
+    },
+  })
+  const { controller } = makeController(op => {
+    if (op === 'snapshot.read') return { outcome: 'APPLIED', payload: v4Snapshot(12) }
+    if (op === 'config.apply') {
+      return {
+        outcome: 'APPLIED',
+        payload: {
+          session_generation: 0,
+          config_generation: 13,
+          snapshot: v4Snapshot(13),
+        },
+      }
+    }
+    return { outcome: 'UNAVAILABLE' }
+  })
+  await waitAuthored(controller)
+  assert.equal(controller.getState().app.value.configGeneration, 12)
+  assert.equal(controller.getState().app.value.config.conf_threshold_permille, 1000)
+  const outcome = await controller.capabilities.applyConfig({
+    sessionGeneration: 0,
+    expectedConfigGeneration: 12,
+    candidate: bridgeSnapshot().config,
+  })
+  assert.equal(outcome.outcome, 'APPLIED')
+  assert.equal(outcome.configGeneration, 13)
+  assert.equal(controller.getState().app.value.configGeneration, 13)
+  assert.equal(controller.getState().app.value.config.counter_name, 'Counter Native')
+  assert.equal(controller.getState().app.value.config.line.y2, 955)
 })
 
 test('setBusinessEnable consumes only cross-checked APPLIED outcomes of the current session', async () => {
