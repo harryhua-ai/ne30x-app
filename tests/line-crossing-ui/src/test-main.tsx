@@ -109,6 +109,10 @@ if (params.get('scenario') === 'runtime') {
                 respond('APPLIED', { session_generation: sessionGeneration });
                 return;
             }
+            if (op === 'live.subscribe') {
+                respond('APPLIED', {});
+                return;
+            }
             respond('REJECTED', { reason: `runtime fixture does not implement ${op}` });
         },
         addEventListener: (_type: 'message', listener: (event: { data: unknown }) => void) => {
@@ -116,6 +120,18 @@ if (params.get('scenario') === 'runtime') {
         },
         removeEventListener: () => { portEmit = null; },
         start: () => undefined,
+    };
+    let streamSeq = 0;
+    const emitLive = (events: Array<Record<string, unknown>>) => {
+        streamSeq += 1;
+        portEmit?.({
+            protocol: BRIDGE_PROTOCOL,
+            type: 'EVENT',
+            seq: nextSeq(),
+            grant_id: grantId,
+            identity,
+            payload: { stream: 'live', stream_seq: streamSeq, data: { server_now_ms: Date.now(), events } },
+        });
     };
     const session = new BridgeSession();
     session.acceptHello({
@@ -134,7 +150,7 @@ if (params.get('scenario') === 'runtime') {
             grant_id: grantId,
             identity,
             expires_at_ms: Date.now() + 600000,
-            ops: ['snapshot.read', 'report-policy.read', 'enable.read', 'video.open', 'video.close'],
+            ops: ['snapshot.read', 'report-policy.read', 'enable.read', 'video.open', 'video.close', 'live.subscribe'],
         });
     }, 0);
     const controller = createRuntimeController(session, { pollIntervalMs: 1200 });
@@ -142,6 +158,7 @@ if (params.get('scenario') === 'runtime') {
         requests: () => received,
         state: () => controller.getState(),
         refresh: () => controller.refresh(),
+        emitLive,
     };
     render(
         <I18nProvider i18n={i18n}>

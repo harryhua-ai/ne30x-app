@@ -279,6 +279,20 @@ const validateLiveData = (value: unknown): Validation<{ server_now_ms: number; e
     return { ok: true, value: { server_now_ms: value.server_now_ms, events, tracks } };
 };
 
+const LIVE_EVENTS_WINDOW = 50;
+
+const mergeLiveEvents = (current: LineCountingEvent[], incoming: LineCountingEvent[]): LineCountingEvent[] => {
+    const seen = new Set(current.map((event) => event.sequence));
+    const merged = [...current];
+    for (const event of incoming) {
+        if (seen.has(event.sequence)) continue;
+        seen.add(event.sequence);
+        merged.push(event);
+    }
+    merged.sort((left, right) => right.sequence - left.sequence);
+    return merged.slice(0, LIVE_EVENTS_WINDOW);
+};
+
 const unavailable = <T>(reason: string): Capability<T> => ({ state: 'unavailable', reason });
 
 const outcomeReason = (op: BridgeOp, outcome: RequestOutcome): string => {
@@ -387,8 +401,10 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             return;
         }
         const patch: Partial<LineCrossingUiState> = {};
-        if (data.value.events !== null) {
-            patch.events = { state: 'available', value: { events: data.value.events, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
+        if (data.value.events !== null || ui.events.state === 'available') {
+            const current = ui.events.state === 'available' ? ui.events.value.events : [];
+            const merged = data.value.events === null ? current : mergeLiveEvents(current, data.value.events);
+            patch.events = { state: 'available', value: { events: merged, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
         }
         if (data.value.tracks !== null) {
             patch.tracks = { state: 'available', value: data.value.tracks, observedAtMs: Date.now() };

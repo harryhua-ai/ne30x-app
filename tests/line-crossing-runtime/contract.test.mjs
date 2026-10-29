@@ -908,6 +908,90 @@ test('STALE and GAP notifications are transient and later frames resync the live
   assert.equal(controller.getState().events.state, 'unavailable')
 })
 
+test('live events accumulate incrementally newest-first with sequence dedupe and a bounded window', async () => {
+  const liveFrame = (streamSeq, sequences, serverNowMs, targetClass) => ({
+    kind: 'event',
+    event: {
+      payload: {
+        stream: 'live',
+        stream_seq: streamSeq,
+        data: {
+          server_now_ms: serverNowMs,
+          events: sequences.map(sequence => ({
+            sequence,
+            timestamp_ms: serverNowMs - sequence * 100,
+            track_id: sequence,
+            direction: sequence % 2 === 0 ? 'out' : 'in',
+            target_class: targetClass,
+          })),
+        },
+      },
+    },
+  })
+  const { session, controller } = makeController(op => (op === 'live.subscribe' ? { outcome: 'APPLIED', payload: {} } : { outcome: 'UNAVAILABLE' }), {
+    ops: [...GRANT_OPS, 'live.subscribe'],
+  })
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'unavailable'), true)
+  session.emit(liveFrame(1, [1, 2], 10000, 'person'))
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'available'), true)
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [2, 1])
+  session.emit(liveFrame(2, [3], 20000, 'vehicle'))
+  await flushMicrotasks()
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [3, 2, 1])
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.target_class), ['vehicle', 'person', 'person'])
+  session.emit(liveFrame(3, [3], 30000, 'vehicle'))
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.value.events.length, 3)
+  assert.equal(controller.getState().events.value.server_now_ms, 30000)
+  session.emit(liveFrame(4, Array.from({ length: 60 }, (_, index) => index + 1), 40000, 'person'))
+  await flushMicrotasks()
+  const windowed = controller.getState().events.value.events
+  assert.equal(windowed.length, 50)
+  assert.deepEqual(windowed.map(event => event.sequence), Array.from({ length: 50 }, (_, index) => 60 - index))
+})
+
+test('a fresh seed after a GAP resync or a re-grant replaces the accumulated live events', async () => {
+  const frame = (streamSeq, sequences) => ({
+    kind: 'event',
+    event: {
+      payload: {
+        stream: 'live',
+        stream_seq: streamSeq,
+        data: {
+          server_now_ms: Date.now(),
+          events: sequences.map(sequence => ({ sequence, timestamp_ms: Date.now() - 1000, track_id: sequence, direction: 'in', target_class: 'person' })),
+        },
+      },
+    },
+  })
+  const status = (name, seq) => ({ kind: 'event', event: { payload: { stream: 'live', stream_seq: seq, status: name } } })
+  const { session, controller } = makeController(op => (op === 'live.subscribe' ? { outcome: 'APPLIED', payload: {} } : { outcome: 'UNAVAILABLE' }), {
+    ops: [...GRANT_OPS, 'live.subscribe'],
+  })
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'unavailable'), true)
+  session.emit(frame(1, [1]))
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'available'), true)
+  session.emit(frame(2, [2]))
+  await flushMicrotasks()
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [2, 1])
+  session.emit(status('GAP', 2))
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.state, 'stale')
+  session.emit(frame(3, [7, 8]))
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.state, 'available')
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [8, 7])
+  session.emit({
+    kind: 'grant',
+    grant: makeGrant({ seq: 3, ops: [...GRANT_OPS, 'live.subscribe'], expires_at_ms: Date.now() + 600000 }),
+  })
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'unavailable'), true)
+  assert.match(controller.getState().events.reason, /not been received/)
+  session.emit(frame(4, [20]))
+  assert.equal(await settleUntil(() => controller.getState().events.state === 'available'), true)
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [20])
+})
+
 test('a missing live producer keeps events and tracks unavailable with the real reason', async () => {
   const { controller } = makeController(op => (op === 'live.subscribe' ? { outcome: 'UNAVAILABLE', payload: { reason: 'live producer is not implemented' } } : { outcome: 'UNAVAILABLE' }), {
     ops: [...GRANT_OPS, 'live.subscribe'],
