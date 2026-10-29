@@ -41,6 +41,7 @@ if (params.get('scenario') === 'runtime') {
     };
     const received: Array<Record<string, unknown>> = [];
     let outboundSeq = 0;
+    let snapshotStorage: Record<string, unknown> | null = null;
     const nextSeq = () => { outboundSeq += 1; return outboundSeq; };
     const grantId = 'runtime-fixture-grant-0001';
     let portEmit: ((data: unknown) => void) | null = null;
@@ -65,7 +66,7 @@ if (params.get('scenario') === 'runtime') {
                 });
             };
             if (op === 'snapshot.read') {
-                respond('APPLIED', {
+                const payload: Record<string, unknown> = {
                     session_generation: sessionGeneration,
                     config_generation: 12,
                     config: candidate,
@@ -81,7 +82,9 @@ if (params.get('scenario') === 'runtime') {
                         },
                     },
                     stats: { window: { in: 5, out: 2 }, total: { in: 50, out: 20 } },
-                });
+                };
+                if (snapshotStorage !== null) payload.storage = snapshotStorage;
+                respond('APPLIED', payload);
                 return;
             }
             if (op === 'report-policy.read') {
@@ -159,6 +162,7 @@ if (params.get('scenario') === 'runtime') {
         state: () => controller.getState(),
         refresh: () => controller.refresh(),
         emitLive,
+        setStorage: (storage: Record<string, unknown> | null) => { snapshotStorage = storage; },
     };
     render(
         <I18nProvider i18n={i18n}>

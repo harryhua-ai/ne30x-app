@@ -13,6 +13,7 @@ import type {
     LineCrossingUiState,
     LineTrack,
     ResetOutcome,
+    StorageHealth,
     VideoStreamGrant,
 } from '../services/api/line-counting';
 import {
@@ -147,10 +148,18 @@ const adaptSnapshotV4 = (value: unknown, sessionGeneration: number): unknown => 
             window: { in: counters.in ?? 0, out: counters.out ?? 0 },
             total: { in: cumulative.in ?? 0, out: cumulative.out ?? 0 },
         },
+        ...(isPlainObject(value.storage) ? { storage: value.storage } : {}),
     };
 };
 
 const snapshotPayloadKeys = ['session_generation', 'config_generation', 'config', 'status', 'stats'] as const;
+
+const validateStorageHealth = (value: unknown): Validation<StorageHealth> => {
+    if (!isPlainObject(value) || !hasKeys(value, ['state', 'withheld'])) return failure('snapshot storage fields invalid');
+    if (typeof value.withheld !== 'boolean') return failure('snapshot storage withheld invalid');
+    if (value.state !== 'ok' && value.state !== 'none' && value.state !== 'degraded' && value.state !== 'corrupt' && value.state !== 'conflict' && value.state !== 'unknown') return failure('snapshot storage state unknown');
+    return { ok: true, value: { state: value.state, withheld: value.withheld } };
+};
 
 const validateSnapshotPayload = (value: unknown): Validation<{
     session_generation: number;
@@ -158,15 +167,24 @@ const validateSnapshotPayload = (value: unknown): Validation<{
     config: LineCrossingConfigCandidate;
     status: LineCountingStatus;
     stats: LineCountingStats | null;
+    storage?: StorageHealth;
 }> => {
     if (!isPlainObject(value)) return failure('snapshot is not an object');
     const hasStats = Object.prototype.hasOwnProperty.call(value, 'stats');
-    if (!hasKeys(value, hasStats ? snapshotPayloadKeys : snapshotPayloadKeys.slice(0, 4))) return failure('snapshot fields do not match the v1 schema');
+    const hasStorage = Object.prototype.hasOwnProperty.call(value, 'storage');
+    const baseKeys = hasStats ? snapshotPayloadKeys : snapshotPayloadKeys.slice(0, 4);
+    if (!hasKeys(value, hasStorage ? [...baseKeys, 'storage'] : baseKeys)) return failure('snapshot fields do not match the v1 schema');
     if (!isInt(value.session_generation, 0, 4294967295) || !isInt(value.config_generation, 0, 4294967295)) return failure('snapshot generations invalid');
     const config = validateCandidateConfig(value.config);
     if (!config.ok) return config;
     const status = validateStatus(value.status);
     if (!status.ok) return status;
+    let storage: StorageHealth | undefined;
+    if (hasStorage) {
+        const checked = validateStorageHealth(value.storage);
+        if (!checked.ok) return checked;
+        storage = checked.value;
+    }
     let stats: LineCountingStats | null = null;
     if (hasStats) {
         const checked = validateStats(value.stats);
@@ -181,6 +199,7 @@ const validateSnapshotPayload = (value: unknown): Validation<{
             config: config.value,
             status: status.value,
             stats,
+            ...(hasStorage ? { storage } : {}),
         },
     };
 };
@@ -464,6 +483,7 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                         observedAtMs: now,
                         config: payload.value.config,
                         status: payload.value.status,
+                        ...(payload.value.storage ? { storage: payload.value.storage } : {}),
                     };
                     patch.app = { state: 'available', value: snapshot, observedAtMs: now };
                     if (payload.value.stats !== null) patch.stats = { state: 'available', value: payload.value.stats, observedAtMs: now };
@@ -585,6 +605,7 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                 observedAtMs: Date.now(),
                 config: snapshot.value.config,
                 status: snapshot.value.status,
+                ...(snapshot.value.storage ? { storage: snapshot.value.storage } : {}),
             };
             emitPatch({
                 app: { state: 'available', value: appliedSnapshot, observedAtMs: appliedSnapshot.observedAtMs },

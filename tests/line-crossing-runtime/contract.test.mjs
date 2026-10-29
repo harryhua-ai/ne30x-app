@@ -720,6 +720,54 @@ test('a snapshot without statistics leaves stats honestly unavailable', async ()
   assert.match(state.stats.reason, /did not include statistics/)
 })
 
+test('a storage-degraded v4 snapshot with a quiet live stream surfaces the degraded storage state', async () => {
+  const v4Snapshot = (storage) => ({
+    schema: 'line-crossing/1',
+    config_generation: 12,
+    state_revision: 147,
+    enable_state: 'enabled',
+    app_state: 'running',
+    storage,
+    model: { valid: true, generation: 1, class_generation: 1, target_class: 'person' },
+    cumulative: { in: 50, out: 20 },
+    counters: { in: 5, out: 2 },
+    active_config: {
+      counter_name: 'Counter Native',
+      target_class_name: 'person',
+      line: { x1_permille: 460, y1_permille: 156, x2_permille: 462, y2_permille: 955 },
+      outside: { x_permille: 311, y_permille: 556 },
+      conf_threshold_permille: 1000,
+      max_dist_permille: 250,
+      track_history_k: 8,
+      max_miss: 5,
+      k_confirm: 5,
+      window_minutes: 5,
+      tracks_report_enable: false,
+      heat_grid_enable: false,
+    },
+  })
+  const { session, controller } = makeController(op => {
+    if (op === 'snapshot.read') return { outcome: 'APPLIED', payload: v4Snapshot({ state: 'degraded', withheld: true }) }
+    if (op === 'live.subscribe') return { outcome: 'APPLIED', payload: {} }
+    return { outcome: 'UNAVAILABLE' }
+  }, { ops: [...GRANT_OPS, 'live.subscribe'] })
+  assert.equal(await waitAuthored(controller), true)
+  assert.deepEqual(controller.getState().app.value.storage, { state: 'degraded', withheld: true })
+  assert.equal(controller.getState().events.state, 'unavailable')
+  session.emit({ kind: 'event', event: { payload: { stream: 'live', stream_seq: 1, status: 'STALE' } } })
+  await flushMicrotasks()
+  assert.equal(controller.getState().events.state, 'unavailable')
+  assert.deepEqual(controller.getState().app.value.storage, { state: 'degraded', withheld: true })
+})
+
+test('snapshot storage health fails closed on malformed payloads', async () => {
+  const bogusState = makeController(op => (op === 'snapshot.read' ? { outcome: 'APPLIED', payload: bridgeSnapshot({ storage: { state: 'exploded', withheld: true } }) } : { outcome: 'UNAVAILABLE' }))
+  assert.equal(await settleUntil(() => bogusState.controller.getState().app.state === 'unavailable' && /storage/.test(bogusState.controller.getState().app.reason || '')), true)
+
+  const missingWithheld = makeController(op => (op === 'snapshot.read' ? { outcome: 'APPLIED', payload: bridgeSnapshot({ storage: { state: 'ok' } }) } : { outcome: 'UNAVAILABLE' }))
+  assert.equal(await settleUntil(() => missingWithheld.controller.getState().app.state === 'unavailable' && /storage/.test(missingWithheld.controller.getState().app.reason || '')), true)
+})
+
 test('config.apply commits only generation-consistent APPLIED results', async () => {
   const applied = (configGeneration, sessionGeneration = 8) => ({
     outcome: 'APPLIED',

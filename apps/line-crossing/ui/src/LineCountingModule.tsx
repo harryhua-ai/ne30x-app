@@ -548,7 +548,7 @@ export default function LineCountingModule({ capabilities = unavailableCapabilit
             </div>
 
             {page === 'realtime' && <div className="space-y-3" data-testid="lc-page-realtime">
-                <StatsAndEvents stats={freshCapability(state?.stats) as Capability<LineCountingStats>} events={freshCapability(state?.events) as Capability<LineCountingEvents>} targetClass={appSnapshot?.status.target_class ?? ''} />
+                <StatsAndEvents stats={freshCapability(state?.stats) as Capability<LineCountingStats>} events={freshCapability(state?.events) as Capability<LineCountingEvents>} targetClass={appSnapshot?.status.target_class ?? ''} storage={appSnapshot?.storage} />
                 <div className="flex justify-end">
                     <Button variant="outline" onClick={() => setConfirmResetStats(true)} disabled={!canResetStats || resetBusy} data-testid="lc-reset-stats">
                         {resetBusy ? <RefreshCw className="h-4 w-4 animate-spin" /> : i18n._('sys.line_counting.reset_stats')}
