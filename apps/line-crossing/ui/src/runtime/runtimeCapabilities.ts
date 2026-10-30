@@ -422,7 +422,7 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             emitPatch({ events: unavailable(liveReason), tracks: unavailable(liveReason) });
             return;
         }
-        const patch: Partial<LineCountingUiState> = {};
+        const patch: Partial<LineCrossingUiState> = {};
         if (data.value.events !== null || ui.events.state === 'available') {
             liveEvents = data.value.events === null ? liveEvents : mergeLiveEvents(liveEvents, data.value.events);
             patch.events = { state: 'available', value: { events: liveEvents, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
