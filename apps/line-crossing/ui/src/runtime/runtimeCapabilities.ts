@@ -298,7 +298,7 @@ const validateLiveData = (value: unknown): Validation<{ server_now_ms: number; e
     return { ok: true, value: { server_now_ms: value.server_now_ms, events, tracks } };
 };
 
-const LIVE_EVENTS_WINDOW = 50;
+const LIVE_EVENTS_WINDOW = 200;
 
 const mergeLiveEvents = (current: LineCountingEvent[], incoming: LineCountingEvent[]): LineCountingEvent[] => {
     const seen = new Set(current.map((event) => event.sequence));
@@ -357,6 +357,9 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
     let livePhase: 'idle' | 'active' | 'failed' = 'idle';
     let liveReason = 'Host has not granted live.subscribe';
     let lastStreamSeq = -1;
+    let liveEvents: LineCountingEvent[] = [];
+    let statsBase: LineCountingStats | null = null;
+    let statsAppliedSeq = 0;
     let refreshInFlight = false;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let disposed = false;
@@ -419,11 +422,26 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             emitPatch({ events: unavailable(liveReason), tracks: unavailable(liveReason) });
             return;
         }
-        const patch: Partial<LineCrossingUiState> = {};
+        const patch: Partial<LineCountingUiState> = {};
         if (data.value.events !== null || ui.events.state === 'available') {
-            const current = ui.events.state === 'available' ? ui.events.value.events : [];
-            const merged = data.value.events === null ? current : mergeLiveEvents(current, data.value.events);
-            patch.events = { state: 'available', value: { events: merged, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
+            liveEvents = data.value.events === null ? liveEvents : mergeLiveEvents(liveEvents, data.value.events);
+            patch.events = { state: 'available', value: { events: liveEvents, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
+            if (data.value.events !== null && statsBase !== null) {
+                const next = { window: { ...statsBase.window }, total: { ...statsBase.total } };
+                for (const event of data.value.events) {
+                    if (event.sequence <= statsAppliedSeq) continue;
+                    if (event.direction === 'in') {
+                        next.window.in += 1;
+                        next.total.in += 1;
+                    } else {
+                        next.window.out += 1;
+                        next.total.out += 1;
+                    }
+                    if (event.sequence > statsAppliedSeq) statsAppliedSeq = event.sequence;
+                }
+                statsBase = next;
+                patch.stats = { state: 'available', value: next, observedAtMs: Date.now() };
+            }
         }
         if (data.value.tracks !== null) {
             patch.tracks = { state: 'available', value: data.value.tracks, observedAtMs: Date.now() };
@@ -486,7 +504,11 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                         ...(payload.value.storage ? { storage: payload.value.storage } : {}),
                     };
                     patch.app = { state: 'available', value: snapshot, observedAtMs: now };
-                    if (payload.value.stats !== null) patch.stats = { state: 'available', value: payload.value.stats, observedAtMs: now };
+                    if (payload.value.stats !== null) {
+                        statsBase = payload.value.stats;
+                        statsAppliedSeq = liveEvents[0]?.sequence ?? 0;
+                        patch.stats = { state: 'available', value: payload.value.stats, observedAtMs: now };
+                    }
                     else patch.stats = unavailable('Host snapshot did not include statistics');
                 } else {
                     patch.app = unavailable(`Host snapshot failed validation: ${payload.reason}`);
