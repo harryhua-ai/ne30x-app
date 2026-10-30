@@ -160,11 +160,15 @@ def gh(args: list[str]) -> tuple[int, str]:
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
 
+GH_HTTP_STATUS = re.compile(r"\(HTTP (\d{3})\)")
+
+
 def gh_not_found(args: list[str]) -> bool:
     code, body = gh(args)
     if code == 0:
         return False
-    if "404" in body or "Not Found" in body:
+    match = GH_HTTP_STATUS.search(body)
+    if match is not None and match.group(1) == "404":
         return True
     raise ReleaseToolError(f"gh api failed for {args[1] if len(args) > 1 else args[0]}: {body}")
 
@@ -176,14 +180,16 @@ def check_conflicts(repo_version: str, repo_slug: str) -> list[str]:
         conflicts.append(f"tag {repo_version} already exists")
     if not gh_not_found(["api", f"repos/{repo_slug}/releases/tags/{repo_version}"]):
         conflicts.append(f"release {repo_version} already exists")
-    code, body = gh(["api", "--paginate",
+    code, body = gh(["api", "--paginate", "--slurp",
                      f"repos/{repo_slug}/releases?per_page=100"])
     if code != 0:
         raise ReleaseToolError(f"unable to list releases: {body}")
-    for release in json.loads(body):
-        if release.get("draft") and release.get("tag_name") == repo_version:
-            conflicts.append(f"draft release {repo_version} already exists")
-            break
+    pages = json.loads(body) if body.strip() else []
+    for page in pages:
+        for release in page:
+            if release.get("draft") and release.get("tag_name") == repo_version:
+                conflicts.append(f"draft release {repo_version} already exists")
+                break
     return conflicts
 
 
@@ -208,10 +214,16 @@ def create_draft(repo_version: str, target_sha: str, title: str,
     code, body = gh(["release", "upload", repo_version,
                      *[str(asset) for asset in assets]])
     if code != 0:
-        gh(["release", "delete", repo_version, "--yes"])
-        raise ReleaseToolError(
-            f"gh release upload failed: {body}; the draft created by this "
-            "invocation was removed")
+        delete_code, delete_body = gh(["release", "delete", repo_version,
+                                       "--yes"])
+        if delete_code == 0:
+            cleanup = "the draft created by this invocation was removed"
+        else:
+            cleanup = ("the draft created by this invocation could NOT be "
+                       "confirmed removed (gh release delete failed: "
+                       f"{delete_body}); verify ownership and remove it "
+                       "manually")
+        raise ReleaseToolError(f"gh release upload failed: {body}; {cleanup}")
     return url
 
 

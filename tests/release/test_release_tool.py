@@ -143,27 +143,48 @@ class CheckConflictsTest(unittest.TestCase):
             release_tool.gh = original
 
     def test_no_conflicts_when_everything_missing(self):
-        self.responses = [(1, "404 Not Found"), (1, "404 Not Found"),
-                          (0, "[]")]
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
+                          (1, "gh: Not Found (HTTP 404)"), (0, "[]")]
         self.assertEqual(self.run_check(), [])
 
     def test_existing_tag_conflicts(self):
-        self.responses = [(0, '{"ref": "refs/tags/v1.0.0"}'), (1, "404"),
-                          (0, "[]")]
+        self.responses = [(0, '{"ref": "refs/tags/v1.0.0"}'),
+                          (1, "gh: Not Found (HTTP 404)"), (0, "[]")]
         conflicts = self.run_check()
         self.assertEqual(conflicts, ["tag v1.0.0 already exists"])
 
     def test_existing_published_release_conflicts(self):
-        self.responses = [(1, "404"), (0, '{"id": 1}'), (0, "[]")]
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
+                          (0, '{"id": 1}'), (0, "[]")]
         conflicts = self.run_check()
         self.assertEqual(conflicts, ["release v1.0.0 already exists"])
 
     def test_existing_draft_conflicts(self):
-        drafts = json.dumps([{"draft": True, "tag_name": "v1.0.0"},
-                             {"draft": True, "tag_name": "v2.0.0"}])
-        self.responses = [(1, "404"), (1, "404"), (0, drafts)]
+        drafts = json.dumps([[{"draft": True, "tag_name": "v1.0.0"},
+                              {"draft": True, "tag_name": "v2.0.0"}]])
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
+                          (1, "gh: Not Found (HTTP 404)"), (0, drafts)]
         conflicts = self.run_check()
         self.assertEqual(conflicts, ["draft release v1.0.0 already exists"])
+
+    def test_draft_conflict_detected_on_second_page(self):
+        page_one = json.dumps([{"draft": True, "tag_name": "v9.0.0"}] * 100)
+        page_two = json.dumps([{"draft": True, "tag_name": "v1.0.0"}])
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
+                          (1, "gh: Not Found (HTTP 404)"),
+                          (0, json.dumps([json.loads(page_one),
+                                          json.loads(page_two)]))]
+        conflicts = self.run_check()
+        self.assertEqual(conflicts, ["draft release v1.0.0 already exists"])
+
+    def test_cross_page_without_conflict_returns_empty(self):
+        page_one = json.dumps([{"draft": True, "tag_name": "v9.0.0"}])
+        page_two = json.dumps([{"draft": False, "tag_name": "v1.0.0"}])
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
+                          (1, "gh: Not Found (HTTP 404)"),
+                          (0, json.dumps([json.loads(page_one),
+                                          json.loads(page_two)]))]
+        self.assertEqual(self.run_check(), [])
 
     def test_tag_endpoint_denial_fails_closed(self):
         self.responses = [(1, "gh: Forbidden (HTTP 403)")]
@@ -171,15 +192,27 @@ class CheckConflictsTest(unittest.TestCase):
             self.run_check()
 
     def test_release_endpoint_denial_fails_closed(self):
-        self.responses = [(1, "404 Not Found"),
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
                           (1, "gh: auth error (HTTP 401)")]
         with self.assertRaises(release_tool.ReleaseToolError):
             self.run_check()
 
     def test_gh_api_hard_failure_fails_closed(self):
-        self.responses = [(1, "404"), (1, "404"), (1, "gh: auth error")]
+        self.responses = [(1, "gh: Not Found (HTTP 404)"),
+                          (1, "gh: Not Found (HTTP 404)"),
+                          (1, "gh: auth error")]
         with self.assertRaises(release_tool.ReleaseToolError):
             self.run_check()
+
+    def test_403_body_mentioning_404_fails_closed(self):
+        self.responses = [(1, "gh: Forbidden (HTTP 403): hint 404")]
+        with self.assertRaises(release_tool.ReleaseToolError):
+            self.run_check()
+
+    def test_404_status_detected_without_not_found_text(self):
+        self.responses = [(1, "gh: request failed (HTTP 404)"),
+                          (1, "gh: request failed (HTTP 404)"), (0, "[]")]
+        self.assertEqual(self.run_check(), [])
 
 
 class CreateDraftTest(unittest.TestCase):
@@ -245,6 +278,34 @@ class CreateDraftTest(unittest.TestCase):
         self.assertIn("was removed", str(ctx.exception))
         self.assertEqual(calls[-1], ("release", "delete"))
         self.assertIn(("release", "create"), [c for c in calls])
+
+    def test_failed_upload_delete_failure_requires_manual_verification(self):
+        calls = []
+
+        def fake_gh(args):
+            calls.append((args[0], args[1] if len(args) > 1 else None))
+            if args[1] == "create":
+                return 0, "https://example.com/draft\n"
+            if args[1] == "delete":
+                return 1, "delete boom"
+            return 1, "upload boom"
+
+        original = release_tool.gh
+        release_tool.gh = fake_gh
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                notes = Path(tmp) / "notes.md"
+                notes.write_text("body", encoding="utf-8")
+                with self.assertRaises(release_tool.ReleaseToolError) as ctx:
+                    release_tool.create_draft("v1.0.0", "a" * 40, "t", notes,
+                                              [])
+        finally:
+            release_tool.gh = original
+        self.assertNotIn("was removed", str(ctx.exception))
+        self.assertIn("could NOT be confirmed removed", str(ctx.exception))
+        self.assertIn("verify ownership and remove it manually",
+                      str(ctx.exception))
+        self.assertEqual(calls[-1], ("release", "delete"))
 
     def test_successful_create_returns_url_without_delete(self):
         calls = []
