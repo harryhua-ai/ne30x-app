@@ -39,17 +39,35 @@ export interface RequestOutcome {
     reason?: string;
 }
 
+interface PendingRequest {
+    op: BridgeOp;
+    resolve: (outcome: RequestOutcome) => void;
+}
+
 export interface BridgeSessionOptions {
     deadlineMs?: number;
     nowFn?: () => number;
     setTimeoutFn?: (handler: () => void, timeout: number) => unknown;
     clearTimeoutFn?: (handle: unknown) => void;
+    randomFn?: () => number;
 }
 
-interface PendingRequest {
-    op: BridgeOp;
-    resolve: (outcome: RequestOutcome) => void;
-}
+const REQUEST_ID_SEED_FLOOR = 0x40000000;
+const REQUEST_ID_SEED_MASK = 0x3ffffffe;
+const REQUEST_ID_MAX = 0x7fffffff;
+
+const defaultRandomInt32 = (): number => {
+    const scope = globalThis as { crypto?: { getRandomValues?: (view: Uint32Array) => Uint32Array } };
+    if (typeof scope.crypto?.getRandomValues === 'function') {
+        const view = new Uint32Array(1);
+        scope.crypto.getRandomValues(view);
+        return view[0] | 0;
+    }
+    return Math.floor(Math.random() * 0x100000000) | 0;
+};
+
+const seedOutboundRequestId = (randomFn: () => number): number =>
+    (Math.floor(randomFn()) & REQUEST_ID_SEED_MASK) | REQUEST_ID_SEED_FLOOR;
 
 const sameIdentity = (a: BridgeIdentity, b: BridgeIdentity): boolean =>
     JSON.stringify(a) === JSON.stringify(b);
@@ -63,7 +81,7 @@ export class BridgeSession {
     private portListener: ((event: { data: unknown }) => void) | null = null;
     private lastInboundSeq = -1;
     private outboundSeq = 0;
-    private outboundRequestId = 0;
+    private outboundRequestId: number;
     private readonly pending = new Map<number, PendingRequest>();
     private readonly listeners = new Set<(notification: BridgeNotification) => void>();
     private readonly deadlineMs: number;
@@ -77,6 +95,7 @@ export class BridgeSession {
         this.nowFn = options.nowFn ?? (() => Date.now());
         this.setTimeoutFn = options.setTimeoutFn ?? ((handler, timeout) => setTimeout(handler, timeout));
         this.clearTimeoutFn = options.clearTimeoutFn ?? ((handle) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+        this.outboundRequestId = seedOutboundRequestId(options.randomFn ?? defaultRandomInt32);
     }
 
     getPhase(): BridgePhase {
@@ -139,7 +158,7 @@ export class BridgeSession {
         if (this.pending.size >= MAX_PENDING_REQUESTS) {
             return Promise.resolve({ outcome: 'UNAVAILABLE', reason: 'Bridge pending request limit reached' });
         }
-        const requestId = this.outboundRequestId + 1;
+        const requestId = this.outboundRequestId >= REQUEST_ID_MAX ? 1 : this.outboundRequestId + 1;
         const seq = this.outboundSeq + 1;
         const message: BridgeRequest = {
             protocol: 'ne301.sidecar.bridge.v1',

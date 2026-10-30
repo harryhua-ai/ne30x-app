@@ -13,6 +13,7 @@ import type {
     LineCrossingUiState,
     LineTrack,
     ResetOutcome,
+    StorageHealth,
     VideoStreamGrant,
 } from '../services/api/line-counting';
 import {
@@ -95,7 +96,70 @@ const validateStats = (value: unknown): Validation<LineCountingStats> => {
     return { ok: true, value: value as unknown as LineCountingStats };
 };
 
+const adaptSnapshotV4 = (value: unknown, sessionGeneration: number): unknown => {
+    if (!isPlainObject(value) || value.schema !== 'line-crossing/1' || !isPlainObject(value.active_config)) {
+        return value;
+    }
+    const model = isPlainObject(value.model) ? value.model : {};
+    const counters = isPlainObject(value.counters) ? value.counters : {};
+    const cumulative = isPlainObject(value.cumulative) ? value.cumulative : {};
+    const cfg = value.active_config;
+    const line = isPlainObject(cfg.line) ? cfg.line : {};
+    const outside = isPlainObject(cfg.outside) ? cfg.outside : {};
+    const targetClass = typeof model.target_class === 'string' ? model.target_class : '';
+    return {
+        session_generation: sessionGeneration,
+        config_generation: value.config_generation,
+        config: {
+            schema: 1,
+            counter_name: cfg.counter_name,
+            target_class_name: cfg.target_class_name,
+            line: {
+                x1: line.x1_permille,
+                y1: line.y1_permille,
+                x2: line.x2_permille,
+                y2: line.y2_permille,
+                outside_x: outside.x_permille,
+                outside_y: outside.y_permille,
+            },
+            conf_threshold_permille: cfg.conf_threshold_permille,
+            max_dist_permille: cfg.max_dist_permille,
+            track_history_k: cfg.track_history_k,
+            max_miss: cfg.max_miss,
+            k_confirm: cfg.k_confirm,
+            tracks_report_enable: cfg.tracks_report_enable,
+            heat_grid_enable: cfg.heat_grid_enable,
+            window_minutes: cfg.window_minutes,
+        },
+        status: {
+            state: value.enable_state === 'disabled'
+                ? 'stopped'
+                : value.app_state === 'running' ? 'running' : 'unknown',
+            target_class: targetClass,
+            model: {
+                name: 'line-crossing',
+                version: '4',
+                postprocess_type: 'unreported',
+                generation: typeof model.generation === 'number' ? model.generation : 0,
+                classes: targetClass ? [{ id: 0, name: targetClass }] : [],
+            },
+        },
+        stats: {
+            window: { in: counters.in ?? 0, out: counters.out ?? 0 },
+            total: { in: cumulative.in ?? 0, out: cumulative.out ?? 0 },
+        },
+        ...(isPlainObject(value.storage) ? { storage: value.storage } : {}),
+    };
+};
+
 const snapshotPayloadKeys = ['session_generation', 'config_generation', 'config', 'status', 'stats'] as const;
+
+const validateStorageHealth = (value: unknown): Validation<StorageHealth> => {
+    if (!isPlainObject(value) || !hasKeys(value, ['state', 'withheld'])) return failure('snapshot storage fields invalid');
+    if (typeof value.withheld !== 'boolean') return failure('snapshot storage withheld invalid');
+    if (value.state !== 'ok' && value.state !== 'none' && value.state !== 'degraded' && value.state !== 'corrupt' && value.state !== 'conflict' && value.state !== 'unknown') return failure('snapshot storage state unknown');
+    return { ok: true, value: { state: value.state, withheld: value.withheld } };
+};
 
 const validateSnapshotPayload = (value: unknown): Validation<{
     session_generation: number;
@@ -103,15 +167,24 @@ const validateSnapshotPayload = (value: unknown): Validation<{
     config: LineCrossingConfigCandidate;
     status: LineCountingStatus;
     stats: LineCountingStats | null;
+    storage?: StorageHealth;
 }> => {
     if (!isPlainObject(value)) return failure('snapshot is not an object');
     const hasStats = Object.prototype.hasOwnProperty.call(value, 'stats');
-    if (!hasKeys(value, hasStats ? snapshotPayloadKeys : snapshotPayloadKeys.slice(0, 4))) return failure('snapshot fields do not match the v1 schema');
+    const hasStorage = Object.prototype.hasOwnProperty.call(value, 'storage');
+    const baseKeys = hasStats ? snapshotPayloadKeys : snapshotPayloadKeys.slice(0, 4);
+    if (!hasKeys(value, hasStorage ? [...baseKeys, 'storage'] : baseKeys)) return failure('snapshot fields do not match the v1 schema');
     if (!isInt(value.session_generation, 0, 4294967295) || !isInt(value.config_generation, 0, 4294967295)) return failure('snapshot generations invalid');
     const config = validateCandidateConfig(value.config);
     if (!config.ok) return config;
     const status = validateStatus(value.status);
     if (!status.ok) return status;
+    let storage: StorageHealth | undefined;
+    if (hasStorage) {
+        const checked = validateStorageHealth(value.storage);
+        if (!checked.ok) return checked;
+        storage = checked.value;
+    }
     let stats: LineCountingStats | null = null;
     if (hasStats) {
         const checked = validateStats(value.stats);
@@ -126,6 +199,7 @@ const validateSnapshotPayload = (value: unknown): Validation<{
             config: config.value,
             status: status.value,
             stats,
+            ...(hasStorage ? { storage } : {}),
         },
     };
 };
@@ -224,6 +298,20 @@ const validateLiveData = (value: unknown): Validation<{ server_now_ms: number; e
     return { ok: true, value: { server_now_ms: value.server_now_ms, events, tracks } };
 };
 
+const LIVE_EVENTS_WINDOW = 50;
+
+const mergeLiveEvents = (current: LineCountingEvent[], incoming: LineCountingEvent[]): LineCountingEvent[] => {
+    const seen = new Set(current.map((event) => event.sequence));
+    const merged = [...current];
+    for (const event of incoming) {
+        if (seen.has(event.sequence)) continue;
+        seen.add(event.sequence);
+        merged.push(event);
+    }
+    merged.sort((left, right) => right.sequence - left.sequence);
+    return merged.slice(0, LIVE_EVENTS_WINDOW);
+};
+
 const unavailable = <T>(reason: string): Capability<T> => ({ state: 'unavailable', reason });
 
 const outcomeReason = (op: BridgeOp, outcome: RequestOutcome): string => {
@@ -316,10 +404,11 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             emitPatch({ events: unavailable(liveReason), tracks: unavailable(liveReason) });
             return;
         }
-        if (event.payload.status === 'GAP' || event.payload.status === 'STALE' || event.payload.stream_seq <= lastStreamSeq) {
-            livePhase = 'failed';
-            liveReason = 'Live stream sequence gap detected; awaiting Host resync';
-            emitPatch({ events: unavailable(liveReason), tracks: unavailable(liveReason) });
+        if (event.payload.status === 'GAP' || event.payload.status === 'STALE') {
+            liveReason = 'Live stream is stale; awaiting the next frame';
+            if (ui.events.state === 'available' || ui.tracks.state === 'available') {
+                emitPatch({ events: { state: 'stale', reason: liveReason }, tracks: { state: 'stale', reason: liveReason } });
+            }
             return;
         }
         lastStreamSeq = event.payload.stream_seq;
@@ -331,8 +420,10 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             return;
         }
         const patch: Partial<LineCrossingUiState> = {};
-        if (data.value.events !== null) {
-            patch.events = { state: 'available', value: { events: data.value.events, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
+        if (data.value.events !== null || ui.events.state === 'available') {
+            const current = ui.events.state === 'available' ? ui.events.value.events : [];
+            const merged = data.value.events === null ? current : mergeLiveEvents(current, data.value.events);
+            patch.events = { state: 'available', value: { events: merged, server_now_ms: data.value.server_now_ms }, observedAtMs: Date.now() };
         }
         if (data.value.tracks !== null) {
             patch.tracks = { state: 'available', value: data.value.tracks, observedAtMs: Date.now() };
@@ -382,7 +473,9 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             const patch: Partial<LineCrossingUiState> = {};
             const now = Date.now();
             if (snapshotResult.outcome === 'APPLIED') {
-                const payload = validateSnapshotPayload(snapshotResult.payload);
+                const payload = validateSnapshotPayload(adaptSnapshotV4(
+                    snapshotResult.payload,
+                    session.getIdentity()?.native_session_generation ?? 0));
                 if (payload.ok) {
                     const snapshot: AppSnapshot = {
                         sessionGeneration: payload.value.session_generation,
@@ -390,6 +483,7 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                         observedAtMs: now,
                         config: payload.value.config,
                         status: payload.value.status,
+                        ...(payload.value.storage ? { storage: payload.value.storage } : {}),
                     };
                     patch.app = { state: 'available', value: snapshot, observedAtMs: now };
                     if (payload.value.stats !== null) patch.stats = { state: 'available', value: payload.value.stats, observedAtMs: now };
@@ -490,7 +584,11 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
             });
             if (result.outcome !== 'APPLIED') return { outcome: result.outcome === 'REJECTED' ? 'UNAVAILABLE' : result.outcome, reason: outcomeReason('config.apply', result) };
             const payload = isPlainObject(result.payload) ? result.payload : null;
-            const snapshot = payload ? validateSnapshotPayload(payload.snapshot) : failure('config result has no snapshot');
+            const snapshot = payload
+                ? validateSnapshotPayload(adaptSnapshotV4(
+                    payload.snapshot,
+                    session.getIdentity()?.native_session_generation ?? 0))
+                : failure('config result has no snapshot');
             if (!payload
                 || !snapshot.ok
                 || !isInt(payload.session_generation, 0, 4294967295)
@@ -507,6 +605,7 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                 observedAtMs: Date.now(),
                 config: snapshot.value.config,
                 status: snapshot.value.status,
+                ...(snapshot.value.storage ? { storage: snapshot.value.storage } : {}),
             };
             emitPatch({
                 app: { state: 'available', value: appliedSnapshot, observedAtMs: appliedSnapshot.observedAtMs },
@@ -616,7 +715,9 @@ export function createRuntimeController(session: BridgeSession, options: Runtime
                     });
                 },
             };
-            return { state: 'available', value: grant, observedAtMs: Date.now() };
+            const granted: Capability<VideoStreamGrant> = { state: 'available', value: grant, observedAtMs: Date.now() };
+            emitPatch({ video: granted });
+            return granted;
         },
     };
 

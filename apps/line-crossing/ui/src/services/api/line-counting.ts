@@ -88,12 +88,18 @@ export interface LineCrossingConfigCandidate {
     window_minutes: number;
 }
 
+export interface StorageHealth {
+    state: 'ok' | 'none' | 'degraded' | 'corrupt' | 'conflict' | 'unknown';
+    withheld: boolean;
+}
+
 export interface AppSnapshot {
     sessionGeneration: number;
     configGeneration: number;
     observedAtMs: number;
     config: LineCrossingConfigCandidate;
     status: LineCountingStatus;
+    storage?: StorageHealth;
 }
 
 export interface HostPolicyConfig {

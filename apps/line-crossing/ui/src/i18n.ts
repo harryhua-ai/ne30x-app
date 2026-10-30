@@ -28,6 +28,7 @@ const appMessages = {
         'lineCrossing.confirmResetLine': 'Reset line',
         'lineCrossing.videoExpired': 'Video authorization expired',
         'lineCrossing.sessionChanged': 'App session changed; reload the current snapshot',
+        'lineCrossing.storageDegraded': 'Storage degraded; live updates paused',
     },
     zh: {
         'lineCrossing.unavailable': '不可用',
@@ -54,6 +55,7 @@ const appMessages = {
         'lineCrossing.confirmResetLine': '重置计数线',
         'lineCrossing.videoExpired': '视频授权已过期',
         'lineCrossing.sessionChanged': 'App 会话已变化，请重新加载当前快照',
+        'lineCrossing.storageDegraded': '存储已降级，实时更新已暂停',
     },
 };
 

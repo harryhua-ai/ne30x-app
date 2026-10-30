@@ -1,11 +1,12 @@
 import { useLingui } from '@lingui/react';
 import { Card, CardContent } from '@/components/ui/card';
-import type { Capability, LineCountingStats, LineCountingEvents } from '@/services/api/line-counting';
+import type { Capability, LineCountingStats, LineCountingEvents, StorageHealth } from '@/services/api/line-counting';
 
 export interface StatsAndEventsProps {
     stats: Capability<LineCountingStats>;
     events: Capability<LineCountingEvents>;
     targetClass: string;
+    storage?: StorageHealth;
 }
 
 function StatCell({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
@@ -19,11 +20,12 @@ function StatCell({ label, value, accent }: { label: string; value: number | str
 
 const COLS = 'grid grid-cols-[64px_minmax(64px,1.3fr)_64px_minmax(56px,1fr)] lg:grid-cols-[80px_150px_80px_minmax(0,1fr)] items-center gap-x-2 px-1';
 
-export default function StatsAndEvents({ stats, events, targetClass }: StatsAndEventsProps) {
+export default function StatsAndEvents({ stats, events, targetClass, storage }: StatsAndEventsProps) {
     const { i18n } = useLingui();
     const statValues = stats.state === 'available' ? stats.value : null;
     const eventValues = events.state === 'available' ? events.value : null;
     const list = eventValues?.events ?? [];
+    const storageDegraded = storage !== undefined && storage.withheld === true;
     const unavailableText = (state: Capability<unknown>['state']) => state === 'stale'
         ? i18n._('lineCrossing.stale')
         : i18n._('lineCrossing.unavailable');
@@ -57,7 +59,7 @@ export default function StatsAndEvents({ stats, events, targetClass }: StatsAndE
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto pr-1" data-testid="lc-event-list">
                         {!eventValues
-                            ? <div data-testid="lc-events-unavailable" className="flex h-full items-center justify-center text-xs text-gray-400">{unavailableText(events.state)}</div>
+                            ? <div data-testid="lc-events-unavailable" className="flex h-full items-center justify-center text-xs text-gray-400">{storageDegraded ? i18n._('lineCrossing.storageDegraded') : unavailableText(events.state)}</div>
                             : list.length === 0
                                 ? <div className="flex h-full items-center justify-center text-xs text-gray-400">{i18n._('sys.line_counting.no_events')}</div>
                                 : <ul>

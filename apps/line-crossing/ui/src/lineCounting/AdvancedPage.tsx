@@ -95,7 +95,7 @@ export default function AdvancedPage({
                             testId="lc-host-backlog-capacity"
                             value={hostConfig.backlog_capacity}
                             min={1}
-                            max={256}
+                            max={8}
                             step={1}
                             disabled={!hostWriteAllowed}
                             onChange={(value) => onHostChange({ backlog_capacity: value })}
