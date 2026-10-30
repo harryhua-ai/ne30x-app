@@ -161,7 +161,7 @@ package-v3: $(V3_IMAGE) $(V3_WORK)/keys/dev-signer.pem
 clean-v3:
 	rm -f $(V3_OBJS) $(V3_ELF) $(V3_PAYLOAD) $(V3_IMAGE)
 
-V4_APP_VERSION ?= 4.0.0
+V4_APP_VERSION ?= 4.2.8
 V4_ELF := $(BUILD)/lc-line-crossing-v4.elf
 V4_APP_SRCS := lc_app_entry_v4.c lc_bus.c lc_bus_config.c lc_stateblob.c \
                lc_ctrl.c lc_cfgcodec.c lc_json.c lc_arena.c lc_libc_mini.c \
@@ -187,12 +187,12 @@ clean-v4:
 
 V5_UI_DIR ?= $(ROOT_DIR)/tests/line-crossing-ui/.build/production
 V5_OUT_DIR ?= $(BUILD)/pkg
-V5_UI_VERSION ?= 1.1.5
+V5_UI_VERSION ?= 1.2.10
 V5_HOST_CAPS ?= 0x3ff
 V5_EVENT_MAX ?= 1576
 V5_STATE_QUOTA ?= 512
 V5_REPORT_MAX ?= 6144
-V5_CONTROL_MAX ?= 256
+V5_CONTROL_MAX ?= 512
 V5_SNAPSHOT_MAX ?= 1024
 V5_LIVE_PUBLISH_MAX ?= 9008
 V5_LIVE_TRACK_MAX ?= 64
@@ -214,3 +214,9 @@ neapp-v5: $(V4_ELF)
 
 clean-v5:
 	rm -rf $(V5_OUT_DIR)
+
+.PHONY: print-v4_app_version print-v5_ui_version
+print-v4_app_version:
+	@echo $(V4_APP_VERSION)
+print-v5_ui_version:
+	@echo $(V5_UI_VERSION)
