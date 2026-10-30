@@ -48,11 +48,6 @@ jobs:
           npm ci --prefix tests/line-crossing-ui/browser-runner --ignore-scripts
           npx --yes playwright@1.64.0 install --with-deps chromium
 
-      - name: Build real Line Crossing v4 ELF
-        run: |
-          make -C apps/line-crossing/app elf-v4 V4_APP_VERSION=4.0.0
-          sha256sum apps/line-crossing/app/build/lc-line-crossing-v4.elf > "$RUNNER_TEMP/neapp-unsigned-evidence/real-elf-sha256.txt"
-
       - name: Run UI, H.264, runtime, bridge, and unsigned-package positive and negative acceptance
         shell: bash
         run: |
@@ -69,9 +64,10 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/neapp-unsigned-evidence"
+          native=$(make -C apps/line-crossing/app -s print-v4_app_version)
           bash package/release/build_neapp.sh --out-dir "$RUNNER_TEMP/neapp-candidate" \
             --source-sha "$GITHUB_SHA"
-          package=$(ls "$RUNNER_TEMP/neapp-candidate"/line-crossing-*.neapp)
+          package="$RUNNER_TEMP/neapp-candidate/line-crossing-$native.neapp"
           python - "$package.provenance.json" > "$evidence_dir/candidate-metadata.json" <<'PY'
           import json
           import sys

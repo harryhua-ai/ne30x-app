@@ -12,10 +12,13 @@ permissions: {}
 
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
       contents: write
+    env:
+      RELEASE_INPUT: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -41,8 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 package/release/release_tool.py validate-version \
-            --version '${{ inputs.version }}'
-          echo "RELEASE_VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
+            --version "$RELEASE_INPUT"
+          echo "RELEASE_VERSION=$RELEASE_INPUT" >> "$GITHUB_ENV"
 
       - name: Resolve packaged versions from the Makefile
         run: |
@@ -63,7 +66,7 @@ jobs:
       - name: Build production candidate package
         run: |
           set -euo pipefail
-          bash package/release/build_neapp.sh --source-sha '${{ github.sha }}'
+          bash package/release/build_neapp.sh --source-sha "$(git rev-parse HEAD)"
 
       - name: Generate English release notes
         run: |
@@ -78,7 +81,7 @@ jobs:
             --repo-version "$RELEASE_VERSION" \
             --provenance "$PACKAGE.provenance.json" \
             --verification "${PACKAGE%.neapp}.verification.json" \
-            --known-limitations docs/release-known-limitations.md \
+            --known-limitations package/release/known-limitations.md \
             --commits-file "$RUNNER_TEMP/commits.txt" \
             --out "$RUNNER_TEMP/release-notes.md"
           cat "$RUNNER_TEMP/release-notes.md"
@@ -88,13 +91,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          target_sha=$(git rev-parse HEAD)
           url=$(python3 package/release/release_tool.py create-draft \
             --version "$RELEASE_VERSION" \
-            --target-sha '${{ github.sha }}' \
+            --target-sha "$target_sha" \
             --title "line-crossing $RELEASE_VERSION" \
             --notes-file "$RUNNER_TEMP/release-notes.md" \
             --assets "$PACKAGE" "$PACKAGE.sha256" \
                      "$PACKAGE.provenance.json" \
                      "${PACKAGE%.neapp}.verification.json")
-          echo "Draft release created (not published): $url"
+          echo "Draft release created (not published) at main commit $target_sha: $url"
           echo "Publishing requires a separate per-version User Release GO."

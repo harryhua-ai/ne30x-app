@@ -144,17 +144,17 @@ class CheckConflictsTest(unittest.TestCase):
 
     def test_no_conflicts_when_everything_missing(self):
         self.responses = [(1, "404 Not Found"), (1, "404 Not Found"),
-                          (1, "404 Not Found")]
+                          (0, "[]")]
         self.assertEqual(self.run_check(), [])
 
     def test_existing_tag_conflicts(self):
         self.responses = [(0, '{"ref": "refs/tags/v1.0.0"}'), (1, "404"),
-                          (1, "404")]
+                          (0, "[]")]
         conflicts = self.run_check()
         self.assertEqual(conflicts, ["tag v1.0.0 already exists"])
 
     def test_existing_published_release_conflicts(self):
-        self.responses = [(1, "404"), (0, '{"id": 1}'), (1, "404")]
+        self.responses = [(1, "404"), (0, '{"id": 1}'), (0, "[]")]
         conflicts = self.run_check()
         self.assertEqual(conflicts, ["release v1.0.0 already exists"])
 
@@ -164,6 +164,17 @@ class CheckConflictsTest(unittest.TestCase):
         self.responses = [(1, "404"), (1, "404"), (0, drafts)]
         conflicts = self.run_check()
         self.assertEqual(conflicts, ["draft release v1.0.0 already exists"])
+
+    def test_tag_endpoint_denial_fails_closed(self):
+        self.responses = [(1, "gh: Forbidden (HTTP 403)")]
+        with self.assertRaises(release_tool.ReleaseToolError):
+            self.run_check()
+
+    def test_release_endpoint_denial_fails_closed(self):
+        self.responses = [(1, "404 Not Found"),
+                          (1, "gh: auth error (HTTP 401)")]
+        with self.assertRaises(release_tool.ReleaseToolError):
+            self.run_check()
 
     def test_gh_api_hard_failure_fails_closed(self):
         self.responses = [(1, "404"), (1, "404"), (1, "gh: auth error")]
@@ -189,15 +200,11 @@ class CreateDraftTest(unittest.TestCase):
             release_tool.gh = original
         self.assertEqual(calls, [])
 
-    def test_failed_create_attempts_draft_cleanup(self):
+    def test_failed_create_deletes_nothing(self):
         calls = []
-        cleanup = []
 
         def fake_gh(args):
-            calls.append(args[0])
-            if args[0] == "release" and args[1] == "delete":
-                cleanup.append(args)
-                return 0, ""
+            calls.append((args[0], args[1] if len(args) > 1 else None))
             return 1, "boom"
 
         original = release_tool.gh
@@ -210,8 +217,58 @@ class CreateDraftTest(unittest.TestCase):
                     release_tool.create_draft("v1.0.0", "a" * 40, "t", notes, [])
         finally:
             release_tool.gh = original
-        self.assertIn("partial draft removed", str(ctx.exception))
-        self.assertEqual(cleanup[0][2], "v1.0.0")
+        self.assertIn("nothing deleted", str(ctx.exception))
+        self.assertNotIn(("release", "delete"), calls)
+        self.assertEqual([call[1] for call in calls], ["create"])
+
+    def test_failed_upload_removes_owned_draft(self):
+        calls = []
+
+        def fake_gh(args):
+            calls.append((args[0], args[1] if len(args) > 1 else None))
+            if args[1] == "create":
+                return 0, "https://example.com/draft\n"
+            if args[1] == "delete":
+                return 0, ""
+            return 1, "upload boom"
+
+        original = release_tool.gh
+        release_tool.gh = fake_gh
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                notes = Path(tmp) / "notes.md"
+                notes.write_text("body", encoding="utf-8")
+                with self.assertRaises(release_tool.ReleaseToolError) as ctx:
+                    release_tool.create_draft("v1.0.0", "a" * 40, "t", notes, [])
+        finally:
+            release_tool.gh = original
+        self.assertIn("was removed", str(ctx.exception))
+        self.assertEqual(calls[-1], ("release", "delete"))
+        self.assertIn(("release", "create"), [c for c in calls])
+
+    def test_successful_create_returns_url_without_delete(self):
+        calls = []
+
+        def fake_gh(args):
+            calls.append((args[0], args[1] if len(args) > 1 else None))
+            if args[1] == "create":
+                return 0, "https://example.com/draft\n"
+            return 0, ""
+
+        original = release_tool.gh
+        release_tool.gh = fake_gh
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                notes = Path(tmp) / "notes.md"
+                notes.write_text("body", encoding="utf-8")
+                asset = Path(tmp) / "a.bin"
+                asset.write_bytes(b"x")
+                url = release_tool.create_draft("v1.0.0", "a" * 40, "t",
+                                                notes, [asset])
+        finally:
+            release_tool.gh = original
+        self.assertEqual(url, "https://example.com/draft")
+        self.assertNotIn(("release", "delete"), calls)
 
 
 if __name__ == "__main__":

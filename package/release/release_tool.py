@@ -160,24 +160,30 @@ def gh(args: list[str]) -> tuple[int, str]:
     return proc.returncode, (proc.stdout + proc.stderr).strip()
 
 
+def gh_not_found(args: list[str]) -> bool:
+    code, body = gh(args)
+    if code == 0:
+        return False
+    if "404" in body or "Not Found" in body:
+        return True
+    raise ReleaseToolError(f"gh api failed for {args[1] if len(args) > 1 else args[0]}: {body}")
+
+
 def check_conflicts(repo_version: str, repo_slug: str) -> list[str]:
     parse_version(repo_version)
     conflicts = []
-    code, _ = gh(["api", f"repos/{repo_slug}/git/ref/tags/{repo_version}"])
-    if code == 0:
+    if not gh_not_found(["api", f"repos/{repo_slug}/git/ref/tags/{repo_version}"]):
         conflicts.append(f"tag {repo_version} already exists")
-    code, body = gh(["api", f"repos/{repo_slug}/releases/tags/{repo_version}"])
-    if code == 0:
+    if not gh_not_found(["api", f"repos/{repo_slug}/releases/tags/{repo_version}"]):
         conflicts.append(f"release {repo_version} already exists")
-    code, body = gh(["api", f"repos/{repo_slug}/releases?per_page=100"])
-    if code == 0:
-        for release in json.loads(body):
-            if release.get("draft") and release.get("tag_name") == repo_version:
-                conflicts.append(
-                    f"draft release {repo_version} already exists")
-                break
-    elif "404" not in body:
+    code, body = gh(["api", "--paginate",
+                     f"repos/{repo_slug}/releases?per_page=100"])
+    if code != 0:
         raise ReleaseToolError(f"unable to list releases: {body}")
+    for release in json.loads(body):
+        if release.get("draft") and release.get("tag_name") == repo_version:
+            conflicts.append(f"draft release {repo_version} already exists")
+            break
     return conflicts
 
 
@@ -192,18 +198,21 @@ def create_draft(repo_version: str, target_sha: str, title: str,
     code, body = gh([
         "release", "create", repo_version, "--draft", "--target", target_sha,
         "--title", title, "--notes-file", str(notes_file),
-        *[str(asset) for asset in assets],
     ])
     if code != 0:
-        cleanup_code, cleanup_body = gh(
-            ["release", "delete", repo_version, "--yes"])
-        detail = f"gh release create failed: {body}"
-        if cleanup_code == 0:
-            detail += " (partial draft removed)"
-        else:
-            detail += f" (cleanup failed: {cleanup_body})"
-        raise ReleaseToolError(detail)
-    return body.strip().splitlines()[-1]
+        raise ReleaseToolError(
+            f"gh release create failed: {body}; nothing deleted — if a "
+            "partial draft was actually created, verify ownership and remove "
+            "it manually")
+    url = body.strip().splitlines()[-1]
+    code, body = gh(["release", "upload", repo_version,
+                     *[str(asset) for asset in assets]])
+    if code != 0:
+        gh(["release", "delete", repo_version, "--yes"])
+        raise ReleaseToolError(
+            f"gh release upload failed: {body}; the draft created by this "
+            "invocation was removed")
+    return url
 
 
 def main(argv: list[str] | None = None) -> int:

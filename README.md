@@ -150,7 +150,7 @@ attachments. The workflow never publishes.
 Publishing a draft is a separate, per-version human action after explicit
 User Release GO. The first official release version has not been approved
 yet. Current pipeline limitations are listed in
-[docs/release-known-limitations.md](docs/release-known-limitations.md).
+[package/release/known-limitations.md](package/release/known-limitations.md).
 
 ## Installation
 

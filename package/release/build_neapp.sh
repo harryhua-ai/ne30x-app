@@ -33,8 +33,9 @@ if [ ! -d "$UI_DIR/browser-runner/node_modules" ]; then
 fi
 
 node "$UI_DIR/browser-runner/build.mjs"
+make -C "$APP_DIR" clean-v4
 make -C "$APP_DIR" elf-v4
-make -C "$APP_DIR" neapp-v5
+make -C "$APP_DIR" neapp-v5 V5_OUT_DIR="$OUT_DIR"
 
 [ -f "$PACKAGE" ] || { echo "expected package missing: $PACKAGE" >&2; exit 1; }
 
