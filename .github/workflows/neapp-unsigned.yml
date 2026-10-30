@@ -48,11 +48,6 @@ jobs:
           npm ci --prefix tests/line-crossing-ui/browser-runner --ignore-scripts
           npx --yes playwright@1.64.0 install --with-deps chromium
 
-      - name: Build real Line Crossing v4 ELF
-        run: |
-          make -C apps/line-crossing/app elf-v4 V4_APP_VERSION=4.0.0
-          sha256sum apps/line-crossing/app/build/lc-line-crossing-v4.elf > "$RUNNER_TEMP/neapp-unsigned-evidence/real-elf-sha256.txt"
-
       - name: Run UI, H.264, runtime, bridge, and unsigned-package positive and negative acceptance
         shell: bash
         run: |
@@ -63,34 +58,46 @@ jobs:
           python -m unittest discover -s tests/unsigned -v 2>&1 | tee "$RUNNER_TEMP/neapp-unsigned-evidence/unsigned-format.log"
           python -m unittest discover -s tests/nepk-v1_1 -v 2>&1 | tee "$RUNNER_TEMP/neapp-unsigned-evidence/legacy-signed-format-regression.log"
 
-      - name: Build and independently verify the real unsigned package
+      - name: Build and independently verify the production candidate package
         if: success()
         shell: bash
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/neapp-unsigned-evidence"
-          python package/unsigned/neapp_pack_v5.py \
-            --elf apps/line-crossing/app/build/lc-line-crossing-v4.elf \
-            --ui-assets tests/line-crossing-ui/.build/production \
-            --out "$RUNNER_TEMP/line-crossing-4.0.0.neapp" \
-            --app-id line-crossing \
-            --native-version 4.0.0 \
-            --ui-version 1.1.1 \
-            --source-commit "$GITHUB_SHA"
-          python package/unsigned/neapp_verify_v5.py \
-            --package "$RUNNER_TEMP/line-crossing-4.0.0.neapp" \
-            --compact > "$evidence_dir/unsigned-package-verification.json"
-          sha256sum "$RUNNER_TEMP/line-crossing-4.0.0.neapp" > "$evidence_dir/unsigned-package-sha256.txt"
-          python - "$evidence_dir/unsigned-package-verification.json" <<'PY'
+          native=$(make -C apps/line-crossing/app -s print-v4_app_version)
+          bash package/release/build_neapp.sh --out-dir "$RUNNER_TEMP/neapp-candidate" \
+            --source-sha "$GITHUB_SHA"
+          package="$RUNNER_TEMP/neapp-candidate/line-crossing-$native.neapp"
+          python - "$package.provenance.json" > "$evidence_dir/candidate-metadata.json" <<'PY'
           import json
           import sys
           from pathlib import Path
 
-          report = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          if report.get("result") != "PASS":
-              raise SystemExit("unsigned NEAPP v5 package failed independent verification")
-          Path(sys.argv[1]).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          provenance = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          print(json.dumps({
+              "artifact": "neapp-v5-unsigned CI candidate (not an official Release)",
+              "app_id": provenance["app_id"],
+              "native_version": provenance["native_version"],
+              "ui_version": provenance["ui_version"],
+              "package_sha256": provenance["package"]["sha256"],
+              "source_commit": provenance["source_commit"],
+          }, indent=2, sort_keys=True))
           PY
+          echo "NEAPP_CI_CANDIDATE_DIR=$RUNNER_TEMP/neapp-candidate" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: neapp-ci-candidate-${{ github.run_number }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/neapp-candidate/*.neapp
+            ${{ runner.temp }}/neapp-candidate/*.neapp.sha256
+            ${{ runner.temp }}/neapp-candidate/*.neapp.provenance.json
+            ${{ runner.temp }}/neapp-candidate/*.verification.json
+            ${{ runner.temp }}/neapp-candidate/candidate.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
 
       - name: Record verification run metadata
         if: always()
@@ -110,7 +117,8 @@ jobs:
               "run_id": os.environ["GITHUB_RUN_ID"],
               "run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
               "signing_inputs_required": False,
-              "installable_neapp_artifact_uploaded": False,
+              "installable_neapp_artifact_uploaded": True,
+              "installable_neapp_artifact": "neapp-ci-candidate (CI candidate, not an official Release)",
           }, indent=2, sort_keys=True) + "\n", encoding="utf-8")
           PY
 

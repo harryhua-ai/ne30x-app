@@ -69,28 +69,36 @@ node tests/line-crossing-ui/browser-runner/build.mjs
 
 ```bash
 make -C apps/line-crossing/app clean-v4
+make -C apps/line-crossing/app elf-v4
+make -C apps/line-crossing/app neapp-v5
+```
 
-make -C apps/line-crossing/app elf-v4 \
-  V4_APP_VERSION=4.0.0
+Or run the whole chain (Web UI, ELF, package, independent verification,
+checksums, and provenance metadata) with one command:
 
-make -C apps/line-crossing/app neapp-v5 \
-  V4_APP_VERSION=4.0.0 \
-  V5_UI_VERSION=1.1.1
+```bash
+bash package/release/build_neapp.sh
 ```
 
 **Output:**
 
 ```text
-apps/line-crossing/app/build/pkg/line-crossing-4.0.0.neapp
+apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp
+apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp.sha256
+apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp.provenance.json
+apps/line-crossing/app/build/pkg/line-crossing-<version>.verification.json
+apps/line-crossing/app/build/pkg/candidate.json
 ```
 
-Versions above are build examples, not the latest official release.
+Packaged versions follow the Makefile defaults (`V4_APP_VERSION`,
+`V5_UI_VERSION`). They are recorded separately in the package provenance;
+they are not the repository release version.
 
 ### 4. Verify
 
 ```bash
 python3 package/unsigned/neapp_verify_v5.py \
-  --package apps/line-crossing/app/build/pkg/line-crossing-4.0.0.neapp \
+  --package apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp \
   --compact
 ```
 
@@ -124,19 +132,25 @@ The standard delivery workflow is:
 
 **Build → Test → Package → Verify → Release Notes → Archive**
 
-Expected release artifacts:
+Every PR and `main` CI run builds the production candidate with
+`package/release/build_neapp.sh`, independently verifies it, and uploads the
+real `.neapp` as a downloadable CI artifact named
+`neapp-ci-candidate-*` together with its SHA-256, provenance metadata, and
+verification report. CI artifacts are candidates, not official releases.
 
-```text
-line-crossing-X.Y.Z.neapp
-line-crossing-X.Y.Z.neapp.sha256
-line-crossing-X.Y.Z.neapp.provenance.json
-verification.json
-RELEASE_NOTES.md
-```
+Releases run through **Actions → Release App → Run workflow** with a single
+input `vX.Y.Z`. The workflow validates the version strictly, fails closed on
+any existing tag/release/draft conflict, builds and verifies the package,
+generates English release notes (changes, package identity with repository
+version and packaged native/UI versions recorded separately, compatibility,
+verification results, known limitations), and creates an **unpublished draft
+release** carrying the `.neapp`, SHA-256, provenance, and verification
+attachments. The workflow never publishes.
 
-Release Notes should summarize features, fixes, compatibility, known issues, and verification results.
-
-Package generation and verification are available. Automated Release Notes and installable CI artifact distribution are still to be implemented. Official GitHub Releases require separate approval.
+Publishing a draft is a separate, per-version human action after explicit
+User Release GO. The first official release version has not been approved
+yet. Current pipeline limitations are listed in
+[package/release/known-limitations.md](package/release/known-limitations.md).
 
 ## Installation
 
