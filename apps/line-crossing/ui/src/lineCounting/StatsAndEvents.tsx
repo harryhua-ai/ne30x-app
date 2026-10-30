@@ -25,7 +25,7 @@ export default function StatsAndEvents({ stats, events, targetClass, storage }: 
     const statValues = stats.state === 'available' ? stats.value : null;
     const eventValues = events.state === 'available' ? events.value : null;
     const list = eventValues?.events ?? [];
-    const storageDegraded = storage !== undefined && storage.state !== 'ok';
+    const storageDegraded = storage !== undefined && storage.withheld === true;
     const unavailableText = (state: Capability<unknown>['state']) => state === 'stale'
         ? i18n._('lineCrossing.stale')
         : i18n._('lineCrossing.unavailable');
