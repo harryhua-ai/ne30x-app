@@ -6,7 +6,7 @@
 
 Applications can be installed, updated, and managed independently without rebuilding the main firmware, provided the device has a compatible App Host.
 
-**Device firmware:** [ne301](https://github.com/harryhua-ai/ne301)
+**Device firmware:** [camthink-ai/ne301](https://github.com/camthink-ai/ne301)
 
 ## Applications
 
