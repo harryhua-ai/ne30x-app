@@ -12,8 +12,8 @@ export interface StatsAndEventsProps {
 function StatCell({ label, value, accent }: { label: string; value: number | string; accent?: string }) {
     return (
         <div className="flex min-w-0 flex-col items-center" data-testid="lc-stat-cell">
-            <span className={`max-w-full truncate font-mono text-[28px] font-semibold leading-[34px] tabular-nums ${accent ?? 'text-gray-800'}`}>{value}</span>
-            <span className="mt-1 max-w-full truncate text-[13px] leading-none text-gray-500">{label}</span>
+            <span className={`max-w-full truncate font-mono text-[34px] font-semibold leading-[40px] tabular-nums ${accent ?? 'text-gray-800'}`}>{value}</span>
+            <span className="mt-1.5 max-w-full truncate text-[14px] leading-none text-gray-500">{label}</span>
         </div>
     );
 }
@@ -37,7 +37,7 @@ export default function StatsAndEvents({ stats, events, targetClass, storage }: 
                     <h4 className="text-base font-semibold leading-6 text-gray-800">{i18n._('sys.line_counting.stats_title')}</h4>
                     <div className="flex min-h-0 flex-1 items-center justify-center">
                         {statValues
-                            ? <div className="grid w-[240px] max-w-full grid-cols-[repeat(2,minmax(0,1fr))] gap-x-4">
+                            ? <div className="grid w-[280px] max-w-full grid-cols-[repeat(2,minmax(0,1fr))] gap-x-5">
                                 <StatCell label={i18n._('sys.line_counting.stat_window_in')} value={statValues.window.in} accent="text-emerald-600" />
                                 <StatCell label={i18n._('sys.line_counting.stat_window_out')} value={statValues.window.out} accent="text-rose-600" />
                                 <div className="col-span-2 my-3 h-px bg-gray-100" />

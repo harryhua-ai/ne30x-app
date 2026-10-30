@@ -849,6 +849,45 @@ test('runtime live frames accumulate crossing events newest first without duplic
   await page.close()
 })
 
+test('gap and stale frames keep the accumulated crossing history for the next live frame', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+  await page.goto(`${serverUrl}/browser/?scenario=runtime`, { waitUntil: 'load' })
+  await page.getByTestId('lc-module').waitFor()
+  await page.waitForFunction(() => window.__lineCrossingRuntimeTest.state().app.state === 'available', null, { timeout: 10000 })
+  const rows = page.getByTestId('lc-event-list').locator('li')
+  const crossing = (sequence, trackId, direction) => ({ sequence, timestamp_ms: Date.now() - 1000, track_id: trackId, direction, target_class: 'person' })
+  const emitLive = events => page.evaluate(liveEvents => window.__lineCrossingRuntimeTest.emitLive(liveEvents), events)
+  const emitLiveStatus = status => page.evaluate(st => window.__lineCrossingRuntimeTest.emitLiveStatus(st), status)
+  await emitLive([crossing(11, 31, 'in')])
+  await emitLive([crossing(12, 32, 'out')])
+  await emitLive([crossing(13, 33, 'in')])
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="lc-event-list"] li').length === 3)
+  await emitLiveStatus('GAP')
+  await page.waitForFunction(() => window.__lineCrossingRuntimeTest.state().events.state === 'stale', null, { timeout: 5000 })
+  await emitLive([crossing(14, 34, 'out')])
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="lc-event-list"] li').length === 4, null, { timeout: 5000 })
+  assert.match(await rows.nth(0).textContent(), /#34/)
+  assert.match(await rows.nth(3).textContent(), /#31/)
+  await page.close()
+})
+
+test('the recent events list rolls over at two hundred entries and evicts the oldest', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+  await page.goto(`${serverUrl}/browser/?scenario=runtime`, { waitUntil: 'load' })
+  await page.getByTestId('lc-module').waitFor()
+  await page.waitForFunction(() => window.__lineCrossingRuntimeTest.state().app.state === 'available', null, { timeout: 10000 })
+  const rows = page.getByTestId('lc-event-list').locator('li')
+  const crossing = (sequence, trackId, direction) => ({ sequence, timestamp_ms: Date.now() - 1000, track_id: trackId, direction, target_class: 'person' })
+  const emitLive = events => page.evaluate(liveEvents => window.__lineCrossingRuntimeTest.emitLive(liveEvents), events)
+  for (let seq = 1; seq <= 205; seq++) {
+    await emitLive([crossing(seq, 1000 + seq, seq % 2 ? 'in' : 'out')])
+  }
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="lc-event-list"] li').length === 200, null, { timeout: 10000 })
+  assert.match(await rows.nth(0).textContent(), /#1205/)
+  assert.match(await rows.nth(199).textContent(), /#1006/)
+  await page.close()
+})
+
 test('degraded storage with a quiet live stream shows the storage-degraded status in the events area', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
   await page.goto(`${serverUrl}/browser/?scenario=runtime`, { waitUntil: 'load' })

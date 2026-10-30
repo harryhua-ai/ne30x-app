@@ -1048,6 +1048,55 @@ test('STALE and GAP notifications are transient and later frames resync the live
   assert.equal(controller.getState().events.state, 'unavailable')
 })
 
+test('live crossing events drive the realtime stats immediately with snapshot correction', async () => {
+  let snapshotCalls = 0
+  const responder = (op) => {
+    if (op === 'live.subscribe') return { outcome: 'APPLIED', payload: {} }
+    if (op === 'snapshot.read') {
+      snapshotCalls += 1
+      return {
+        outcome: 'APPLIED',
+        payload: snapshotCalls === 1
+          ? bridgeSnapshot()
+          : bridgeSnapshot({ stats: { window: { in: 7, out: 3 }, total: { in: 52, out: 22 } } }),
+      }
+    }
+    return { outcome: 'UNAVAILABLE' }
+  }
+  const frame = (streamSeq, sequence, direction) => ({
+    kind: 'event',
+    event: {
+      payload: {
+        stream: 'live',
+        stream_seq: streamSeq,
+        data: {
+          server_now_ms: Date.now(),
+          events: [{ sequence, timestamp_ms: Date.now() - 1000, track_id: sequence, direction, target_class: 'person' }],
+        },
+      },
+    },
+  })
+  const { session, controller } = makeController(responder, { ops: [...GRANT_OPS, 'live.subscribe'] })
+  assert.equal(await settleUntil(() => controller.getState().stats.state === 'available'), true)
+  assert.deepEqual(controller.getState().stats.value, { window: { in: 5, out: 2 }, total: { in: 50, out: 20 } })
+
+  session.emit(frame(1, 1, 'in'))
+  await flushMicrotasks()
+  assert.deepEqual(controller.getState().stats.value, { window: { in: 6, out: 2 }, total: { in: 51, out: 20 } })
+
+  session.emit(frame(2, 2, 'out'))
+  await flushMicrotasks()
+  assert.deepEqual(controller.getState().stats.value, { window: { in: 6, out: 3 }, total: { in: 51, out: 21 } })
+
+  snapshotCalls = 1
+  await controller.refresh()
+  assert.deepEqual(controller.getState().stats.value, { window: { in: 7, out: 3 }, total: { in: 52, out: 22 } })
+
+  session.emit(frame(3, 3, 'in'))
+  await flushMicrotasks()
+  assert.deepEqual(controller.getState().stats.value, { window: { in: 8, out: 3 }, total: { in: 53, out: 22 } })
+})
+
 test('live events accumulate incrementally newest-first with sequence dedupe and a bounded window', async () => {
   const liveFrame = (streamSeq, sequences, serverNowMs, targetClass) => ({
     kind: 'event',
@@ -1083,14 +1132,16 @@ test('live events accumulate incrementally newest-first with sequence dedupe and
   await flushMicrotasks()
   assert.equal(controller.getState().events.value.events.length, 3)
   assert.equal(controller.getState().events.value.server_now_ms, 30000)
-  session.emit(liveFrame(4, Array.from({ length: 60 }, (_, index) => index + 1), 40000, 'person'))
-  await flushMicrotasks()
+  for (let batch = 0; batch < 3; batch++) {
+    session.emit(liveFrame(4 + batch, Array.from({ length: 70 }, (_, index) => batch * 70 + index + 1), 40000, 'person'))
+    await flushMicrotasks()
+  }
   const windowed = controller.getState().events.value.events
-  assert.equal(windowed.length, 50)
-  assert.deepEqual(windowed.map(event => event.sequence), Array.from({ length: 50 }, (_, index) => 60 - index))
+  assert.equal(windowed.length, 200)
+  assert.deepEqual(windowed.map(event => event.sequence), Array.from({ length: 200 }, (_, index) => 210 - index))
 })
 
-test('a fresh seed after a GAP resync or a re-grant replaces the accumulated live events', async () => {
+test('a fresh seed after a GAP resync or a re-grant keeps the accumulated live events', async () => {
   const frame = (streamSeq, sequences) => ({
     kind: 'event',
     event: {
@@ -1120,7 +1171,7 @@ test('a fresh seed after a GAP resync or a re-grant replaces the accumulated liv
   session.emit(frame(3, [7, 8]))
   await flushMicrotasks()
   assert.equal(controller.getState().events.state, 'available')
-  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [8, 7])
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [8, 7, 2, 1])
   session.emit({
     kind: 'grant',
     grant: makeGrant({ seq: 3, ops: [...GRANT_OPS, 'live.subscribe'], expires_at_ms: Date.now() + 600000 }),
@@ -1129,7 +1180,7 @@ test('a fresh seed after a GAP resync or a re-grant replaces the accumulated liv
   assert.match(controller.getState().events.reason, /not been received/)
   session.emit(frame(4, [20]))
   assert.equal(await settleUntil(() => controller.getState().events.state === 'available'), true)
-  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [20])
+  assert.deepEqual(controller.getState().events.value.events.map(event => event.sequence), [20, 8, 7, 2, 1])
 })
 
 test('a missing live producer keeps events and tracks unavailable with the real reason', async () => {

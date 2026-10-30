@@ -136,6 +136,17 @@ if (params.get('scenario') === 'runtime') {
             payload: { stream: 'live', stream_seq: streamSeq, data: { server_now_ms: Date.now(), events } },
         });
     };
+    const emitLiveStatus = (status: string) => {
+        streamSeq += 1;
+        portEmit?.({
+            protocol: BRIDGE_PROTOCOL,
+            type: 'EVENT',
+            seq: nextSeq(),
+            grant_id: grantId,
+            identity,
+            payload: { stream: 'live', stream_seq: streamSeq, status },
+        });
+    };
     const session = new BridgeSession();
     session.acceptHello({
         protocol: BRIDGE_PROTOCOL,
@@ -162,6 +173,7 @@ if (params.get('scenario') === 'runtime') {
         state: () => controller.getState(),
         refresh: () => controller.refresh(),
         emitLive,
+        emitLiveStatus,
         setStorage: (storage: Record<string, unknown> | null) => { snapshotStorage = storage; },
     };
     render(
