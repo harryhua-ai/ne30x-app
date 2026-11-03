@@ -1,0 +1,356 @@
+name: ght
+# ght-adoption-managed: ght-single/v1
+on:
+  pull_request:
+    types: [closed]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  issue_comment:
+    types: [created, edited, deleted]
+  push:
+    paths: ['docs/plans/current-plan.yaml']
+  workflow_dispatch:
+    inputs:
+      operation:
+        required: true
+        type: choice
+        options: [complete, plan-publish]
+      issue:
+        required: false
+        type: string
+      pr:
+        required: false
+        type: string
+      plan_path:
+        required: false
+        type: string
+        default: docs/plans/current-plan.yaml
+      replace_revision:
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  review_verdict:
+    if: >-
+      github.repository_owner == 'harryhua-ai' &&
+      (github.event_name == 'pull_request_review' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        (contains(github.event.comment.body, 'A REVIEW') ||
+         contains(github.event.changes.body.from, 'A REVIEW'))))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: write
+    env:
+      GHT_RUNTIME_REF: "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: true
+      - name: Materialize and verify immutable local Runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GHT_RUNTIME_REF" in
+            *[!0-9a-f]*|"") echo "Invalid immutable runtime identity" >&2; exit 1 ;;
+          esac
+          [ "${#GHT_RUNTIME_REF}" -eq 64 ] || { echo "Runtime digest must have 64 hex characters" >&2; exit 1; }
+          ref="refs/ght/runtime/$GHT_RUNTIME_REF"
+          before=$(git ls-remote origin "$ref")
+          [[ "$before" =~ ^[0-9a-f]{40}[$'\t']refs/ght/runtime/[0-9a-f]{64}$ ]] || { echo "Capsule ref is absent or ambiguous" >&2; exit 1; }
+          want=${before%%$'\t'*}
+          tmpref="refs/ght/tmp/workflow-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-review"
+          trap 'git update-ref -d "$tmpref" 2>/dev/null || true' EXIT
+          git fetch --force --no-tags origin "+$ref:$tmpref"
+          got=$(git rev-parse "$tmpref^{commit}")
+          [ "$got" = "$want" ] || { echo "Capsule object changed" >&2; exit 1; }
+          capsule_dir=$(mktemp -d "$RUNNER_TEMP/ght-capsule.XXXXXXXX")
+          git show "$tmpref:runtime.zip" > "$capsule_dir/runtime.zip"
+          git show "$tmpref:MANIFEST.json" > "$capsule_dir/MANIFEST.json"
+          after=$(git ls-remote origin "$ref")
+          [ "$before" = "$after" ] || { echo "Capsule ref moved during read" >&2; exit 1; }
+          python3 - "$capsule_dir" "$GHT_RUNTIME_REF" <<'PY'
+          import hashlib, json, pathlib, re, stat, sys, zipfile
+          root, pin = pathlib.Path(sys.argv[1]), sys.argv[2]
+          payload = (root / "runtime.zip").read_bytes()
+          if hashlib.sha256(payload).hexdigest() != pin:
+              raise SystemExit("Capsule ZIP digest does not match immutable pin")
+          manifest = json.loads((root / "MANIFEST.json").read_text())
+          if not isinstance(manifest, dict) or manifest.get("digest") != pin or manifest.get("kind") != "runtime-capsule" or manifest.get("product") != "harry-dev":
+              raise SystemExit("Capsule manifest identity invalid")
+          if not isinstance(manifest.get("release"), str) or not re.fullmatch(r"v[0-9]+(?:\.[0-9]+)*", manifest["release"]):
+              raise SystemExit("Capsule release identity invalid")
+          source = manifest.get("source_sha")
+          legacy = (manifest["release"] == "v1.1.2"
+                    and pin == "fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962"
+                    and source == "cfb522a")
+          if not (isinstance(source, str) and re.fullmatch("[0-9a-f]{40}", source)) and not legacy:
+              raise SystemExit("Capsule source SHA is neither exact nor the known legacy identity")
+          out = root / "extracted"
+          out.mkdir()
+          with zipfile.ZipFile(root / "runtime.zip") as arc:
+              seen = set()
+              for info in arc.infolist():
+                  path = pathlib.PurePosixPath(info.filename)
+                  if path.is_absolute() or not path.parts or ".." in path.parts or "\\" in info.filename or info.filename in seen:
+                      raise SystemExit("Unsafe capsule archive member")
+                  seen.add(info.filename)
+                  mode = info.external_attr >> 16
+                  if stat.S_ISLNK(mode) or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR):
+                      raise SystemExit("Unsafe capsule member type")
+                  target = out.joinpath(*path.parts)
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(arc.read(info))
+                      target.chmod(0o755 if mode & 0o111 else 0o644)
+          candidates = list(out.rglob("scripts/ght-gha-adapter.sh"))
+          if len(candidates) != 1:
+              raise SystemExit("Runtime has no unique canonical GHT adapter")
+          package = candidates[0].parent.parent
+          for name in ("ght-gha-complete.sh", "ght-plan-publish.sh", "ght-gha-review-trigger.py", "ght-gha-review-verdict.py"):
+              if not (package / "scripts" / name).is_file():
+                  raise SystemExit(f"Required Runtime script missing: {name}")
+          with open(__import__("os").environ["GITHUB_ENV"], "a") as env:
+              print("GHT_RUNTIME_DIR=" + str(package), file=env)
+          PY
+          git update-ref -d "$tmpref"
+          trap - EXIT
+
+      - name: Publish canonical exact-SHA review Check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 "$GHT_RUNTIME_DIR/scripts/ght-gha-review-trigger.py"
+
+  complete:
+    if: >-
+      github.repository_owner == 'harryhua-ai' &&
+      ((github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'complete'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: write
+    env:
+      GHT_RUNTIME_REF: "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.merge_commit_sha || github.sha }}
+          persist-credentials: true
+      - name: Materialize and verify immutable local Runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GHT_RUNTIME_REF" in
+            *[!0-9a-f]*|"") echo "Invalid immutable runtime identity" >&2; exit 1 ;;
+          esac
+          [ "${#GHT_RUNTIME_REF}" -eq 64 ] || { echo "Runtime digest must have 64 hex characters" >&2; exit 1; }
+          ref="refs/ght/runtime/$GHT_RUNTIME_REF"
+          before=$(git ls-remote origin "$ref")
+          [[ "$before" =~ ^[0-9a-f]{40}[$'\t']refs/ght/runtime/[0-9a-f]{64}$ ]] || { echo "Capsule ref is absent or ambiguous" >&2; exit 1; }
+          want=${before%%$'\t'*}
+          tmpref="refs/ght/tmp/workflow-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-complete"
+          trap 'git update-ref -d "$tmpref" 2>/dev/null || true' EXIT
+          git fetch --force --no-tags origin "+$ref:$tmpref"
+          got=$(git rev-parse "$tmpref^{commit}")
+          [ "$got" = "$want" ] || { echo "Capsule object changed" >&2; exit 1; }
+          capsule_dir=$(mktemp -d "$RUNNER_TEMP/ght-capsule.XXXXXXXX")
+          git show "$tmpref:runtime.zip" > "$capsule_dir/runtime.zip"
+          git show "$tmpref:MANIFEST.json" > "$capsule_dir/MANIFEST.json"
+          after=$(git ls-remote origin "$ref")
+          [ "$before" = "$after" ] || { echo "Capsule ref moved during read" >&2; exit 1; }
+          python3 - "$capsule_dir" "$GHT_RUNTIME_REF" <<'PY'
+          import hashlib, json, pathlib, re, stat, sys, zipfile
+          root, pin = pathlib.Path(sys.argv[1]), sys.argv[2]
+          payload = (root / "runtime.zip").read_bytes()
+          if hashlib.sha256(payload).hexdigest() != pin:
+              raise SystemExit("Capsule ZIP digest does not match immutable pin")
+          manifest = json.loads((root / "MANIFEST.json").read_text())
+          if not isinstance(manifest, dict) or manifest.get("digest") != pin or manifest.get("kind") != "runtime-capsule" or manifest.get("product") != "harry-dev":
+              raise SystemExit("Capsule manifest identity invalid")
+          if not isinstance(manifest.get("release"), str) or not re.fullmatch(r"v[0-9]+(?:\.[0-9]+)*", manifest["release"]):
+              raise SystemExit("Capsule release identity invalid")
+          source = manifest.get("source_sha")
+          legacy = (manifest["release"] == "v1.1.2"
+                    and pin == "fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962"
+                    and source == "cfb522a")
+          if not (isinstance(source, str) and re.fullmatch("[0-9a-f]{40}", source)) and not legacy:
+              raise SystemExit("Capsule source SHA is neither exact nor the known legacy identity")
+          out = root / "extracted"
+          out.mkdir()
+          with zipfile.ZipFile(root / "runtime.zip") as arc:
+              seen = set()
+              for info in arc.infolist():
+                  path = pathlib.PurePosixPath(info.filename)
+                  if path.is_absolute() or not path.parts or ".." in path.parts or "\\" in info.filename or info.filename in seen:
+                      raise SystemExit("Unsafe capsule archive member")
+                  seen.add(info.filename)
+                  mode = info.external_attr >> 16
+                  if stat.S_ISLNK(mode) or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR):
+                      raise SystemExit("Unsafe capsule member type")
+                  target = out.joinpath(*path.parts)
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(arc.read(info))
+                      target.chmod(0o755 if mode & 0o111 else 0o644)
+          candidates = list(out.rglob("scripts/ght-gha-adapter.sh"))
+          if len(candidates) != 1:
+              raise SystemExit("Runtime has no unique canonical GHT adapter")
+          package = candidates[0].parent.parent
+          for name in ("ght-gha-complete.sh", "ght-plan-publish.sh", "ght-gha-review-trigger.py", "ght-gha-review-verdict.py"):
+              if not (package / "scripts" / name).is_file():
+                  raise SystemExit(f"Required Runtime script missing: {name}")
+          with open(__import__("os").environ["GITHUB_ENV"], "a") as env:
+              print("GHT_RUNTIME_DIR=" + str(package), file=env)
+          PY
+          git update-ref -d "$tmpref"
+          trap - EXIT
+
+      - name: Resolve exact Candidate Issue and PR
+        id: facts
+        env:
+          GHA_EVENT_NAME: ${{ github.event_name }}
+          GHA_PR_NUMBER: ${{ github.event.pull_request.number }}
+          GHA_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          GHA_DISPATCH_ISSUE: ${{ inputs.issue }}
+          GHA_DISPATCH_PR: ${{ inputs.pr }}
+        run: sh "$GHT_RUNTIME_DIR/scripts/ght-gha-adapter.sh" resolve >> "$GITHUB_OUTPUT"
+      - name: Record not-applicable outcome
+        if: steps.facts.outputs.applicable == 'false'
+        run: echo "No applicable GHT Candidate; completion skipped." >> "$GITHUB_STEP_SUMMARY"
+      - name: Complete bound merged attempt
+        if: steps.facts.outputs.applicable != 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHT_RECONCILER_ID: ght-complete-workflow
+          GHT_EXECUTOR_ID: ght-complete-workflow
+        run: GHT_RUNTIME_DIR= sh "$GHT_RUNTIME_DIR/scripts/ght-gha-adapter.sh" complete "${{ steps.facts.outputs.issue }}" "${{ steps.facts.outputs.pr }}"
+
+  publish:
+    if: >-
+      github.repository_owner == 'harryhua-ai' &&
+      ((github.event_name == 'push' && github.ref_name == github.event.repository.default_branch) ||
+       (github.event_name == 'workflow_dispatch' && inputs.operation == 'plan-publish' &&
+        github.ref_name == github.event.repository.default_branch))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read
+    env:
+      GHT_RUNTIME_REF: "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || github.event.repository.default_branch }}
+          persist-credentials: true
+      - name: Materialize and verify immutable local Runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$GHT_RUNTIME_REF" in
+            *[!0-9a-f]*|"") echo "Invalid immutable runtime identity" >&2; exit 1 ;;
+          esac
+          [ "${#GHT_RUNTIME_REF}" -eq 64 ] || { echo "Runtime digest must have 64 hex characters" >&2; exit 1; }
+          ref="refs/ght/runtime/$GHT_RUNTIME_REF"
+          before=$(git ls-remote origin "$ref")
+          [[ "$before" =~ ^[0-9a-f]{40}[$'\t']refs/ght/runtime/[0-9a-f]{64}$ ]] || { echo "Capsule ref is absent or ambiguous" >&2; exit 1; }
+          want=${before%%$'\t'*}
+          tmpref="refs/ght/tmp/workflow-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-plan"
+          trap 'git update-ref -d "$tmpref" 2>/dev/null || true' EXIT
+          git fetch --force --no-tags origin "+$ref:$tmpref"
+          got=$(git rev-parse "$tmpref^{commit}")
+          [ "$got" = "$want" ] || { echo "Capsule object changed" >&2; exit 1; }
+          capsule_dir=$(mktemp -d "$RUNNER_TEMP/ght-capsule.XXXXXXXX")
+          git show "$tmpref:runtime.zip" > "$capsule_dir/runtime.zip"
+          git show "$tmpref:MANIFEST.json" > "$capsule_dir/MANIFEST.json"
+          after=$(git ls-remote origin "$ref")
+          [ "$before" = "$after" ] || { echo "Capsule ref moved during read" >&2; exit 1; }
+          python3 - "$capsule_dir" "$GHT_RUNTIME_REF" <<'PY'
+          import hashlib, json, pathlib, re, stat, sys, zipfile
+          root, pin = pathlib.Path(sys.argv[1]), sys.argv[2]
+          payload = (root / "runtime.zip").read_bytes()
+          if hashlib.sha256(payload).hexdigest() != pin:
+              raise SystemExit("Capsule ZIP digest does not match immutable pin")
+          manifest = json.loads((root / "MANIFEST.json").read_text())
+          if not isinstance(manifest, dict) or manifest.get("digest") != pin or manifest.get("kind") != "runtime-capsule" or manifest.get("product") != "harry-dev":
+              raise SystemExit("Capsule manifest identity invalid")
+          if not isinstance(manifest.get("release"), str) or not re.fullmatch(r"v[0-9]+(?:\.[0-9]+)*", manifest["release"]):
+              raise SystemExit("Capsule release identity invalid")
+          source = manifest.get("source_sha")
+          legacy = (manifest["release"] == "v1.1.2"
+                    and pin == "fee4e7022707b4da7ab54651aaedadfcb78a21ce489521df6fef78c0f12fe962"
+                    and source == "cfb522a")
+          if not (isinstance(source, str) and re.fullmatch("[0-9a-f]{40}", source)) and not legacy:
+              raise SystemExit("Capsule source SHA is neither exact nor the known legacy identity")
+          out = root / "extracted"
+          out.mkdir()
+          with zipfile.ZipFile(root / "runtime.zip") as arc:
+              seen = set()
+              for info in arc.infolist():
+                  path = pathlib.PurePosixPath(info.filename)
+                  if path.is_absolute() or not path.parts or ".." in path.parts or "\\" in info.filename or info.filename in seen:
+                      raise SystemExit("Unsafe capsule archive member")
+                  seen.add(info.filename)
+                  mode = info.external_attr >> 16
+                  if stat.S_ISLNK(mode) or stat.S_IFMT(mode) not in (0, stat.S_IFREG, stat.S_IFDIR):
+                      raise SystemExit("Unsafe capsule member type")
+                  target = out.joinpath(*path.parts)
+                  if info.is_dir():
+                      target.mkdir(parents=True, exist_ok=True)
+                  else:
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      target.write_bytes(arc.read(info))
+                      target.chmod(0o755 if mode & 0o111 else 0o644)
+          candidates = list(out.rglob("scripts/ght-gha-adapter.sh"))
+          if len(candidates) != 1:
+              raise SystemExit("Runtime has no unique canonical GHT adapter")
+          package = candidates[0].parent.parent
+          for name in ("ght-gha-complete.sh", "ght-plan-publish.sh", "ght-gha-review-trigger.py", "ght-gha-review-verdict.py"):
+              if not (package / "scripts" / name).is_file():
+                  raise SystemExit(f"Required Runtime script missing: {name}")
+          with open(__import__("os").environ["GITHUB_ENV"], "a") as env:
+              print("GHT_RUNTIME_DIR=" + str(package), file=env)
+          PY
+          git update-ref -d "$tmpref"
+          trap - EXIT
+
+      - name: Publish authorized Plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHT_PLAN_PUBLISHER_ID: ght-plan-publish-workflow
+          GHT_PLAN_PATH: ${{ inputs.plan_path || 'docs/plans/current-plan.yaml' }}
+          GHT_REPLACE_REVISION: ${{ inputs.replace_revision }}
+        run: |
+          set -euo pipefail
+          sh "$GHT_RUNTIME_DIR/scripts/ght-gha-adapter.sh" plan-publish \
+            "$GHT_PLAN_PATH" "$GHT_REPLACE_REVISION" | tee plan-publish-result.json
+
+      - name: Publish outcome evidence
+        if: always()
+        run: |
+          {
+            echo "## Execution Plan publication"
+            if [ -s plan-publish-result.json ]; then
+              plan_id=$(jq -r '.plan_id' plan-publish-result.json)
+              revision=$(jq -r '.revision' plan-publish-result.json)
+              ref=$(jq -r '.ref' plan-publish-result.json)
+              nodes=$(jq -r '.nodes' plan-publish-result.json)
+              replaced=$(jq -r '.replaced // "first publish"' plan-publish-result.json)
+              echo "- plan_id: \`$plan_id\`"
+              echo "- published revision: \`$revision\`"
+              echo "- ref: \`$ref\` ($nodes nodes, replaced: $replaced)"
+            else
+              echo "- publication FAILED — see the step log; no half-published pointer exists (CAS guarantees the previous revision stays current)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
