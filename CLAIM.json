@@ -12,7 +12,24 @@
  "heartbeat_at": "2026-11-03T10:50:38Z",
  "supersedes": null,
  "contract_digest": "e0eb09f0f5a202cdf5c9afc5132d02ad20d0936a8b194fa49cf3a7f8b5ae95e6",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/3/86e018c9",
+  "sha": "6d59b30451b64efa7280242ab9269cd9283cd5b7",
+  "scope": {
+   "pass": true,
+   "paths": {
+    ".github/workflows/ght.yml": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 1,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-11-03T10:51:46Z"
+ },
  "runtime": {
   "digest": "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31",
   "release": "v1.1.9",
