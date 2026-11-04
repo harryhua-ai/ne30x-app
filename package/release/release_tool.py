@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 VERSION_RE = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+# Product version in provenance carries no "v" prefix (issue #6).
+PRODUCT_VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(\d+)\.(\d+)$")
 
 ADDED_PREFIXES = ("feat",)
 FIXED_PREFIXES = ("fix",)
@@ -66,6 +68,24 @@ def render_notes(repo_version: str, provenance: dict, verification: dict,
     if missing:
         raise ReleaseToolError(f"provenance is missing: {', '.join(missing)}")
 
+    product_version = provenance.get("product_version")
+    if product_version:
+        if (not isinstance(product_version, str)
+                or PRODUCT_VERSION_RE.match(product_version) is None
+                or int(product_version.split(".", 1)[0]) < 1):
+            raise ReleaseToolError(
+                f"provenance product_version is not MAJOR.MINOR.PATCH with "
+                f"major >= 1: {product_version!r}")
+        if repo_version != f"v{product_version}":
+            raise ReleaseToolError(
+                f"release version {repo_version} does not match the package "
+                f"product version v{product_version}")
+        product_display = product_version
+    else:
+        # Packages without trusted product metadata are never mapped to a
+        # guessed version (issue #6: never presented as v1.0.0).
+        product_display = "unknown (legacy package; no trusted product metadata)"
+
     lines = [
         f"## line-crossing {repo_version}",
         "",
@@ -75,19 +95,21 @@ def render_notes(repo_version: str, provenance: dict, verification: dict,
         "",
         "| Field | Value |",
         "| --- | --- |",
-        f"| Repository version | {repo_version} (release batch identity) |",
+        f"| Product version | {product_display} |",
         f"| App ID | {provenance['app_id']} |",
-        f"| Native version | {'.'.join(str(x) for x in provenance['native_version'])} |",
-        f"| UI version | {'.'.join(str(x) for x in provenance['ui_version'])} |",
         f"| Package format | {provenance.get('format', 'neapp-v5-unsigned')} |",
         f"| Package size | {package_len} bytes |",
         f"| Package SHA-256 | `{package_sha}` |",
         f"| Source commit | `{provenance['source_commit']}` |",
         f"| Signing | {provenance.get('signing_dependencies', 'none')} |",
         "",
-        "Repository version, native version, and UI version are recorded",
-        "separately; they are different version lines and may carry equal or",
-        "different values.",
+        "The product version is the only user-facing version line; the",
+        "release title and file names use the same 1.0.x product version.",
+        "Native and UI component versions are internal build identity for",
+        "diagnostics and upgrade checks; they are recorded in the attached",
+        "provenance file and are not shown to users. Packages without",
+        "trusted product metadata are displayed as unknown legacy packages,",
+        "never as a guessed product version.",
         "",
         "### Changes",
         "",

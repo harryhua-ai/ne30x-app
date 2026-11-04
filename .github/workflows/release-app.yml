@@ -50,9 +50,15 @@ jobs:
       - name: Resolve packaged versions from the Makefile
         run: |
           set -euo pipefail
-          native=$(make -C apps/line-crossing/app -s print-v4_app_version)
+          product=$(make -C apps/line-crossing/app -s print-v5_product_version)
           echo "PKG_DIR=apps/line-crossing/app/build/pkg" >> "$GITHUB_ENV"
-          echo "PACKAGE=apps/line-crossing/app/build/pkg/line-crossing-$native.neapp" >> "$GITHUB_ENV"
+          echo "PACKAGE=apps/line-crossing/app/build/pkg/line-crossing-$product.neapp" >> "$GITHUB_ENV"
+          # The release version must be the product version line (issue #6);
+          # release_tool.py notes enforces v<X.Y.Z> == product_version.
+          if [ "$RELEASE_VERSION" != "v$product" ]; then
+            echo "release version $RELEASE_VERSION does not match the packaged product version v$product" >&2
+            exit 1
+          fi
 
       - name: Check tag and release conflicts (fail closed)
         env:

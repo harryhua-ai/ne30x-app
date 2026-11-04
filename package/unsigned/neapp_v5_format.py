@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "package"))
 
 import neapp_v5_native as v4
+import neapp_v5_product_version as product
 import neapp_v5_ui_assets as ui
 
 CONTAINER_MAGIC = bytes.fromhex("4e45415050050000")
@@ -545,6 +546,17 @@ def _verify_impl(data, policy, host_admission):
                 f"asset {rec.path!r} sha256 does not match the manifest record {rec.sha256.hex()}")
         cursor += rec.file_len
 
+    # Product-version metadata (issue #6): only packages that require
+    # CAP_PRODUCT_VERSION (bit 10, 0x400) carry trusted product metadata; for
+    # those, the carrier asset must exist and strictly match the canonical
+    # schema. Packages without the bit keep their exact historical behavior —
+    # a same-named asset there is an ordinary hashed resource and is never
+    # interpreted as product metadata. No container byte, magic, or reserved
+    # slot is read or changed by this branch.
+    product_version = None
+    if manifest.required_host_caps & v4.CAP_PRODUCT_VERSION:
+        product_version = product.extract_product_version(ui_manifest, ui_payload)
+
     if host_admission and manifest.target_board_id != policy.target_board_id:
         raise v4.TargetIncompatible(
             f"target_board_id {manifest.target_board_id:#010x} != policy {policy.target_board_id:#010x}")
@@ -643,4 +655,6 @@ def _verify_impl(data, policy, host_admission):
             "install, execution, or device acceptance"
         ),
     }
+    if product_version is not None:
+        report["product_version"] = product_version
     return report, None

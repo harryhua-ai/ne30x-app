@@ -32,7 +32,16 @@ CAP_CONTROL_RECEIVE = 1 << 6
 CAP_BUSINESS_SNAPSHOT = 1 << 7
 CAP_ENABLE_CONTROL = 1 << 8
 CAP_LIVE_PUBLISH = 1 << 9
+# Product-version metadata gate (issue #6): bit 10 marks packages that carry
+# the trusted product-version carrier asset (product-version.json). Bit 10 is
+# outside the mask implemented by Hosts that predate product metadata
+# (APP_ADMISSION_V4_KNOWN_CAPS_MASK / supported_caps_mask == 0x3ff), so their
+# existing unknown-bit/unsupported-bit admission refusals fail closed on such
+# packages BEFORE install. The bit only widens the package-side vocabulary;
+# it adds no quota semantics and never relaxes any existing coupling.
+CAP_PRODUCT_VERSION = 1 << 10
 HOST_CAPS_KNOWN_MASK = 0x000003FF
+HOST_CAPS_VOCABULARY_MASK = HOST_CAPS_KNOWN_MASK | CAP_PRODUCT_VERSION
 
 RUN_PROFILE_V4 = 3
 
@@ -112,8 +121,10 @@ def min_live_publish_max(live_track_max: int) -> int:
 def validate_policy_shape(caps: int, run_profile: int, event_max: int, state_quota: int,
                           report_max: int, control_max: int, snapshot_max: int,
                           live_publish_max: int, live_track_max: int) -> None:
-    if caps & ~HOST_CAPS_KNOWN_MASK:
-        raise BadPackage(f"required_host_caps has unknown bits: {caps & ~HOST_CAPS_KNOWN_MASK:#x}")
+    if caps & ~HOST_CAPS_VOCABULARY_MASK:
+        raise BadPackage(f"required_host_caps has unknown bits: {caps & ~HOST_CAPS_VOCABULARY_MASK:#x} "
+                         f"(vocabulary mask {HOST_CAPS_VOCABULARY_MASK:#x}; Hosts that do not "
+                         "implement a declared bit still refuse the package at admission)")
     if run_profile != RUN_PROFILE_V4:
         raise BadPackage(
             f"unknown run_profile {run_profile} (v4 allows only {RUN_PROFILE_V4}; "

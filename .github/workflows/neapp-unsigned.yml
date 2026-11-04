@@ -65,10 +65,10 @@ jobs:
         run: |
           set -euo pipefail
           evidence_dir="$RUNNER_TEMP/neapp-unsigned-evidence"
-          native=$(make -C apps/line-crossing/app -s print-v4_app_version)
+          product=$(make -C apps/line-crossing/app -s print-v5_product_version)
           bash package/release/build_neapp.sh --out-dir "$RUNNER_TEMP/neapp-candidate" \
             --source-sha "$GITHUB_SHA"
-          package="$RUNNER_TEMP/neapp-candidate/line-crossing-$native.neapp"
+          package="$RUNNER_TEMP/neapp-candidate/line-crossing-$product.neapp"
           python - "$package.provenance.json" > "$evidence_dir/candidate-metadata.json" <<'PY'
           import json
           import sys
@@ -78,6 +78,7 @@ jobs:
           print(json.dumps({
               "artifact": "neapp-v5-unsigned CI candidate (not an official Release)",
               "app_id": provenance["app_id"],
+              "product_version": provenance["product_version"],
               "native_version": provenance["native_version"],
               "ui_version": provenance["ui_version"],
               "package_sha256": provenance["package"]["sha256"],

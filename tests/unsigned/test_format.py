@@ -181,8 +181,11 @@ class V5FormatNegativeTests(unittest.TestCase):
         self.assertEqual(error.code, "BAD_PACKAGE")
 
     def test_unknown_capability_bits_are_rejected(self):
+        # Bit 11 (0x800) and above stay outside the package vocabulary mask;
+        # bit 10 (0x400) is the product-version gate (issue #6) and is covered
+        # by tests/unsigned/test_product_version.py.
         data = bytearray(self.package)
-        struct.pack_into("<I", data, 16 + v5.NATIVE_MEMBER_HEADER_LEN + 72, 0x00000463)
+        struct.pack_into("<I", data, 16 + v5.NATIVE_MEMBER_HEADER_LEN + 72, 0x00000863)
         _, error = v5.verify_package_v5(bytes(data))
         self.assertIsNotNone(error)
         self.assertEqual(error.code, "BAD_PACKAGE")

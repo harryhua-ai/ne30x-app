@@ -77,26 +77,41 @@ bash package/release/build_neapp.sh
 **Output:**
 
 ```text
-apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp
-apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp.sha256
-apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp.provenance.json
-apps/line-crossing/app/build/pkg/line-crossing-<version>.verification.json
+apps/line-crossing/app/build/pkg/line-crossing-<product-version>.neapp
+apps/line-crossing/app/build/pkg/line-crossing-<product-version>.neapp.sha256
+apps/line-crossing/app/build/pkg/line-crossing-<product-version>.neapp.provenance.json
+apps/line-crossing/app/build/pkg/line-crossing-<product-version>.verification.json
+apps/line-crossing/app/build/pkg/line-crossing-<product-version>.oldhost-gate.json
 apps/line-crossing/app/build/pkg/candidate.json
 ```
 
-Packaged versions follow the Makefile defaults (`V4_APP_VERSION`,
-`V5_UI_VERSION`). They are recorded separately in the package provenance;
-they are not the repository release version.
+The user-facing package file name uses the **product version** (Makefile
+default `V5_PRODUCT_VERSION`, e.g. `1.0.1`), which is the only version line
+shown to users. The internal Native and UI component versions (Makefile
+defaults `V4_APP_VERSION`, `V5_UI_VERSION`) keep increasing independently for
+diagnostics and device upgrade checks; they are recorded in the package
+provenance and are not the repository release version. Product-version
+packages carry the trusted carrier asset `product-version.json` inside the
+UI asset tree and require the `CAP_PRODUCT_VERSION` gate bit (`0x400`, see
+`required_host_caps`), so Hosts that predate product metadata refuse the
+package before install; the build records that refusal as
+`*.oldhost-gate.json`.
 
 ### 4. Verify
 
 ```bash
+# Simulating the current (pre-product-metadata) Host: refused.
 python3 package/unsigned/neapp_verify_v5.py \
-  --package apps/line-crossing/app/build/pkg/line-crossing-<version>.neapp \
+  --package apps/line-crossing/app/build/pkg/line-crossing-<product-version>.neapp \
   --compact
+
+# Simulating a product-version-capable Host (0x7ff = 0x3ff | 0x400): PASS.
+python3 package/unsigned/neapp_verify_v5.py \
+  --package apps/line-crossing/app/build/pkg/line-crossing-<product-version>.neapp \
+  --host-caps-hex 0x7ff --compact
 ```
 
-A successful verification returns `PASS`.
+A successful verification returns `PASS` and reports `product_version`.
 
 ## Testing
 
@@ -133,13 +148,15 @@ real `.neapp` as a downloadable CI artifact named
 verification report. CI artifacts are candidates, not official releases.
 
 Releases run through **Actions → Release App → Run workflow** with a single
-input `vX.Y.Z`. The workflow validates the version strictly, fails closed on
-any existing tag/release/draft conflict, builds and verifies the package,
-generates English release notes (changes, package identity with repository
-version and packaged native/UI versions recorded separately, compatibility,
-verification results, known limitations), and creates an **unpublished draft
-release** carrying the `.neapp`, SHA-256, provenance, and verification
-attachments. The workflow never publishes.
+input `vX.Y.Z`. The workflow validates the version strictly, requires it to
+match the packaged product version line, fails closed on any existing
+tag/release/draft conflict, builds and verifies the package, generates
+English release notes (changes, package identity with the product version as
+the only user-facing version line — internal native/UI versions stay in the
+attached provenance file — compatibility, verification results, known
+limitations), and creates an **unpublished draft release** carrying the
+`.neapp`, SHA-256, provenance, and verification attachments. The workflow
+never publishes.
 
 Publishing a draft is a separate, per-version human action after explicit
 User Release GO. The first official release version has not been approved
