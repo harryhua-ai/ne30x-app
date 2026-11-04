@@ -17,6 +17,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--package", required=True, type=Path)
     parser.add_argument("--host-policy", type=Path, default=None)
+    parser.add_argument("--host-caps-hex", default=None,
+                        help="override the simulated Host supported caps mask "
+                             "(e.g. 0x7ff for a Host that admits the "
+                             "product-version gate bit 0x400)")
     parser.add_argument("--no-host-admission", action="store_true")
     parser.add_argument("--compact", action="store_true")
     args = parser.parse_args()
@@ -29,6 +33,17 @@ def main() -> int:
             print(json.dumps({"result": "INPUT_ERROR", "detail": str(error)}, sort_keys=True,
                              indent=None if args.compact else 2))
             return 1
+    if args.host_caps_hex is not None:
+        try:
+            caps = int(args.host_caps_hex, 0)
+            if not 0 <= caps <= 0xFFFFFFFF:
+                raise ValueError("caps mask outside u32 range")
+        except ValueError as error:
+            print(json.dumps({"result": "INPUT_ERROR", "detail": str(error)}, sort_keys=True,
+                             indent=None if args.compact else 2))
+            return 1
+        policy = policy or v4.DevicePolicyV4()
+        policy.host_caps = caps
     try:
         report, error = v5.verify_package_v5(
             args.package.read_bytes(),

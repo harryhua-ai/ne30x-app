@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "package" / "unsigned"))
 
 import neapp_v5_native as v4
 import neapp_v5_image as image_builder
+import neapp_v5_product_version as product
 import neapp_v5_ui_assets as ui
 import neapp_v5_format as v5
 
@@ -137,8 +138,33 @@ def build_v5(
     live_track_max: int,
     source_commit: str | None = None,
     provenance_path: Path | None = None,
+    product_version: str | None = None,
 ) -> dict:
     assets = collect_assets(ui_asset_root)
+    if product_version is not None:
+        try:
+            product_version = product.parse_product_version(product_version)
+            blob = next((data for name, data in assets
+                         if name == product.PRODUCT_VERSION_ASSET_PATH), None)
+            if blob is None:
+                raise PackError(
+                    f"product-version packages must carry "
+                    f"{product.PRODUCT_VERSION_ASSET_PATH!r} in the UI asset tree "
+                    "(the carrier asset rides collect_assets() and the existing "
+                    "per-asset hash chain)")
+            embedded = product.parse_product_version_asset(blob)
+        except (v4.PackageError, ValueError) as error:
+            raise PackError(str(error.detail if isinstance(error, v4.PackageError)
+                                else error)) from error
+        if embedded != product_version:
+            raise PackError(
+                f"{product.PRODUCT_VERSION_ASSET_PATH!r} embeds product "
+                f"version {embedded!r} but the package declares "
+                f"{product_version!r}")
+        # The capability gate is implied by the metadata: a package that
+        # claims a product version MUST require a bit outside the current
+        # 0x3ff Host support mask so old Hosts fail closed before install.
+        host_caps |= v4.CAP_PRODUCT_VERSION
     elf = elf_path.read_bytes()
     version_text = ".".join(str(part) for part in native_version)
     marker = f"{app_id}-app {version_text}: v4 session entry".encode("ascii")
@@ -197,7 +223,14 @@ def build_v5(
     ))
     ui_payload = b"".join(blob for _, blob in assets)
     package = v5.build_package_v5(manifest, image, ui_manifest, ui_payload)
-    report, error = v5.verify_package_v5(package)
+    # Self-verification simulates the admitting Host: product-version packages
+    # are admitted only by a Host whose supported_caps_mask includes bit 10
+    # (0x400). The default policy keeps the current real 0x3ff mask, so the
+    # old-Host fail-closed behavior stays the offline default.
+    self_verify_policy = v4.DevicePolicyV4(
+        host_caps=(v4.HOST_CAPS_VOCABULARY_MASK if product_version is not None
+                   else v4.HOST_CAPS_KNOWN_MASK))
+    report, error = v5.verify_package_v5(package, policy=self_verify_policy)
     if error is not None or report is None:
         raise PackError(f"packer self-verification rejected the package: "
                         f"{error.code if error else 'UNKNOWN'}: {error.detail if error else ''}")
@@ -256,6 +289,8 @@ def build_v5(
         },
         "verification_boundary": report["boundary"],
     }
+    if product_version is not None:
+        metadata["product_version"] = product_version
     provenance_path.write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return metadata
 
@@ -280,6 +315,11 @@ def main() -> int:
     parser.add_argument("--live-publish-max", type=parse_int, default=0)
     parser.add_argument("--live-track-max", type=parse_int, default=0)
     parser.add_argument("--source-commit", default=None)
+    parser.add_argument("--product-version", default=None,
+                        help="declare the trusted product version (e.g. 1.0.1); "
+                             "requires %s in the UI asset tree and implies the "
+                             "CAP_PRODUCT_VERSION gate bit 0x400"
+                             % product.PRODUCT_VERSION_ASSET_PATH)
     args = parser.parse_args()
     try:
         metadata = build_v5(
@@ -289,6 +329,7 @@ def main() -> int:
             args.control_max, args.snapshot_max, args.live_publish_max,
             args.live_track_max,
             args.source_commit, args.provenance_out,
+            product_version=args.product_version,
         )
     except (OSError, ValueError, RuntimeError) as error:
         print(json.dumps({"result": "REJECTED", "detail": str(error)}, sort_keys=True), file=sys.stderr)
