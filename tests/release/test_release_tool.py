@@ -117,6 +117,12 @@ class RenderNotesTest(unittest.TestCase):
         broken["product_version"] = "01.0.1"
         with self.assertRaises(release_tool.ReleaseToolError):
             self.render(provenance=broken)
+        broken["product_version"] = "1.0.01"
+        with self.assertRaises(release_tool.ReleaseToolError):
+            self.render(provenance=broken)
+        broken["product_version"] = "1.01.1"
+        with self.assertRaises(release_tool.ReleaseToolError):
+            self.render(provenance=broken)
         broken["product_version"] = "0.9.9"
         with self.assertRaises(release_tool.ReleaseToolError):
             self.render(provenance=broken)

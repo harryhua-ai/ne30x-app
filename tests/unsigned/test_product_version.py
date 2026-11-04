@@ -46,10 +46,17 @@ class CarrierSchemaTests(unittest.TestCase):
     def test_declared_version_validation(self):
         self.assertEqual(product.parse_product_version("1.0.1"), "1.0.1")
         self.assertEqual(product.parse_product_version("10.20.30"), "10.20.30")
+        self.assertEqual(product.parse_product_version("1.0.0"), "1.0.0")
+        self.assertEqual(product.parse_product_version("1.10.1"), "1.10.1")
         for bad in ("v1.0.1", "01.0.1", "1.0", "1.0.1.0", "0.9.9", "1..0",
-                    "1.0.x", "", "1.0.1 ", " 1.0.1", 1.01, None):
+                    "1.0.x", "", "1.0.1 ", " 1.0.1", 1.01, None,
+                    "1.01.1", "1.0.01"):
             with self.assertRaises(ValueError, msg=repr(bad)):
                 product.parse_product_version(bad)
+        for bad_asset in (b'{"product_version":"1.01.1"}',
+                          b'{"product_version":"1.0.01"}'):
+            with self.assertRaises(v4.BadPackage):
+                product.parse_product_version_asset(bad_asset)
 
     def test_asset_schema_negatives(self):
         cases = {

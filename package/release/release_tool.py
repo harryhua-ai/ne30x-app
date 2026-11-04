@@ -7,7 +7,7 @@ from pathlib import Path
 
 VERSION_RE = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 # Product version in provenance carries no "v" prefix (issue #6).
-PRODUCT_VERSION_RE = re.compile(r"^(0|[1-9]\d*)\.(\d+)\.(\d+)$")
+PRODUCT_VERSION_RE = re.compile(r"^([1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 
 ADDED_PREFIXES = ("feat",)
 FIXED_PREFIXES = ("fix",)
