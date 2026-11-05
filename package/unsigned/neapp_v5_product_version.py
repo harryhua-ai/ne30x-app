@@ -47,7 +47,7 @@ import neapp_v5_native as v4
 
 PRODUCT_VERSION_ASSET_PATH = "product-version.json"
 
-# Product line starts at 1.0.1: major >= 1, no leading zeros anywhere.
+# Product version is MAJOR.MINOR.PATCH: major >= 1, no leading zeros.
 PRODUCT_VERSION_RE = re.compile(r"^([1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 MIN_ASSET_LEN = 1

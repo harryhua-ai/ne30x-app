@@ -15,7 +15,7 @@ PROVENANCE = {
     "app_id": "line-crossing",
     "native_version": [4, 2, 8],
     "ui_version": [1, 2, 10],
-    "product_version": "1.0.1",
+    "product_version": "1.0.2",
     "source_commit": "a" * 40,
     "signing_dependencies": "none: no private key, no SPKI, no signature",
     "package": {"sha256": "b" * 64, "len": 123456},
@@ -73,13 +73,13 @@ class CommitClassificationTest(unittest.TestCase):
 
 class RenderNotesTest(unittest.TestCase):
     def render(self, provenance=PROVENANCE, verification=VERIFICATION,
-               commits=None, limitations=None, repo_version="v1.0.1"):
+               commits=None, limitations=None, repo_version="v1.0.2"):
         return release_tool.render_notes(repo_version, provenance, verification,
                                          commits or {}, limitations or [])
 
     def test_notes_show_product_version_as_the_only_version_line(self):
         text = self.render()
-        self.assertIn("| Product version | 1.0.1 |", text)
+        self.assertIn("| Product version | 1.0.2 |", text)
         self.assertNotIn("| Native version |", text)
         self.assertNotIn("| UI version |", text)
         self.assertNotIn("| Repository version |", text)
@@ -100,7 +100,7 @@ class RenderNotesTest(unittest.TestCase):
     def test_notes_mark_legacy_packages_unknown(self):
         legacy = dict(PROVENANCE)
         legacy.pop("product_version")
-        text = self.render(provenance=legacy, repo_version="v1.0.1")
+        text = self.render(provenance=legacy, repo_version="v1.0.2")
         self.assertIn("| Product version | unknown (legacy package; "
                       "no trusted product metadata) |", text)
         # Legacy packages are never presented as a guessed product version.
@@ -108,13 +108,13 @@ class RenderNotesTest(unittest.TestCase):
 
     def test_notes_refuse_release_version_product_mismatch(self):
         with self.assertRaises(release_tool.ReleaseToolError):
-            self.render(repo_version="v1.0.2")
+            self.render(repo_version="v1.0.3")
         with self.assertRaises(release_tool.ReleaseToolError):
             self.render(repo_version="v4.2.8")
 
     def test_notes_reject_invalid_product_version_in_provenance(self):
         broken = dict(PROVENANCE)
-        broken["product_version"] = "01.0.1"
+        broken["product_version"] = "01.0.2"
         with self.assertRaises(release_tool.ReleaseToolError):
             self.render(provenance=broken)
         broken["product_version"] = "1.0.01"
