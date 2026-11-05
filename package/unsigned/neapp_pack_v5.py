@@ -316,7 +316,7 @@ def main() -> int:
     parser.add_argument("--live-track-max", type=parse_int, default=0)
     parser.add_argument("--source-commit", default=None)
     parser.add_argument("--product-version", default=None,
-                        help="declare the trusted product version (e.g. 1.0.1); "
+                        help="declare the trusted product version (e.g. 1.0.2); "
                              "requires %s in the UI asset tree and implies the "
                              "CAP_PRODUCT_VERSION gate bit 0x400"
                              % product.PRODUCT_VERSION_ASSET_PATH)

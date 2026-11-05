@@ -31,7 +31,7 @@ PACKER = ROOT / "package" / "unsigned" / "neapp_pack_v5.py"
 VERIFIER = ROOT / "package" / "unsigned" / "neapp_verify_v5.py"
 PRODUCT_CAPS = v4.HOST_CAPS_VOCABULARY_MASK  # 0x7ff: product-version-capable Host
 OLD_HOST_CAPS = v4.HOST_CAPS_KNOWN_MASK      # 0x3ff: Hosts without product metadata
-CANONICAL = b'{"product_version":"1.0.1"}'
+CANONICAL = b'{"product_version":"1.0.2"}'
 
 
 def run_cli(script: Path, *args: str) -> subprocess.CompletedProcess:
@@ -41,15 +41,15 @@ def run_cli(script: Path, *args: str) -> subprocess.CompletedProcess:
 
 class CarrierSchemaTests(unittest.TestCase):
     def test_canonical_bytes_parse(self):
-        self.assertEqual(product.parse_product_version_asset(CANONICAL), "1.0.1")
+        self.assertEqual(product.parse_product_version_asset(CANONICAL), "1.0.2")
 
     def test_declared_version_validation(self):
-        self.assertEqual(product.parse_product_version("1.0.1"), "1.0.1")
+        self.assertEqual(product.parse_product_version("1.0.2"), "1.0.2")
         self.assertEqual(product.parse_product_version("10.20.30"), "10.20.30")
         self.assertEqual(product.parse_product_version("1.0.0"), "1.0.0")
         self.assertEqual(product.parse_product_version("1.10.1"), "1.10.1")
-        for bad in ("v1.0.1", "01.0.1", "1.0", "1.0.1.0", "0.9.9", "1..0",
-                    "1.0.x", "", "1.0.1 ", " 1.0.1", 1.01, None,
+        for bad in ("v1.0.2", "01.0.2", "1.0", "1.0.2.0", "0.9.9", "1..0",
+                    "1.0.x", "", "1.0.2 ", " 1.0.2", 1.01, None,
                     "1.01.1", "1.0.01"):
             with self.assertRaises(ValueError, msg=repr(bad)):
                 product.parse_product_version(bad)
@@ -61,18 +61,18 @@ class CarrierSchemaTests(unittest.TestCase):
     def test_asset_schema_negatives(self):
         cases = {
             "not json": b"product_version",
-            "not an object": b'"1.0.1"',
-            "array": b'[{"product_version":"1.0.1"}]',
-            "missing key": b'{"version":"1.0.1"}',
-            "extra field": b'{"product_version":"1.0.1","channel":"stable"}',
+            "not an object": b'"1.0.2"',
+            "array": b'[{"product_version":"1.0.2"}]',
+            "missing key": b'{"version":"1.0.2"}',
+            "extra field": b'{"product_version":"1.0.2","channel":"stable"}',
             "non-string": b'{"product_version":1.01}',
-            "v prefix": b'{"product_version":"v1.0.1"}',
+            "v prefix": b'{"product_version":"v1.0.2"}',
             "zero major": b'{"product_version":"0.1.0"}',
-            "leading zero": b'{"product_version":"01.0.1"}',
-            "whitespace": b'{"product_version": "1.0.1"}',
+            "leading zero": b'{"product_version":"01.0.2"}',
+            "whitespace": b'{"product_version": "1.0.2"}',
             "trailing newline": CANONICAL + b"\n",
-            "duplicate key": b'{"product_version":"1.0.1","product_version":"1.0.2"}',
-            "nan constant": b'{"product_version":"1.0.1","x":NaN}',
+            "duplicate key": b'{"product_version":"1.0.2","product_version":"1.0.3"}',
+            "nan constant": b'{"product_version":"1.0.2","x":NaN}',
             "empty": b"",
             "too long": b'{"product_version":"' + b"1" * 200 + b'"}',
             "invalid utf-8": b'{"product_version":"1.0.\xff"}',
@@ -90,9 +90,9 @@ class ProductPackageTests(unittest.TestCase):
         self.elf_path = self.root / "fixture.elf"
         self.elf_path.write_bytes(fixture_elf())
         self.ui_root = write_fixture_ui_tree(self.root / "ui")
-        self.out = self.root / "line-crossing-1.0.1.neapp"
+        self.out = self.root / "line-crossing-1.0.2.neapp"
 
-    def pack_product(self, product_version="1.0.1", carrier=CANONICAL):
+    def pack_product(self, product_version="1.0.2", carrier=CANONICAL):
         (self.ui_root / product.PRODUCT_VERSION_ASSET_PATH).write_bytes(carrier)
         return build_v5(
             self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
@@ -103,7 +103,7 @@ class ProductPackageTests(unittest.TestCase):
 
     def test_product_package_carries_the_asset_in_the_hash_chain(self):
         metadata = self.pack_product()
-        self.assertEqual(metadata["product_version"], "1.0.1")
+        self.assertEqual(metadata["product_version"], "1.0.2")
         self.assertEqual(metadata["host_policy"]["host_caps"], 0x63 | v4.CAP_PRODUCT_VERSION)
         carrier_records = [entry for entry in metadata["ui_build"]["asset_records"]
                            if entry["path"] == product.PRODUCT_VERSION_ASSET_PATH]
@@ -113,7 +113,7 @@ class ProductPackageTests(unittest.TestCase):
         report, error = v5.verify_package_v5(data, policy=v4.DevicePolicyV4(host_caps=PRODUCT_CAPS))
         self.assertIsNone(error)
         self.assertEqual(report["result"], "PASS")
-        self.assertEqual(report["product_version"], "1.0.1")
+        self.assertEqual(report["product_version"], "1.0.2")
         self.assertEqual(report["required_host_caps"], f"{0x63 | v4.CAP_PRODUCT_VERSION:#x}")
         # The carrier asset rides collect_assets(): it is an ordinary record
         # in the verified UI manifest hash chain.
@@ -146,7 +146,7 @@ class ProductPackageTests(unittest.TestCase):
         data = bytearray(self.out.read_bytes())
         index = data.find(CANONICAL)
         self.assertGreaterEqual(index, 0)
-        data[index + len(CANONICAL) - 3] = ord("2")  # 1.0.1 -> 1.0.2 in bytes
+        data[index + len(CANONICAL) - 3] = ord("3")  # 1.0.2 -> 1.0.3 in bytes
         report, error = v5.verify_package_v5(
             bytes(data), policy=v4.DevicePolicyV4(host_caps=PRODUCT_CAPS))
         self.assertIsNone(report)
@@ -160,26 +160,26 @@ class ProductPackageTests(unittest.TestCase):
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
                 0, 0, 0, 256, 0, 0, 0,
-                product_version="1.0.1",
+                product_version="1.0.2",
             )
         self.assertFalse(self.out.exists())
 
     def test_pack_refuses_carrier_declared_mismatch(self):
-        self.pack_product()  # writes 1.0.1 carrier
+        self.pack_product()  # writes 1.0.2 carrier
         with self.assertRaises(PackError):
             build_v5(
                 self.elf_path, self.ui_root, self.out, FIXTURE_APP_ID,
                 FIXTURE_NATIVE_VERSION, FIXTURE_UI_VERSION, 0x63,
                 0, 0, 0, 256, 0, 0, 0,
-                product_version="1.0.2",
+                product_version="1.0.3",
             )
 
     def test_pack_refuses_non_canonical_carrier(self):
         with self.assertRaises(PackError):
-            self.pack_product(carrier=b'{"product_version": "1.0.1"}\n')
+            self.pack_product(carrier=b'{"product_version": "1.0.2"}\n')
 
     def test_pack_refuses_invalid_declared_version(self):
-        for bad in ("v1.0.1", "01.2.3", "0.1.0", "1.0"):
+        for bad in ("v1.0.2", "01.2.3", "0.1.0", "1.0"):
             with self.assertRaises(PackError, msg=bad):
                 self.pack_product(product_version=bad)
 
@@ -244,17 +244,17 @@ class ProductCliTests(unittest.TestCase):
             elf_path.write_bytes(fixture_elf())
             ui_root = write_fixture_ui_tree(root / "ui")
             (ui_root / product.PRODUCT_VERSION_ASSET_PATH).write_bytes(CANONICAL)
-            out = root / "line-crossing-1.0.1.neapp"
+            out = root / "line-crossing-1.0.2.neapp"
             pack = run_cli(PACKER, "--elf", str(elf_path), "--ui-assets", str(ui_root),
                            "--out", str(out), "--app-id", "line-crossing",
                            "--native-version", "4.0.0", "--ui-version", "1.1.1",
-                           "--product-version", "1.0.1")
+                           "--product-version", "1.0.2")
             self.assertEqual(pack.returncode, 0, pack.stderr)
             payload = json.loads(pack.stdout)
             self.assertEqual(payload["result"], "PASS")
 
             provenance = json.loads(Path(str(out) + ".provenance.json").read_text(encoding="utf-8"))
-            self.assertEqual(provenance["product_version"], "1.0.1")
+            self.assertEqual(provenance["product_version"], "1.0.2")
             self.assertEqual(provenance["native_version"], [4, 0, 0])
             self.assertEqual(provenance["ui_version"], [1, 1, 1])
 
@@ -271,7 +271,7 @@ class ProductCliTests(unittest.TestCase):
             self.assertEqual(admitted.returncode, 0, admitted.stderr)
             admitted_report = json.loads(admitted.stdout)
             self.assertEqual(admitted_report["result"], "PASS")
-            self.assertEqual(admitted_report["product_version"], "1.0.1")
+            self.assertEqual(admitted_report["product_version"], "1.0.2")
 
     def test_packer_cli_refuses_bad_product_version_flag(self):
         with tempfile.TemporaryDirectory(prefix="neapp-product-cli-bad-") as raw:
@@ -280,11 +280,11 @@ class ProductCliTests(unittest.TestCase):
             elf_path.write_bytes(fixture_elf())
             ui_root = write_fixture_ui_tree(root / "ui")
             (ui_root / product.PRODUCT_VERSION_ASSET_PATH).write_bytes(CANONICAL)
-            out = root / "line-crossing-1.0.1.neapp"
+            out = root / "line-crossing-1.0.2.neapp"
             pack = run_cli(PACKER, "--elf", str(elf_path), "--ui-assets", str(ui_root),
                            "--out", str(out), "--app-id", "line-crossing",
                            "--native-version", "4.0.0", "--ui-version", "1.1.1",
-                           "--product-version", "01.0.1")
+                           "--product-version", "01.0.2")
             self.assertNotEqual(pack.returncode, 0)
             self.assertFalse(out.exists())
 

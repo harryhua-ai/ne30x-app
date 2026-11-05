@@ -86,7 +86,7 @@ apps/line-crossing/app/build/pkg/candidate.json
 ```
 
 The user-facing package file name uses the **product version** (Makefile
-default `V5_PRODUCT_VERSION`, e.g. `1.0.1`), which is the only version line
+default `V5_PRODUCT_VERSION`, e.g. `1.0.2`), which is the only version line
 shown to users. The internal Native and UI component versions (Makefile
 defaults `V4_APP_VERSION`, `V5_UI_VERSION`) keep increasing independently for
 diagnostics and device upgrade checks; they are recorded in the package
@@ -159,8 +159,8 @@ limitations), and creates an **unpublished draft release** carrying the
 never publishes.
 
 Publishing a draft is a separate, per-version human action after explicit
-User Release GO. The first official release version has not been approved
-yet. Current pipeline limitations are listed in
+User Release GO. Existing tags and release assets are never overwritten.
+Current pipeline limitations are listed in
 [package/release/known-limitations.md](package/release/known-limitations.md).
 
 ## Installation
