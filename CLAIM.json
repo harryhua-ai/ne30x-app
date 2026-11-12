@@ -46,5 +46,11 @@
   "release": "v1.1.9",
   "source_sha": "40a83836f80b391c7669cf011084ca8726bdf088",
   "release_repo": null
+ },
+ "delivery": {
+  "pr": 16,
+  "sha": "cfc1c196d5cd89c1640cb3df87966997171cbb60",
+  "note": "Attempt 3 candidate: F6 four-file patch + 1.0.3/1.2.17 bump + carrier; native identity byte-exact vs official 1.0.2 (ELF/image/member/TBS); awaiting A exact-SHA review on PR #16 (base=main)",
+  "delivered_at": "2026-11-12T05:57:24Z"
  }
 }
