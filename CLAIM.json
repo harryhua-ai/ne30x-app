@@ -1,22 +1,25 @@
 {
  "v": 3,
  "task": 15,
- "claim_id": "harryhua-ai-20261112T025447-7d8740f2",
+ "claim_id": "harryhua-ai-20261112T032627-6d170efb",
  "github_principal": "harryhua-ai",
  "executor_id": "harryhua-ai",
- "claimed_at": "2026-11-12T02:54:51Z",
- "lease_expires_at": "2026-11-12T03:10:59Z",
+ "claimed_at": "2026-11-12T03:26:30Z",
+ "lease_expires_at": "2026-11-12T03:32:30Z",
  "execution_base": "40899dc97754162dbbff97ea7a8ef464caa96b1a",
- "status": "blocked",
- "branch": "agent/15/650e413d",
- "heartbeat_at": "2026-11-12T03:08:58Z",
- "supersedes": null,
+ "status": "active",
+ "branch": "agent/15/3ebd7aa5",
+ "heartbeat_at": "2026-11-12T03:26:30Z",
+ "supersedes": {
+  "claim_id": "harryhua-ai-20261112T025447-7d8740f2",
+  "sha": "6f366ee6624a1b69966fd5ed6809f40180607343",
+  "status": "blocked"
+ },
  "contract_digest": "bd22cfc9a1f22a664450f8349dc835946a81ece289ba9e5f8086aa676482aa70",
  "candidate": null,
  "runtime": {
   "digest": "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31",
   "release": "v1.1.9",
   "source_sha": "40a83836f80b391c7669cf011084ca8726bdf088"
- },
- "note": "Contract STOP gate triggered: candidate native payload (4.2.14, unchanged version) differs from the published v1.0.2 native payload in length (26,048 vs 25,856 image bytes) and content \u2014 same-source rebuild in the local host toolchain does not reproduce the published native bytes (matches the #200 toolchain-divergence signature). Version transition work (Makefile 1.0.3/1.2.17 + test assertions) preserved uncommitted in .worktree/issue-15; candidate artifact + build log archived. Corrective path for ruling: pinned-container rebuild so native bytes match the published line. Full evidence: issue comment 6813216900."
+ }
 }
