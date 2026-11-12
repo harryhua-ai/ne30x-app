@@ -12,7 +12,27 @@
  "heartbeat_at": "2026-11-12T02:24:15Z",
  "supersedes": null,
  "contract_digest": "c2eaf674b8a3ea1d1c54c374e430cba542105c0819ee15a872a1a63ca53ea3de",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/13/7447821f",
+  "sha": "864cd60cd75c24217401df851a1a6220ae4df16b",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "apps/line-crossing/ui/src/lib/MSE/h264Player.ts": "ALLOWED",
+    "apps/line-crossing/ui/src/lib/MSE/websocket-init.ts": "ALLOWED",
+    "tests/line-crossing-ui/browser.test.mjs": "ALLOWED",
+    "tests/line-crossing-ui/contract.test.mjs": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 4,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-11-12T02:25:33Z"
+ },
  "runtime": {
   "digest": "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31",
   "release": "v1.1.9",
