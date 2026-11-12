@@ -121,8 +121,6 @@ export default class H264Player {
 
     private videoElement: HTMLVideoElement | null = null;
 
-    private wsRetryCount: number = 3;
-
     private wsUrl: string = '';
 
     private isStarted: boolean = false;
@@ -228,7 +226,6 @@ export default class H264Player {
         this.creatVideoPlayer();
         this.webSocketWorker = null;
         this.decodeWorker = null;
-        this.wsRetryCount = 3;
         this.wsUrl = '';
         this.isStarted = false;
         this.isConnected = false;
@@ -272,7 +269,7 @@ export default class H264Player {
                     window.dispatchEvent(new CustomEvent('wv_close', {
                         detail: { code: msg.code, reason: msg.reason }
                     }));
-                    if (msg.reason === 'Connection replaced') {
+                    if (msg.reason === 'Connection replaced' || msg.reason === 'Reconnect limit reached') {
                         logStreamError('WS', 'replaced', String(msg.code ?? ''), msg.reason || '');
                         this.cb({ t: 'connectionUnavailable' });
                     }
@@ -287,12 +284,6 @@ export default class H264Player {
                     logStreamError('WS', 'socket-error', '', msg.error || 'ws error');
 
                     window.dispatchEvent(new CustomEvent('wv_work', { detail: false }));
-                    this.wsRetryCount -= 1;
-                    if (this.wsRetryCount > 0 && !(typeof document !== 'undefined' && document.hidden)) {
-                        this.resetStartState().start(this.wsUrl);
-                    } else {
-                        this.cb({ t: 'connectionUnavailable' });
-                    }
                     break;
                 case 'video-data': {
 
@@ -397,11 +388,6 @@ export default class H264Player {
     wsConnect(url: string): this {
         this.isConnected = true;
         this.webSocketWorker?.postMessage({ type: 'connect', url });
-        return this;
-    }
-
-    resetStartState(): this {
-        this.isStarted = false;
         return this;
     }
 
@@ -565,8 +551,6 @@ export default class H264Player {
         this.packetCount = 0;
         this.packetsPerSecond = 0;
         this.lastPacketSec = 0;
-        this.wsRetryCount = 3;
-
         if (this.webSocketWorker) {
             this.wsDisconnect();
             await sleep(300);
