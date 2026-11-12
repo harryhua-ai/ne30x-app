@@ -7,7 +7,7 @@
  "claimed_at": "2026-11-12T05:28:49Z",
  "lease_expires_at": "2026-11-12T06:02:29Z",
  "execution_base": "460c8cd17c45d04aedf1cde0af4a8123502d91d7",
- "status": "active",
+ "status": "delivered",
  "branch": "agent/15/3a0c00f4",
  "heartbeat_at": "2026-11-12T05:56:29Z",
  "supersedes": {
@@ -52,5 +52,12 @@
   "sha": "cfc1c196d5cd89c1640cb3df87966997171cbb60",
   "note": "Attempt 3 candidate: F6 four-file patch + 1.0.3/1.2.17 bump + carrier; native identity byte-exact vs official 1.0.2 (ELF/image/member/TBS); awaiting A exact-SHA review on PR #16 (base=main)",
   "delivered_at": "2026-11-12T05:57:24Z"
+ },
+ "completed": {
+  "pr": 16,
+  "merge_commit": "b32f46a0f877813b90dc6a5766c5efb254c0d3c2",
+  "candidate_sha": "cfc1c196d5cd89c1640cb3df87966997171cbb60",
+  "completed_by": "harryhua-ai",
+  "completed_at": "2026-11-12T06:17:09Z"
  }
 }
