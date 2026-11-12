@@ -16,7 +16,27 @@
   "status": "blocked"
  },
  "contract_digest": "ffe5f362c1c579ae8115dbb4bcfc1bc40392626aaecc79be52748b21786dba45",
- "candidate": null,
+ "candidate": {
+  "branch": "agent/15/3a0c00f4",
+  "sha": "7fbbe5cb27b8ea12b23a408a6c727b67e1f00a25",
+  "scope": {
+   "pass": true,
+   "paths": {
+    "apps/line-crossing/ui/src/lib/MSE/h264Player.ts": "ALLOWED",
+    "apps/line-crossing/ui/src/lib/MSE/websocket-init.ts": "ALLOWED",
+    "tests/line-crossing-ui/browser.test.mjs": "ALLOWED",
+    "tests/line-crossing-ui/contract.test.mjs": "ALLOWED"
+   },
+   "violations": [],
+   "main_attributed_paths": [],
+   "counts": {
+    "ALLOWED": 4,
+    "FORBIDDEN": 0,
+    "MAIN_ATTRIBUTED": 0
+   }
+  },
+  "preserved_at": "2026-11-12T05:30:47Z"
+ },
  "runtime": {
   "digest": "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31",
   "release": "v1.1.9",
