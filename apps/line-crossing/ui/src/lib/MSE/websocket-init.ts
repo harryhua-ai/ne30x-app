@@ -6,6 +6,7 @@ let shouldReconnect = false;
 
 let retryCount = 0;
 const baseDelay = 1000;
+const maxRetryCount = 6;
 let retryTimer: number | null = null;
 
 function clearRetryTimer(): void {
@@ -54,6 +55,13 @@ function teardown(resetUrl = false): void {
 
 function scheduleReconnect(): void {
     if (!shouldReconnect || !currentUrl || retryTimer !== null) {
+        return;
+    }
+
+    if (retryCount >= maxRetryCount) {
+        shouldReconnect = false;
+        teardown(true);
+        ctx.postMessage({ type: 'close', code: 1006, reason: 'Reconnect limit reached' });
         return;
     }
 

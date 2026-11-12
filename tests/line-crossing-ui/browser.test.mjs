@@ -24,6 +24,7 @@ let server
 let serverUrl
 let streamEnabled = true
 let frameUnits = []
+let acceptedStreams = 0
 const streams = new Map()
 const requests = []
 
@@ -231,11 +232,21 @@ const serveAsset = (request, response, root, prefix) => {
   createReadStream(target).pipe(response)
 }
 
-const closeStreams = () => {
+const closeStreams = (reason = '') => {
   for (const [socket, timer] of streams) {
     clearInterval(timer)
     streams.delete(socket)
-    if (!socket.destroyed && socket.writable) socket.end(Buffer.from([0x88, 0x02, 0x03, 0xe8]))
+    const reasonBytes = Buffer.from(reason)
+    const payload = Buffer.concat([Buffer.from([0x03, 0xe8]), reasonBytes])
+    if (!socket.destroyed && socket.writable) socket.end(Buffer.concat([Buffer.from([0x88, payload.length]), payload]))
+  }
+}
+
+const dropStreams = () => {
+  for (const [socket, timer] of streams) {
+    clearInterval(timer)
+    streams.delete(socket)
+    socket.destroy()
   }
 }
 
@@ -272,6 +283,7 @@ before(async () => {
     }
     const accept = createHash('sha1').update(`${key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64')
     socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accept}\r\n\r\n`)
+    acceptedStreams += 1
     socket.setNoDelay(true)
     let sequence = 0
     const timer = setInterval(() => {
@@ -340,6 +352,115 @@ test('production entry reports unavailable capabilities without placeholder data
     assert.equal(await page.getByTestId('lc-page-realtime').count(), 1, label)
     await page.close()
   }
+})
+
+const waitForDecodedFrameRecovery = async (page, outageMs, previousAcceptedStreams) => {
+  const deadline = Date.now() + 30000
+  while (acceptedStreams <= previousAcceptedStreams && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+  assert.ok(acceptedStreams > previousAcceptedStreams, `no stream connection was accepted after the ${outageMs}ms interruption`)
+  const remainingMs = Math.max(1, deadline - Date.now())
+  await page.waitForFunction((outageFrames) => {
+    const video = document.querySelector('#lcVideoPlayer')
+    const probe = window.__lcVideoFrameProbe
+    return video?.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+      && !video.paused
+      && probe?.frames >= outageFrames + 25
+  }, await page.evaluate(() => window.__lcVideoFrameProbe.frames), { timeout: remainingMs, polling: 100 })
+}
+
+for (const outageMs of [5000, 10000]) {
+  test(`business video resumes decoded frames within 30s after ${outageMs / 1000}s network interruption`, async () => {
+    streamEnabled = true
+    const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+    try {
+      await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
+      await page.getByTestId('lc-module').waitFor()
+      await page.waitForFunction(() => {
+        const video = document.querySelector('#lcVideoPlayer')
+        return video?.videoWidth === 320 && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused
+      }, null, { timeout: 20000 })
+      await page.evaluate(() => {
+        const video = document.querySelector('#lcVideoPlayer')
+        window.__lcVideoFrameProbe = { frames: 0 }
+        const observeFrame = () => {
+          window.__lcVideoFrameProbe.frames += 1
+          video.requestVideoFrameCallback(observeFrame)
+        }
+        video.requestVideoFrameCallback(observeFrame)
+      })
+      await page.waitForFunction(() => window.__lcVideoFrameProbe.frames >= 25, null, { timeout: 5000 })
+      const priorAcceptedStreams = acceptedStreams
+      streamEnabled = false
+      dropStreams()
+      await page.waitForTimeout(outageMs)
+      const outageFrames = await page.evaluate(() => window.__lcVideoFrameProbe.frames)
+      streamEnabled = true
+      await waitForDecodedFrameRecovery(page, outageMs, priorAcceptedStreams)
+      const recovered = await page.evaluate(() => ({
+        frames: window.__lcVideoFrameProbe.frames,
+        width: document.querySelector('#lcVideoPlayer').videoWidth,
+        readyState: document.querySelector('#lcVideoPlayer').readyState,
+        paused: document.querySelector('#lcVideoPlayer').paused,
+      }))
+      assert.ok(recovered.frames >= outageFrames + 25, `decoded frames did not resume after ${outageMs}ms: ${JSON.stringify(recovered)}`)
+    } finally {
+      streamEnabled = true
+      await page.close()
+    }
+  })
+}
+
+test('manual Retry restores decoded business video after automatic recovery becomes unavailable', async () => {
+  streamEnabled = true
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+  try {
+    await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
+    await page.getByTestId('lc-module').waitFor()
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#lcVideoPlayer')
+      return video?.videoWidth === 320 && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused
+    }, null, { timeout: 20000 })
+    await page.evaluate(() => {
+      const video = document.querySelector('#lcVideoPlayer')
+      window.__lcVideoFrameProbe = { frames: 0 }
+      const observeFrame = () => {
+        window.__lcVideoFrameProbe.frames += 1
+        video.requestVideoFrameCallback(observeFrame)
+      }
+      video.requestVideoFrameCallback(observeFrame)
+    })
+    await page.waitForFunction(() => window.__lcVideoFrameProbe.frames >= 25, null, { timeout: 5000 })
+    const priorVideoCalls = await page.evaluate(() => window.__lineCrossingTest.getCalls().video.length)
+    const priorAcceptedStreams = acceptedStreams
+    closeStreams('Connection replaced')
+    await page.waitForFunction(() => document.querySelector('[data-testid="lc-video-state"]')?.getAttribute('data-state') === 'unavailable', null, { timeout: 5000 })
+    await page.getByTestId('lc-video-retry').click()
+    await page.waitForFunction((count) => window.__lineCrossingTest.getCalls().video.length === count + 1, priorVideoCalls, { timeout: 5000 })
+    await waitForDecodedFrameRecovery(page, 'manual Retry', priorAcceptedStreams)
+  } finally {
+    await page.close()
+  }
+})
+
+test('unmount disposes the active video stream without reconnecting', async () => {
+  streamEnabled = true
+  const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'en-US' })
+  await page.goto(`${serverUrl}/browser/`, { waitUntil: 'load' })
+  await page.getByTestId('lc-module').waitFor()
+  await page.waitForFunction(() => {
+    const video = document.querySelector('#lcVideoPlayer')
+    return video?.videoWidth === 320 && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && !video.paused
+  }, null, { timeout: 20000 })
+  assert.ok(streams.size > 0, 'the video fixture should have an active stream before unmount')
+  const acceptedBeforeUnmount = acceptedStreams
+  await page.close()
+  const deadline = Date.now() + 5000
+  while (streams.size > 0 && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50))
+  assert.equal(streams.size, 0, 'the business page unmount must close its active stream')
+  await new Promise(resolve => setTimeout(resolve, 1500))
+  assert.equal(acceptedStreams, acceptedBeforeUnmount, 'the disposed player must not reconnect after unmount')
 })
 
 test('real H.264 playback, line editing, separate saves, reconnect and revoked video grant work offline', async () => {

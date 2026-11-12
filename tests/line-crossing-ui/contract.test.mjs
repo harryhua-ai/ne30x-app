@@ -21,7 +21,7 @@ test('production bundle stays inside the NEAPP05 UI asset envelope', () => {
   assert.ok(files.every(file => file.bytes.length <= 1024 * 1024))
   assert.ok(files.reduce((total, file) => total + file.bytes.length, 0) <= 2 * 1024 * 1024)
   assert.ok(files.some(file => file.path.endsWith('videoWorker-CwSEKqUk.js')))
-  assert.ok(files.some(file => file.path.endsWith('websocket-init-yiJ-u6et.js')))
+  assert.ok(files.some(file => file.path.startsWith('assets/websocket-init-') && file.path.endsWith('.js')))
   assert.ok(files.some(file => file.path === 'assets/jmuxer.min.js'))
   assert.ok(files.some(file => file.path.startsWith('assets/FileSaver.min-') && file.path.endsWith('.js')))
   const html = readFileSync(path.join(productionRoot, 'index.html'), 'utf8')
