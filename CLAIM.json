@@ -5,9 +5,9 @@
  "github_principal": "harryhua-ai",
  "executor_id": "harryhua-ai",
  "claimed_at": "2026-11-12T03:26:30Z",
- "lease_expires_at": "2026-11-12T03:46:36Z",
+ "lease_expires_at": "2026-11-12T03:42:45Z",
  "execution_base": "40899dc97754162dbbff97ea7a8ef464caa96b1a",
- "status": "active",
+ "status": "blocked",
  "branch": "agent/15/3ebd7aa5",
  "heartbeat_at": "2026-11-12T03:40:36Z",
  "supersedes": {
@@ -21,5 +21,6 @@
   "digest": "62522523196295078391a06b316f5a8c7e74d9ac1f6cba534284cb5068ec8a31",
   "release": "v1.1.9",
   "source_sha": "40a83836f80b391c7669cf011084ca8726bdf088"
- }
+ },
+ "note": "Attempt 2 STOP: controlled-toolchain (container GCC 13.3.Rel1, CI image) native reproduction FAILED \u2014 produced ELF 2a889990 vs published cc6181bd; image 26,044 vs 26,048 (+4B), first diff offset 16, 8,645/26,044 shared bytes differ (~33%). Eliminated: host toolchain, source-state divergence (app/ tree byte-identical 460c8cd1..40899dc), framing shift. Requires published-native build provenance (environment/command/flags) for reproduction, or an explicit native-version-bump decision. Evidence comment 6813222589 (see issue); attempt 1 evidence 6813216900; preserved transition changes in .worktree/issue-15-r2."
 }
