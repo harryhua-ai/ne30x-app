@@ -13,14 +13,14 @@ PROVENANCE = {
     "artifact_type": "unsigned NEAPP v5 package",
     "format": "neapp-v5-unsigned",
     "app_id": "line-crossing",
-    "native_version": [4, 2, 8],
-    "ui_version": [1, 2, 10],
-    "product_version": "1.0.2",
+    "native_version": [4, 2, 14],
+    "ui_version": [1, 2, 17],
+    "product_version": "1.0.3",
     "source_commit": "a" * 40,
     "signing_dependencies": "none: no private key, no SPKI, no signature",
     "package": {"sha256": "b" * 64, "len": 123456},
     "host_policy": {
-        "host_caps": "0x3ff",
+        "host_caps": "0x7ff",
         "event_max": 1576,
         "state_quota": 512,
         "control_max": 512,
@@ -73,13 +73,13 @@ class CommitClassificationTest(unittest.TestCase):
 
 class RenderNotesTest(unittest.TestCase):
     def render(self, provenance=PROVENANCE, verification=VERIFICATION,
-               commits=None, limitations=None, repo_version="v1.0.2"):
+               commits=None, limitations=None, repo_version="v1.0.3"):
         return release_tool.render_notes(repo_version, provenance, verification,
                                          commits or {}, limitations or [])
 
     def test_notes_show_product_version_as_the_only_version_line(self):
         text = self.render()
-        self.assertIn("| Product version | 1.0.2 |", text)
+        self.assertIn("| Product version | 1.0.3 |", text)
         self.assertNotIn("| Native version |", text)
         self.assertNotIn("| UI version |", text)
         self.assertNotIn("| Repository version |", text)
@@ -93,14 +93,14 @@ class RenderNotesTest(unittest.TestCase):
         # the notes; they stay only in the attached provenance file.
         self.assertNotIn("| Native version |", text)
         self.assertNotIn("| UI version |", text)
-        self.assertNotIn("4.2.8", text)
-        self.assertNotIn("1.2.10", text)
+        self.assertNotIn("4.2.14", text)
+        self.assertNotIn("1.2.17", text)
         self.assertIn("provenance", text)
 
     def test_notes_mark_legacy_packages_unknown(self):
         legacy = dict(PROVENANCE)
         legacy.pop("product_version")
-        text = self.render(provenance=legacy, repo_version="v1.0.2")
+        text = self.render(provenance=legacy, repo_version="v1.0.3")
         self.assertIn("| Product version | unknown (legacy package; "
                       "no trusted product metadata) |", text)
         # Legacy packages are never presented as a guessed product version.
@@ -108,7 +108,7 @@ class RenderNotesTest(unittest.TestCase):
 
     def test_notes_refuse_release_version_product_mismatch(self):
         with self.assertRaises(release_tool.ReleaseToolError):
-            self.render(repo_version="v1.0.3")
+            self.render(repo_version="v1.0.2")
         with self.assertRaises(release_tool.ReleaseToolError):
             self.render(repo_version="v4.2.8")
 

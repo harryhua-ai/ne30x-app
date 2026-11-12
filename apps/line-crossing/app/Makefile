@@ -80,10 +80,10 @@ clean-v4:
 
 V5_UI_DIR ?= $(ROOT_DIR)/tests/line-crossing-ui/.build/production
 V5_OUT_DIR ?= $(BUILD)/pkg
-V5_UI_VERSION ?= 1.2.16
+V5_UI_VERSION ?= 1.2.17
 # User-facing product version line (1.0.x): strictly monotonic. The internal Native/UI lines keep increasing independently and
 # never decrease; they remain in provenance/diagnostics only.
-V5_PRODUCT_VERSION ?= 1.0.2
+V5_PRODUCT_VERSION ?= 1.0.3
 V5_HOST_CAPS ?= 0x3ff
 V5_EVENT_MAX ?= 1576
 V5_STATE_QUOTA ?= 512
